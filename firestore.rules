@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isString(value) {
+      return value is string;
+    }
+
+    function isNumber(value) {
+      return value is int || value is float;
+    }
+
+    function hasSyncFields(data) {
+      return data.keys().hasAll(["deleted", "clientUpdatedAt"]) &&
+        data.deleted is bool &&
+        isNumber(data.clientUpdatedAt);
+    }
+
+    match /users/{uid} {
+      allow read, write: if false;
+
+      match /profile/{profileId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          request.resource.data.keys().hasAll(["name", "onboardingCompleted", "level", "xpTotal", "xpThisWeek", "streakDays"]) &&
+          isString(request.resource.data.name) &&
+          request.resource.data.onboardingCompleted is bool &&
+          isNumber(request.resource.data.level) &&
+          isNumber(request.resource.data.xpTotal) &&
+          isNumber(request.resource.data.xpThisWeek) &&
+          isNumber(request.resource.data.streakDays) &&
+          hasSyncFields(request.resource.data);
+        allow delete: if isOwner(uid);
+      }
+
+      match /meta/{metaId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /{collectionId}/{docId} {
+        allow read: if isOwner(uid) &&
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+
+        allow create, update: if isOwner(uid) &&
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"] &&
+          hasSyncFields(request.resource.data);
+
+        allow delete: if isOwner(uid) &&
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

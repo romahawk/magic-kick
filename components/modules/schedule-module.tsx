@@ -1,0 +1,395 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { useAppStore } from "@/lib/store"
+import { getWeekDays } from "@/lib/game-utils"
+import { cn } from "@/lib/utils"
+import { format, parseISO, isToday, isSameDay } from "date-fns"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CalendarDays, Clock, Play, Pause, RotateCcw, Timer, Pencil } from "lucide-react"
+import type { TaskCategory } from "@/lib/types"
+
+const POMODORO_WORK = 25 * 60
+const POMODORO_BREAK = 5 * 60
+const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
+
+export function ScheduleModule() {
+  const allSchedule = useAppStore((s) => s.schedule)
+  const allTasks = useAppStore((s) => s.tasks)
+  const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const updateTask = useAppStore((s) => s.updateTask)
+  const unscheduleTask = useAppStore((s) => s.unscheduleTask)
+  const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
+  const weekDays = getWeekDays()
+  const schedule = allSchedule.filter((item) => !item.deleted)
+  const tasks = allTasks.filter((task) => !task.deleted)
+  const [selectedDay, setSelectedDay] = useState(
+    weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
+  )
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editCategory, setEditCategory] = useState<TaskCategory>("Learning")
+  const [editDate, setEditDate] = useState("")
+  const [editStartTime, setEditStartTime] = useState("09:00")
+  const [editEndTime, setEditEndTime] = useState("09:30")
+  const [editEstimate, setEditEstimate] = useState("")
+
+  useEffect(() => {
+    if (!categories.includes(editCategory)) {
+      setEditCategory(categories[0] ?? "General")
+    }
+  }, [categories, editCategory])
+
+  const dayItems = schedule.filter((item) => {
+    const itemDate = parseISO(item.startISO)
+    return format(itemDate, "yyyy-MM-dd") === selectedDay
+  }).sort((a, b) => a.startISO.localeCompare(b.startISO))
+
+  const weekItems = [...schedule].sort((a, b) => a.startISO.localeCompare(b.startISO))
+
+  function openTaskEditor(scheduleItemId: string) {
+    const item = schedule.find((entry) => entry.id === scheduleItemId)
+    if (!item?.linkedTaskId) return
+    const task = tasks.find((entry) => entry.id === item.linkedTaskId)
+    if (!task) return
+    setEditingTaskId(task.id)
+    setEditTitle(task.title)
+    setEditCategory(task.category)
+    setEditDate(task.dueDate ?? format(parseISO(item.startISO), "yyyy-MM-dd"))
+    setEditStartTime(format(parseISO(item.startISO), "HH:mm"))
+    setEditEndTime(format(parseISO(item.endISO), "HH:mm"))
+    setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
+  }
+
+  function saveTaskFromSchedule() {
+    if (!editingTaskId) return
+    updateTask(
+      editingTaskId,
+      {
+        title: editTitle.trim(),
+        category: editCategory,
+        dueDate: editDate || undefined,
+        estimateMin: editEstimate ? Number(editEstimate) : undefined,
+      },
+      {
+        startHHmm: editStartTime,
+        endHHmm: editEndTime,
+      }
+    )
+    setEditingTaskId(null)
+  }
+
+  function handleRemoveTimeAssignment() {
+    if (!editingTaskId) return
+    unscheduleTask(editingTaskId)
+    setEditingTaskId(null)
+  }
+
+  function handleMoveToTodo() {
+    if (!editingTaskId) return
+    moveTaskToTodo(editingTaskId)
+    setEditingTaskId(null)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
+        <p className="text-sm text-muted-foreground">Plan your day and stay focused.</p>
+      </div>
+
+      <Tabs defaultValue="day">
+        <TabsList>
+          <TabsTrigger value="day">Day View</TabsTrigger>
+          <TabsTrigger value="week">Week View</TabsTrigger>
+          <TabsTrigger value="pomodoro">Pomodoro</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="day" className="mt-4 flex flex-col gap-4">
+          {/* Day selector */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {weekDays.map((d) => (
+              <button
+                key={d.iso}
+                onClick={() => setSelectedDay(d.iso)}
+                className={cn(
+                  "flex min-w-[3.5rem] flex-col items-center rounded-lg px-3 py-2 text-xs transition-colors",
+                  selectedDay === d.iso
+                    ? "bg-primary text-primary-foreground"
+                    : d.isToday
+                      ? "bg-primary/10 text-primary"
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                )}
+              >
+                <span className="font-medium">{d.label}</span>
+                <span className="text-lg font-bold">{d.short}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Day schedule */}
+          {dayItems.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-8">
+                <CalendarDays className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No events for this day.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {dayItems.map((item) => {
+                const start = parseISO(item.startISO)
+                const end = parseISO(item.endISO)
+                return (
+                  <Card key={item.id}>
+                    <CardContent className="flex items-center gap-4 p-4">
+                      <div className={cn("h-12 w-1 rounded-full", item.color || "bg-primary")} />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {format(start, "HH:mm")} - {format(end, "HH:mm")}
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {item.type}
+                      </Badge>
+                      {item.linkedTaskId ? (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openTaskEditor(item.id)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="week" className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {weekDays.map((day) => {
+              const items = weekItems.filter((item) => {
+                const itemDate = parseISO(item.startISO)
+                return isSameDay(itemDate, day.date)
+              })
+              return (
+                <Card key={day.iso} className={cn(day.isToday && "ring-2 ring-primary")}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between text-sm">
+                      <span>{day.label} {day.short}</span>
+                      {day.isToday && <Badge className="bg-primary text-primary-foreground text-[10px]">Today</Badge>}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-1.5">
+                    {items.length === 0 ? (
+                      <p className="py-2 text-center text-xs text-muted-foreground">Free day</p>
+                    ) : (
+                      items.map((item) => {
+                        const start = parseISO(item.startISO)
+                        const end = parseISO(item.endISO)
+                        return (
+                          <div key={item.id} className="flex items-center gap-2 rounded-md border border-border p-2">
+                            <div className={cn("h-6 w-0.5 rounded-full", item.color || "bg-primary")} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{item.title}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {format(start, "HH:mm")} - {format(end, "HH:mm")}
+                              </p>
+                            </div>
+                            {item.linkedTaskId ? (
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : null}
+                          </div>
+                        )
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pomodoro" className="mt-4">
+          <PomodoroTimer />
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={!!editingTaskId} onOpenChange={(open) => !open && setEditingTaskId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Task From Schedule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="schedule-task-title">Title</Label>
+              <Input id="schedule-task-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select value={editCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="schedule-task-date">Date</Label>
+              <Input id="schedule-task-date" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="schedule-task-start">Start</Label>
+                <Input id="schedule-task-start" type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="schedule-task-end">End</Label>
+                <Input id="schedule-task-end" type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="schedule-task-estimate">Estimate (min)</Label>
+              <Input id="schedule-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} />
+            </div>
+            <Button onClick={saveTaskFromSchedule} className="w-full">Save Task</Button>
+            <Button variant="outline" onClick={handleRemoveTimeAssignment} className="w-full">
+              Remove Assigned Time
+            </Button>
+            <Button variant="secondary" onClick={handleMoveToTodo} className="w-full">
+              Move to ToDo List
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function PomodoroTimer() {
+  const [mode, setMode] = useState<"work" | "break">("work")
+  const [timeLeft, setTimeLeft] = useState(POMODORO_WORK)
+  const [running, setRunning] = useState(false)
+  const [completedPomodoros, setCompletedPomodoros] = useState(0)
+
+  const totalTime = mode === "work" ? POMODORO_WORK : POMODORO_BREAK
+  const progress = ((totalTime - timeLeft) / totalTime) * 100
+  const minutes = Math.floor(timeLeft / 60)
+  const seconds = timeLeft % 60
+
+  const handleComplete = useCallback(() => {
+    if (mode === "work") {
+      setCompletedPomodoros((p) => p + 1)
+      setMode("break")
+      setTimeLeft(POMODORO_BREAK)
+    } else {
+      setMode("work")
+      setTimeLeft(POMODORO_WORK)
+    }
+    setRunning(false)
+  }, [mode])
+
+  useEffect(() => {
+    if (!running) return
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleComplete()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [running, handleComplete])
+
+  function reset() {
+    setRunning(false)
+    setTimeLeft(mode === "work" ? POMODORO_WORK : POMODORO_BREAK)
+  }
+
+  return (
+    <div className="mx-auto max-w-sm">
+      <Card>
+        <CardContent className="flex flex-col items-center gap-6 p-8">
+          <div className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              {mode === "work" ? "Focus Time" : "Break Time"}
+            </span>
+          </div>
+
+          {/* Timer circle */}
+          <div className="relative flex h-48 w-48 items-center justify-center">
+            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 200 200">
+              <circle
+                cx="100"
+                cy="100"
+                r="90"
+                fill="none"
+                className="stroke-secondary"
+                strokeWidth="8"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r="90"
+                fill="none"
+                className={mode === "work" ? "stroke-primary" : "stroke-chart-2"}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 90}`}
+                strokeDashoffset={`${2 * Math.PI * 90 * (1 - progress / 100)}`}
+                style={{ transition: "stroke-dashoffset 0.5s ease" }}
+              />
+            </svg>
+            <div className="z-10 text-center">
+              <p className="font-mono text-4xl font-bold tabular-nums text-foreground">
+                {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={reset}
+              aria-label="Reset timer"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => setRunning(!running)}
+              className="gap-2 px-8"
+            >
+              {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {running ? "Pause" : "Start"}
+            </Button>
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span>Completed today: <strong className="text-foreground">{completedPomodoros}</strong></span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
