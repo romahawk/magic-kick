@@ -75,6 +75,10 @@ export interface Resource extends SyncFields {
   category: string
   title: string
   url?: string
+  links?: Array<{
+    label: string
+    url: string
+  }>
   description: string
   tags: string[]
 }
@@ -94,6 +98,7 @@ export interface Profile extends SyncFields {
   name: string
   onboardingCompleted: boolean
   taskCategories?: string[]
+  taskCategoryColors?: Record<string, string>
   level: number
   xpTotal: number
   xpThisWeek: number

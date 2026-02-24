@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, ExternalLink, Search, Plus, Tag } from "lucide-react"
+import { BookOpen, ExternalLink, Search, Plus, Tag, Trash2, Pencil } from "lucide-react"
 
 export function ResourcesModule() {
   const allResources = useAppStore((s) => s.resources)
   const addResource = useAppStore((s) => s.addResource)
+  const updateResource = useAppStore((s) => s.updateResource)
+  const deleteResource = useAppStore((s) => s.deleteResource)
   const resources = allResources.filter((r) => !r.deleted)
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
@@ -21,10 +23,20 @@ export function ResourcesModule() {
   const [open, setOpen] = useState(false)
 
   const [newTitle, setNewTitle] = useState("")
-  const [newUrl, setNewUrl] = useState("")
+  const [newLinkLabel, setNewLinkLabel] = useState("")
+  const [newLinkUrl, setNewLinkUrl] = useState("")
+  const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
   const [newCategory, setNewCategory] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [newTags, setNewTags] = useState("")
+  const [editingResourceId, setEditingResourceId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editCategory, setEditCategory] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editTags, setEditTags] = useState("")
+  const [editLinkLabel, setEditLinkLabel] = useState("")
+  const [editLinkUrl, setEditLinkUrl] = useState("")
+  const [editLinks, setEditLinks] = useState<Array<{ label: string; url: string }>>([])
 
   const categories = useMemo(
     () => Array.from(new Set(resources.map((r) => r.category))),
@@ -54,21 +66,100 @@ export function ResourcesModule() {
     return map
   }, [filtered])
 
+  function normalizeUrl(url: string) {
+    const trimmed = url.trim()
+    if (!trimmed) return ""
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    return `https://${trimmed}`
+  }
+
+  function addStagedLink() {
+    const url = normalizeUrl(newLinkUrl)
+    if (!url) return
+    const label = newLinkLabel.trim() || "Link"
+    setNewLinks((prev) => [...prev, { label, url }])
+    setNewLinkLabel("")
+    setNewLinkUrl("")
+  }
+
+  function getResourceLinks(resource: { url?: string; links?: Array<{ label: string; url: string }> }) {
+    if (resource.links && resource.links.length > 0) return resource.links
+    if (resource.url) return [{ label: "Link", url: resource.url }]
+    return []
+  }
+
   function handleAdd() {
     if (!newTitle.trim()) return
+    const draftUrl = normalizeUrl(newLinkUrl)
+    const draftLinks = draftUrl
+      ? [...newLinks, { label: newLinkLabel.trim() || "Link", url: draftUrl }]
+      : newLinks
+    const normalizedLinks = draftLinks
+      .map((link) => ({ label: link.label.trim() || "Link", url: normalizeUrl(link.url) }))
+      .filter((link) => Boolean(link.url))
+
     addResource({
       category: newCategory || "General",
       title: newTitle,
-      url: newUrl || undefined,
+      url: normalizedLinks[0]?.url,
+      links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
       description: newDescription,
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
     })
     setNewTitle("")
-    setNewUrl("")
+    setNewLinkLabel("")
+    setNewLinkUrl("")
+    setNewLinks([])
     setNewCategory("")
     setNewDescription("")
     setNewTags("")
     setOpen(false)
+  }
+
+  function openEdit(resourceId: string) {
+    const resource = resources.find((item) => item.id === resourceId)
+    if (!resource) return
+    setEditingResourceId(resource.id)
+    setEditTitle(resource.title)
+    setEditCategory(resource.category)
+    setEditDescription(resource.description)
+    setEditTags(resource.tags.join(", "))
+    setEditLinks(getResourceLinks(resource))
+    setEditLinkLabel("")
+    setEditLinkUrl("")
+  }
+
+  function addEditLink() {
+    const url = normalizeUrl(editLinkUrl)
+    if (!url) return
+    const label = editLinkLabel.trim() || "Link"
+    setEditLinks((prev) => [...prev, { label, url }])
+    setEditLinkLabel("")
+    setEditLinkUrl("")
+  }
+
+  function handleSaveEdit() {
+    if (!editingResourceId || !editTitle.trim()) return
+    const draftUrl = normalizeUrl(editLinkUrl)
+    const draftLinks = draftUrl
+      ? [...editLinks, { label: editLinkLabel.trim() || "Link", url: draftUrl }]
+      : editLinks
+    const normalizedLinks = draftLinks
+      .map((link) => ({ label: link.label.trim() || "Link", url: normalizeUrl(link.url) }))
+      .filter((link) => Boolean(link.url))
+
+    updateResource(editingResourceId, {
+      title: editTitle.trim(),
+      category: editCategory.trim() || "General",
+      description: editDescription.trim(),
+      tags: editTags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      url: normalizedLinks[0]?.url,
+      links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
+    })
+    setEditingResourceId(null)
   }
 
   return (
@@ -94,8 +185,43 @@ export function ResourcesModule() {
                 <Input id="res-title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Resource name" />
               </div>
               <div>
-                <Label htmlFor="res-url">URL (optional)</Label>
-                <Input id="res-url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://..." />
+                <Label>Links (optional)</Label>
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    value={newLinkLabel}
+                    onChange={(e) => setNewLinkLabel(e.target.value)}
+                    placeholder="Label (e.g. Trello)"
+                  />
+                  <Input
+                    value={newLinkUrl}
+                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                    placeholder="https://..."
+                  />
+                  <Button type="button" variant="secondary" onClick={addStagedLink}>
+                    Add
+                  </Button>
+                </div>
+                {newLinks.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {newLinks.map((link, index) => (
+                      <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
+                        <span className="truncate">
+                          {link.label}: {link.url}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => setNewLinks((prev) => prev.filter((_, i) => i !== index))}
+                          aria-label={`Remove ${link.label} link`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <Label htmlFor="res-cat">Category</Label>
@@ -190,28 +316,62 @@ export function ResourcesModule() {
               {items.map((resource) => (
                 <Card key={resource.id} className="transition-colors hover:bg-secondary/30">
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{resource.title}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{resource.description}</p>
-                      </div>
-                      {resource.url && (
-                        <a
-                          href={resource.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                          aria-label={`Open ${resource.title} in new tab`}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {resource.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                      ))}
-                    </div>
+                    {(() => {
+                      const links = getResourceLinks(resource)
+                      return (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{resource.title}</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">{resource.description}</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => openEdit(resource.id)}
+                                aria-label={`Edit ${resource.title}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => deleteResource(resource.id)}
+                                aria-label={`Delete ${resource.title}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          {links.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {links.map((link, index) => (
+                                <a
+                                  key={`${resource.id}-${link.url}-${index}`}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                >
+                                  <span>{link.label || "Link"}</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {resource.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                            ))}
+                          </div>
+                        </>
+                      )
+                    })()}
                   </CardContent>
                 </Card>
               ))}
@@ -219,6 +379,71 @@ export function ResourcesModule() {
           </div>
         ))
       )}
+      <Dialog open={Boolean(editingResourceId)} onOpenChange={(open) => !open && setEditingResourceId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Resource</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div>
+              <Label htmlFor="edit-res-title">Title</Label>
+              <Input id="edit-res-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label>Links (optional)</Label>
+              <div className="mt-1 flex gap-2">
+                <Input
+                  value={editLinkLabel}
+                  onChange={(e) => setEditLinkLabel(e.target.value)}
+                  placeholder="Label (e.g. Trello)"
+                />
+                <Input
+                  value={editLinkUrl}
+                  onChange={(e) => setEditLinkUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+                <Button type="button" variant="secondary" onClick={addEditLink}>
+                  Add
+                </Button>
+              </div>
+              {editLinks.length > 0 && (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {editLinks.map((link, index) => (
+                    <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
+                      <span className="truncate">
+                        {link.label}: {link.url}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => setEditLinks((prev) => prev.filter((_, i) => i !== index))}
+                        aria-label={`Remove ${link.label} link`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-res-cat">Category</Label>
+              <Input id="edit-res-cat" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-res-desc">Description</Label>
+              <Input id="edit-res-desc" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-res-tags">Tags (comma-separated)</Label>
+              <Input id="edit-res-tags" value={editTags} onChange={(e) => setEditTags(e.target.value)} />
+            </div>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
