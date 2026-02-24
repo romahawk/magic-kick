@@ -22,6 +22,31 @@ import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achie
 
 export const STORE_KEY = "magic-kick-store"
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
+const DEFAULT_TASK_CATEGORY_COLORS: Record<string, string> = {
+  Learning: "#22c55e",
+  Sport: "#f97316",
+  "Family/Home": "#06b6d4",
+  Hobby: "#a855f7",
+  Travel: "#f59e0b",
+}
+
+function colorFromCategoryName(name: string) {
+  const source = name.trim().toLowerCase()
+  let hash = 0
+  for (let i = 0; i < source.length; i++) {
+    hash = source.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash) % 360
+  return `hsl(${hue}, 70%, 50%)`
+}
+
+function buildCategoryColors(categories: string[], existing?: Record<string, string>) {
+  const result: Record<string, string> = {}
+  for (const category of categories) {
+    result[category] = existing?.[category] ?? DEFAULT_TASK_CATEGORY_COLORS[category] ?? colorFromCategoryName(category)
+  }
+  return result
+}
 
 const ENTITY_COLLECTIONS: Exclude<SyncCollection, "profile">[] = [
   "tasks",
@@ -66,6 +91,7 @@ function createInitialData() {
     name: "New Player",
     onboardingCompleted: false,
     taskCategories: DEFAULT_TASK_CATEGORIES,
+    taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
     level: 1,
     xpTotal: 0,
     xpThisWeek: 0,
@@ -176,6 +202,7 @@ export interface AppState {
   addCategory: (name: string) => void
   renameCategory: (from: string, to: string) => void
   deleteCategory: (name: string) => void
+  setCategoryColor: (name: string, color: string) => void
   toggleTask: (id: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">>) => void
   reorderTasks: (draggedTaskId: string, targetTaskId: string) => void
@@ -266,6 +293,10 @@ export const useAppStore = create<AppState>()(
             profile: {
               ...s.profile,
               taskCategories: [...categories, normalized],
+              taskCategoryColors: {
+                ...(s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS),
+                [normalized]: colorFromCategoryName(normalized),
+              },
               clientUpdatedAt: ts,
               deleted: false,
             },
@@ -290,6 +321,10 @@ export const useAppStore = create<AppState>()(
           if (categories.some((item) => item.toLowerCase() === nextName.toLowerCase())) return {}
 
           const nextCategories = categories.map((item) => (item === from ? nextName : item))
+          const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS
+          const nextColors = { ...colors }
+          nextColors[nextName] = colors[from] ?? colorFromCategoryName(nextName)
+          delete nextColors[from]
           const changedTaskIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
             if (task.category !== from) return task
@@ -308,6 +343,7 @@ export const useAppStore = create<AppState>()(
             profile: {
               ...s.profile,
               taskCategories: nextCategories,
+              taskCategoryColors: nextColors,
               clientUpdatedAt: ts,
               deleted: false,
             },
@@ -332,6 +368,12 @@ export const useAppStore = create<AppState>()(
           const remaining = categories.filter((item) => item !== name)
           const fallback = remaining[0] ?? "General"
           const nextCategories = remaining.length > 0 ? remaining : [fallback]
+          const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS
+          const nextColors = { ...colors }
+          delete nextColors[name]
+          if (!nextColors[fallback]) {
+            nextColors[fallback] = DEFAULT_TASK_CATEGORY_COLORS[fallback] ?? colorFromCategoryName(fallback)
+          }
 
           const changedTaskIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
@@ -351,6 +393,7 @@ export const useAppStore = create<AppState>()(
             profile: {
               ...s.profile,
               taskCategories: nextCategories,
+              taskCategoryColors: nextColors,
               clientUpdatedAt: ts,
               deleted: false,
             },
@@ -365,6 +408,30 @@ export const useAppStore = create<AppState>()(
             },
           }
         })
+      },
+
+      setCategoryColor: (name, color) => {
+        const normalized = color.trim()
+        if (!name || !normalized) return
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            taskCategoryColors: {
+              ...(s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS),
+              [name]: normalized,
+            },
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
       },
 
       toggleTask: (id) => {
@@ -1057,10 +1124,19 @@ export const useAppStore = create<AppState>()(
           ...merged.profile,
           name: merged.profile?.name?.trim() || "New Player",
           onboardingCompleted: Boolean(merged.profile?.onboardingCompleted),
-          taskCategories:
-            merged.profile?.taskCategories && merged.profile.taskCategories.length > 0
-              ? merged.profile.taskCategories.filter(Boolean)
-              : DEFAULT_TASK_CATEGORIES,
+          taskCategories: (() => {
+            if (merged.profile?.taskCategories && merged.profile.taskCategories.length > 0) {
+              return merged.profile.taskCategories.filter(Boolean)
+            }
+            return DEFAULT_TASK_CATEGORIES
+          })(),
+          taskCategoryColors: (() => {
+            const categories =
+              merged.profile?.taskCategories && merged.profile.taskCategories.length > 0
+                ? merged.profile.taskCategories.filter(Boolean)
+                : DEFAULT_TASK_CATEGORIES
+            return buildCategoryColors(categories, merged.profile?.taskCategoryColors)
+          })(),
           deleted: false,
           clientUpdatedAt: merged.profile?.clientUpdatedAt ?? now(),
         }

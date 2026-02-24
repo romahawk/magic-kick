@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { useAppStore } from "@/lib/store"
-import { CATEGORY_COLORS, isOverdue, isDueToday } from "@/lib/game-utils"
+import { isOverdue, isDueToday } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +22,9 @@ const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "T
 export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const categoryColors = taskCategoryColors ?? {}
   const toggleTask = useAppStore((s) => s.toggleTask)
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const updateTask = useAppStore((s) => s.updateTask)
@@ -30,6 +32,7 @@ export function TodoModule() {
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const removeCategory = useAppStore((s) => s.deleteCategory)
+  const setCategoryColor = useAppStore((s) => s.setCategoryColor)
   const tasks = useMemo(
     () => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allTasks]
@@ -220,6 +223,23 @@ export function TodoModule() {
                   ))}
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Category Colors</Label>
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div key={category} className="flex items-center justify-between rounded-md border border-border p-2">
+                      <span className="text-sm">{category}</span>
+                      <input
+                        type="color"
+                        value={categoryColors[category] ?? "#64748b"}
+                        onChange={(e) => setCategoryColor(category, e.target.value)}
+                        className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0"
+                        aria-label={`Pick color for ${category}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -243,6 +263,7 @@ export function TodoModule() {
             <TaskRow
               key={task.id}
               task={task}
+              categoryColor={categoryColors[task.category]}
               onToggle={toggleTask}
               onSelect={openTask}
               onDragStart={(taskId) => setDraggedTaskId(taskId)}
@@ -262,7 +283,7 @@ export function TodoModule() {
               <Card key={cat}>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-sm">
-                    <span className={cn("inline-block h-2.5 w-2.5 rounded-full", CATEGORY_COLORS[cat] ?? "bg-secondary")} />
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: categoryColors[cat] ?? "#64748b" }} />
                     {cat}
                     <Badge variant="secondary" className="ml-auto text-[10px]">
                       {groupedByCategory[cat]?.length ?? 0}
@@ -343,7 +364,9 @@ export function TodoModule() {
                 </div>
               ) : null}
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={cn(CATEGORY_COLORS[selectedTask.category] ?? "bg-secondary")}>{selectedTask.category}</Badge>
+                <Badge style={{ backgroundColor: categoryColors[selectedTask.category] ?? "#334155", color: "#ffffff" }}>
+                  {selectedTask.category}
+                </Badge>
                 <Badge variant="outline" className="gap-1">
                   <Zap className="h-3 w-3" /> {selectedTask.xpValue} XP
                 </Badge>
@@ -408,6 +431,7 @@ export function TodoModule() {
 
 function TaskRow({
   task,
+  categoryColor,
   onToggle,
   onSelect,
   onDragStart,
@@ -415,6 +439,7 @@ function TaskRow({
   onDragEnd,
 }: {
   task: Task
+  categoryColor?: string
   onToggle: (id: string) => void
   onSelect: (t: Task) => void
   onDragStart: (taskId: string) => void
@@ -451,7 +476,7 @@ function TaskRow({
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <Badge variant="secondary" className="text-[10px]">{task.category}</Badge>
+          <Badge variant="secondary" className="text-[10px]" style={categoryColor ? { backgroundColor: categoryColor, color: "#ffffff" } : undefined}>{task.category}</Badge>
           {task.dueDate && (
             <span className={cn("text-[10px] text-muted-foreground", isOverdue(task.dueDate) && "text-destructive font-medium")}>
               {isDueToday(task.dueDate) ? "Today" : task.dueDate}

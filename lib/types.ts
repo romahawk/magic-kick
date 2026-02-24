@@ -94,6 +94,7 @@ export interface Profile extends SyncFields {
   name: string
   onboardingCompleted: boolean
   taskCategories?: string[]
+  taskCategoryColors?: Record<string, string>
   level: number
   xpTotal: number
   xpThisWeek: number
