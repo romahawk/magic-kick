@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { AuthProvider } from "@/components/auth/AuthProvider"
+import { FaviconManager } from "@/components/favicon-manager"
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -11,6 +12,12 @@ const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: 'Magic Kick - Your Personal Command Center',
   description: 'Your personal Command Center for goals, projects, and wins.',
+  icons: {
+    icon: [
+      { url: "/favicons/orbit.svg", type: "image/svg+xml" },
+    ],
+    shortcut: [{ url: "/favicons/orbit.svg", type: "image/svg+xml" }],
+  },
 }
 
 export const viewport: Viewport = {
@@ -37,6 +44,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
+            <FaviconManager />
             {children}
             <Toaster />
           </AuthProvider>

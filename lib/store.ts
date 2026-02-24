@@ -222,6 +222,8 @@ export interface AppState {
   deleteProject: (projectId: string) => void
   addAchievement: (a: Omit<Achievement, "id">) => void
   addResource: (r: Omit<Resource, "id">) => void
+  updateResource: (id: string, updates: Partial<Omit<Resource, "id" | "deleted" | "clientUpdatedAt">>) => void
+  deleteResource: (id: string) => void
   addJournalEntry: (j: Omit<JournalEntry, "id">) => void
   addScheduleItem: (s: Omit<ScheduleItem, "id">) => void
   toggleMilestone: (projectId: string, milestoneId: string) => void
@@ -952,6 +954,51 @@ export const useAppStore = create<AppState>()(
             pending: {
               ...s.sync.pending,
               resources: { ...s.sync.pending.resources, [id]: item.clientUpdatedAt ?? now() },
+            },
+          },
+        }))
+      },
+
+      updateResource: (id, updates) => {
+        const ts = now()
+        set((s) => ({
+          resources: s.resources.map((resource) =>
+            resource.id === id
+              ? {
+                  ...resource,
+                  ...updates,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                }
+              : resource
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              resources: { ...s.sync.pending.resources, [id]: ts },
+            },
+          },
+        }))
+      },
+
+      deleteResource: (id) => {
+        const ts = now()
+        set((s) => ({
+          resources: s.resources.map((resource) =>
+            resource.id === id
+              ? {
+                  ...resource,
+                  deleted: true,
+                  clientUpdatedAt: ts,
+                }
+              : resource
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              resources: { ...s.sync.pending.resources, [id]: ts },
             },
           },
         }))
