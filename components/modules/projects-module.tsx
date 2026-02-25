@@ -13,10 +13,45 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FolderKanban, CheckCircle2, Plus, Pencil, Trash2 } from "lucide-react"
+import { FolderKanban, CheckCircle2, Plus, Pencil, Trash2, ExternalLink } from "lucide-react"
 import type { Project } from "@/lib/types"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const DEFAULT_PROJECT_COLOR = "#3b82f6"
+const LEGACY_COLOR_MAP: Record<string, string> = {
+  "bg-chart-1": "#3b82f6",
+  "bg-chart-2": "#22c55e",
+  "bg-chart-3": "#06b6d4",
+  "bg-chart-4": "#f97316",
+  "bg-chart-5": "#a855f7",
+}
+
+function normalizeUrl(url: string) {
+  const trimmed = url.trim()
+  if (!trimmed) return ""
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
+function normalizeProjectColor(color: string | undefined) {
+  const trimmed = color?.trim() ?? ""
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed
+  return LEGACY_COLOR_MAP[trimmed] ?? DEFAULT_PROJECT_COLOR
+}
+
+function getProjectLinks(project: { url?: string; links?: Array<{ label: string; url: string }> }) {
+  if (project.links && project.links.length > 0) return project.links
+  if (project.url) return [{ label: "Link", url: project.url }]
+  return []
+}
+
+function gradientStyleFromColor(color: string | undefined) {
+  const safeColor = normalizeProjectColor(color)
+  return {
+    backgroundImage: `linear-gradient(135deg, ${safeColor}1f 0%, ${safeColor}08 100%)`,
+    borderColor: `${safeColor}33`,
+  }
+}
 
 export function ProjectsModule() {
   const allProjects = useAppStore((s) => s.projects)
@@ -33,8 +68,11 @@ export function ProjectsModule() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [objective, setObjective] = useState("")
-  const [color, setColor] = useState("bg-chart-1")
+  const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
+  const [newLinkLabel, setNewLinkLabel] = useState("")
+  const [newLinkUrl, setNewLinkUrl] = useState("")
+  const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
 
   const defaultWeekRange = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -49,8 +87,11 @@ export function ProjectsModule() {
     setEditingId(null)
     setTitle("")
     setObjective("")
-    setColor("bg-chart-1")
+    setColor(DEFAULT_PROJECT_COLOR)
     setMilestones("")
+    setNewLinkLabel("")
+    setNewLinkUrl("")
+    setNewLinks([])
     setOpen(true)
   }
 
@@ -58,9 +99,21 @@ export function ProjectsModule() {
     setEditingId(project.id)
     setTitle(project.title)
     setObjective(project.objective)
-    setColor(project.color)
+    setColor(normalizeProjectColor(project.color))
     setMilestones(project.milestones.map((m) => `${DAY_LABELS[m.dayIndex]}:${m.title}`).join(", "))
+    setNewLinkLabel("")
+    setNewLinkUrl("")
+    setNewLinks(getProjectLinks(project))
     setOpen(true)
+  }
+
+  function addStagedLink() {
+    const url = normalizeUrl(newLinkUrl)
+    if (!url) return
+    const label = newLinkLabel.trim() || "Link"
+    setNewLinks((prev) => [...prev, { label, url }])
+    setNewLinkLabel("")
+    setNewLinkUrl("")
   }
 
   function parseMilestones(input: string) {
@@ -82,20 +135,33 @@ export function ProjectsModule() {
 
   function saveProject() {
     if (!title.trim()) return
+    const draftUrl = normalizeUrl(newLinkUrl)
+    const draftLinks = draftUrl
+      ? [...newLinks, { label: newLinkLabel.trim() || "Link", url: draftUrl }]
+      : newLinks
+    const normalizedLinks = draftLinks
+      .map((link) => ({ label: link.label.trim() || "Link", url: normalizeUrl(link.url) }))
+      .filter((link) => Boolean(link.url))
+    const selectedColor = normalizeProjectColor(color)
+
     if (!editingId) {
       addProject({
         title: title.trim(),
         objective: objective.trim() || "Project objective",
         weekStartISO: defaultWeekRange.start,
         weekEndISO: defaultWeekRange.end,
-        color,
+        color: selectedColor,
+        url: normalizedLinks[0]?.url,
+        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
         milestones: parseMilestones(milestones),
       })
     } else {
       updateProject(editingId, {
         title: title.trim(),
         objective: objective.trim() || "Project objective",
-        color,
+        color: selectedColor,
+        url: normalizedLinks[0]?.url,
+        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
       })
     }
     setOpen(false)
@@ -128,8 +194,62 @@ export function ProjectsModule() {
                 <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="project-color">Color class</Label>
-                <Input id="project-color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="bg-chart-1" />
+                <Label htmlFor="project-color">Card color</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    id="project-color"
+                    type="color"
+                    value={normalizeProjectColor(color)}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="h-10 w-14 cursor-pointer p-1"
+                    aria-label="Pick project card color"
+                  />
+                  <Input
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    placeholder="#3b82f6"
+                    className="font-mono text-xs"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Links (optional)</Label>
+                <div className="mt-1 flex gap-2">
+                  <Input
+                    value={newLinkLabel}
+                    onChange={(e) => setNewLinkLabel(e.target.value)}
+                    placeholder="Label (e.g. Figma)"
+                  />
+                  <Input
+                    value={newLinkUrl}
+                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                    placeholder="https://..."
+                  />
+                  <Button type="button" variant="secondary" onClick={addStagedLink}>
+                    Add
+                  </Button>
+                </div>
+                {newLinks.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {newLinks.map((link, index) => (
+                      <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
+                        <span className="truncate">
+                          {link.label}: {link.url}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => setNewLinks((prev) => prev.filter((_, i) => i !== index))}
+                          aria-label={`Remove ${link.label} link`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {!editingId ? (
                 <div>
@@ -234,10 +354,10 @@ export function ProjectsModule() {
           const completedTasks = projectTasks.filter((t) => t.completed).length
 
           return (
-            <Card key={project.id}>
+            <Card key={project.id} style={gradientStyleFromColor(project.color)}>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <FolderKanban className="h-4 w-4 text-primary" />
+                  <FolderKanban className="h-4 w-4" style={{ color: normalizeProjectColor(project.color) }} />
                   {project.title}
                 </CardTitle>
               </CardHeader>
@@ -249,6 +369,22 @@ export function ProjectsModule() {
                   </Badge>
                 </div>
                 <div>
+                  {getProjectLinks(project).length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {getProjectLinks(project).map((link, index) => (
+                        <a
+                          key={`${project.id}-${link.url}-${index}`}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <span>{link.label || "Link"}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   <p className="mb-1 text-xs font-medium">Milestones</p>
                   <div className="flex flex-col gap-1.5">
                     {project.milestones.map((m) => (
