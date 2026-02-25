@@ -47,6 +47,11 @@ export interface Project extends SyncFields {
   weekEndISO: string
   milestones: ProjectMilestone[]
   color: string
+  url?: string
+  links?: Array<{
+    label: string
+    url: string
+  }>
 }
 
 export interface Achievement extends SyncFields {
