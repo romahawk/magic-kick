@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FolderKanban, CheckCircle2, Plus, Pencil, Trash2, ExternalLink } from "lucide-react"
-import type { Project } from "@/lib/types"
+import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X } from "lucide-react"
+import type { Project, ProjectMilestone } from "@/lib/types"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DEFAULT_PROJECT_COLOR = "#3b82f6"
@@ -60,6 +60,9 @@ export function ProjectsModule() {
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
   const toggleMilestone = useAppStore((s) => s.toggleMilestone)
+  const addMilestone = useAppStore((s) => s.addMilestone)
+  const updateMilestone = useAppStore((s) => s.updateMilestone)
+  const deleteMilestone = useAppStore((s) => s.deleteMilestone)
   const weekDays = getWeekDays()
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
@@ -73,6 +76,10 @@ export function ProjectsModule() {
   const [newLinkLabel, setNewLinkLabel] = useState("")
   const [newLinkUrl, setNewLinkUrl] = useState("")
   const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
+  const [newMilestoneByProject, setNewMilestoneByProject] = useState<Record<string, { title: string; dayIndex: number }>>({})
+  const [editingMilestone, setEditingMilestone] = useState<{ projectId: string; milestoneId: string } | null>(null)
+  const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
+  const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
 
   const defaultWeekRange = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -165,6 +172,53 @@ export function ProjectsModule() {
       })
     }
     setOpen(false)
+  }
+
+  function getMilestoneDraft(projectId: string) {
+    return newMilestoneByProject[projectId] ?? { title: "", dayIndex: 0 }
+  }
+
+  function updateMilestoneDraft(projectId: string, updates: Partial<{ title: string; dayIndex: number }>) {
+    setNewMilestoneByProject((prev) => ({
+      ...prev,
+      [projectId]: {
+        ...getMilestoneDraft(projectId),
+        ...updates,
+      },
+    }))
+  }
+
+  function handleAddMilestone(projectId: string) {
+    const draft = getMilestoneDraft(projectId)
+    if (!draft.title.trim()) return
+    addMilestone(projectId, {
+      title: draft.title.trim(),
+      dayIndex: draft.dayIndex,
+    })
+    updateMilestoneDraft(projectId, { title: "", dayIndex: draft.dayIndex })
+  }
+
+  function startEditingMilestone(projectId: string, milestone: ProjectMilestone) {
+    setEditingMilestone({ projectId, milestoneId: milestone.id })
+    setEditingMilestoneTitle(milestone.title)
+    setEditingMilestoneDayIndex(milestone.dayIndex)
+  }
+
+  function saveMilestoneEdit() {
+    if (!editingMilestone || !editingMilestoneTitle.trim()) return
+    updateMilestone(editingMilestone.projectId, editingMilestone.milestoneId, {
+      title: editingMilestoneTitle.trim(),
+      dayIndex: editingMilestoneDayIndex,
+    })
+    setEditingMilestone(null)
+    setEditingMilestoneTitle("")
+    setEditingMilestoneDayIndex(0)
+  }
+
+  function cancelMilestoneEdit() {
+    setEditingMilestone(null)
+    setEditingMilestoneTitle("")
+    setEditingMilestoneDayIndex(0)
   }
 
   return (
@@ -386,12 +440,67 @@ export function ProjectsModule() {
                     </div>
                   )}
                   <p className="mb-1 text-xs font-medium">Milestones</p>
+                  <div className="mb-2 flex gap-1.5">
+                    <Input
+                      value={getMilestoneDraft(project.id).title}
+                      onChange={(e) => updateMilestoneDraft(project.id, { title: e.target.value })}
+                      placeholder="New milestone"
+                      className="h-8 text-xs"
+                    />
+                    <select
+                      value={getMilestoneDraft(project.id).dayIndex}
+                      onChange={(e) => updateMilestoneDraft(project.id, { dayIndex: Number(e.target.value) })}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      aria-label="Milestone day"
+                    >
+                      {DAY_LABELS.map((day, index) => (
+                        <option key={`${project.id}-draft-day-${day}`} value={index}>
+                          {day}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="button" size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleAddMilestone(project.id)} aria-label={`Add milestone to ${project.title}`}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                   <div className="flex flex-col gap-1.5">
                     {project.milestones.map((m) => (
                       <div key={m.id} className="flex items-center gap-2">
                         <Checkbox checked={m.completed} onCheckedChange={() => toggleMilestone(project.id, m.id)} aria-label={`Toggle milestone: ${m.title}`} />
-                        <span className={cn("text-sm", m.completed && "line-through text-muted-foreground")}>{m.title}</span>
-                        <span className="ml-auto text-[10px] text-muted-foreground">{DAY_LABELS[m.dayIndex]}</span>
+                        {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
+                          <>
+                            <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
+                            <select
+                              value={editingMilestoneDayIndex}
+                              onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
+                              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                              aria-label="Edit milestone day"
+                            >
+                              {DAY_LABELS.map((day, index) => (
+                                <option key={`${project.id}-${m.id}-day-${day}`} value={index}>
+                                  {day}
+                                </option>
+                              ))}
+                            </select>
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit} aria-label="Cancel milestone edit">
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className={cn("text-sm", m.completed && "line-through text-muted-foreground")}>{m.title}</span>
+                            <span className="ml-auto text-[10px] text-muted-foreground">{DAY_LABELS[m.dayIndex]}</span>
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     ))}
                     {project.milestones.length === 0 ? <p className="text-xs text-muted-foreground">No milestones yet.</p> : null}
