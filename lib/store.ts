@@ -8,6 +8,7 @@ import type {
   ModuleId,
   Profile,
   Project,
+  ProjectMilestone,
   Resource,
   ScheduleItem,
   SyncCollection,
@@ -63,6 +64,12 @@ type LocalEntity = Task | Goal | Project | Achievement | ScheduleItem | Resource
 
 function now() {
   return Date.now()
+}
+
+function normalizeTimeHHmm(input?: string) {
+  const trimmed = input?.trim()
+  if (!trimmed) return undefined
+  return /^\d{2}:\d{2}$/.test(trimmed) ? trimmed : undefined
 }
 
 function createEmptyPending(): PendingRecord {
@@ -204,7 +211,7 @@ export interface AppState {
   deleteCategory: (name: string) => void
   setCategoryColor: (name: string, color: string) => void
   toggleTask: (id: string) => void
-  addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">>) => void
+  addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
   reorderTasks: (draggedTaskId: string, targetTaskId: string) => void
   updateTask: (
     id: string,
@@ -220,6 +227,13 @@ export interface AppState {
   addProject: (project: Omit<Project, "id" | "milestones"> & { milestones?: Array<{ title: string; dayIndex: number }> }) => void
   updateProject: (projectId: string, updates: Partial<Omit<Project, "id" | "milestones">>) => void
   deleteProject: (projectId: string) => void
+  addMilestone: (projectId: string, milestone: Pick<ProjectMilestone, "title" | "dayIndex">) => void
+  updateMilestone: (
+    projectId: string,
+    milestoneId: string,
+    updates: Partial<Pick<ProjectMilestone, "title" | "dayIndex" | "completed">>
+  ) => void
+  deleteMilestone: (projectId: string, milestoneId: string) => void
   addAchievement: (a: Omit<Achievement, "id">) => void
   addResource: (r: Omit<Resource, "id">) => void
   updateResource: (id: string, updates: Partial<Omit<Resource, "id" | "deleted" | "clientUpdatedAt">>) => void
@@ -481,17 +495,19 @@ export const useAppStore = create<AppState>()(
       },
 
       addTask: (task) => {
+        const { timeHHmm, ...taskInput } = task
         const id = generateId()
-        const xpValue = task.xpValue ?? calculateTaskXP(task)
+        const xpValue = taskInput.xpValue ?? calculateTaskXP(taskInput)
         set((s) => {
           const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
-          const item = touchEntity({ ...task, id, xpValue, order: maxOrder + 1, deleted: false })
+          const item = touchEntity({ ...taskInput, id, xpValue, order: maxOrder + 1, deleted: false })
           const nextTasks = [...s.tasks, item]
           const nextSchedule = [...s.schedule]
           const ts = item.clientUpdatedAt ?? now()
 
           if (item.dueDate) {
-            const start = parseISO(`${item.dueDate}T09:00`)
+            const startHHmm = normalizeTimeHHmm(timeHHmm) ?? "09:00"
+            const start = parseISO(`${item.dueDate}T${startHHmm}`)
             const end = addMinutes(start, item.estimateMin ?? 30)
             const scheduleId = `task-${item.id}`
             nextSchedule.push(
@@ -860,6 +876,8 @@ export const useAppStore = create<AppState>()(
           weekStartISO: project.weekStartISO,
           weekEndISO: project.weekEndISO,
           color: project.color,
+          url: project.url,
+          links: project.links,
           milestones,
           deleted: false,
         })
@@ -919,6 +937,94 @@ export const useAppStore = create<AppState>()(
         const ts = now()
         set((s) => ({
           projects: s.projects.map((p) => (p.id === projectId ? { ...p, deleted: true, clientUpdatedAt: ts } : p)),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              projects: { ...s.sync.pending.projects, [projectId]: ts },
+            },
+          },
+        }))
+      },
+
+      addMilestone: (projectId, milestone) => {
+        const ts = now()
+        const nextMilestone: ProjectMilestone = {
+          id: generateId(),
+          title: milestone.title.trim() || "Milestone",
+          dayIndex: Math.max(0, Math.min(6, milestone.dayIndex)),
+          completed: false,
+        }
+        set((s) => ({
+          projects: s.projects.map((project) =>
+            project.id === projectId
+              ? {
+                  ...project,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                  milestones: [...project.milestones, nextMilestone],
+                }
+              : project
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              projects: { ...s.sync.pending.projects, [projectId]: ts },
+            },
+          },
+        }))
+      },
+
+      updateMilestone: (projectId, milestoneId, updates) => {
+        const ts = now()
+        set((s) => ({
+          projects: s.projects.map((project) =>
+            project.id === projectId
+              ? {
+                  ...project,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                  milestones: project.milestones.map((milestone) =>
+                    milestone.id === milestoneId
+                      ? {
+                          ...milestone,
+                          ...(typeof updates.title === "string"
+                            ? { title: updates.title.trim() || milestone.title }
+                            : {}),
+                          ...(typeof updates.dayIndex === "number"
+                            ? { dayIndex: Math.max(0, Math.min(6, updates.dayIndex)) }
+                            : {}),
+                          ...(typeof updates.completed === "boolean" ? { completed: updates.completed } : {}),
+                        }
+                      : milestone
+                  ),
+                }
+              : project
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              projects: { ...s.sync.pending.projects, [projectId]: ts },
+            },
+          },
+        }))
+      },
+
+      deleteMilestone: (projectId, milestoneId) => {
+        const ts = now()
+        set((s) => ({
+          projects: s.projects.map((project) =>
+            project.id === projectId
+              ? {
+                  ...project,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                  milestones: project.milestones.filter((milestone) => milestone.id !== milestoneId),
+                }
+              : project
+          ),
           sync: {
             ...s.sync,
             pending: {
@@ -1201,7 +1307,15 @@ export const useAppStore = create<AppState>()(
           xpValue: task.xpValue ?? calculateTaskXP(task),
         }))
         const goals = normalizeCollection(merged.goals)
-        const projects = normalizeCollection(merged.projects)
+        const projects = normalizeCollection(merged.projects).map((project) => ({
+          ...project,
+          milestones: (project.milestones ?? []).map((milestone) => ({
+            id: milestone.id ?? generateId(),
+            title: milestone.title ?? "Milestone",
+            dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
+            completed: Boolean(milestone.completed),
+          })),
+        }))
         const achievements = buildAchievementCatalog(normalizeCollection(merged.achievements))
         const schedule = normalizeCollection(merged.schedule)
         const resources = normalizeCollection(merged.resources)

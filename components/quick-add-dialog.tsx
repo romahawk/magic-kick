@@ -24,13 +24,23 @@ export function QuickAddDialog() {
 
   const [taskTitle, setTaskTitle] = useState("")
   const [taskCategory, setTaskCategory] = useState<TaskCategory>("Learning")
+  const [taskDay, setTaskDay] = useState("")
+  const [taskTime, setTaskTime] = useState("")
   const [goalTitle, setGoalTitle] = useState("")
   const [journalHighlights, setJournalHighlights] = useState("")
 
   function handleAddTask() {
     if (!taskTitle.trim()) return
-    addTask({ title: taskTitle, category: taskCategory, completed: false })
+    addTask({
+      title: taskTitle.trim(),
+      category: taskCategory,
+      completed: false,
+      dueDate: taskDay || undefined,
+      timeHHmm: taskDay ? taskTime || undefined : undefined,
+    })
     setTaskTitle("")
+    setTaskDay("")
+    setTaskTime("")
     setOpen(false)
   }
 
@@ -88,6 +98,22 @@ export function QuickAddDialog() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="task-day">Day (optional)</Label>
+                <Input id="task-day" type="date" value={taskDay} onChange={(e) => setTaskDay(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="task-time">Time (optional)</Label>
+                <Input
+                  id="task-time"
+                  type="time"
+                  value={taskTime}
+                  onChange={(e) => setTaskTime(e.target.value)}
+                  disabled={!taskDay}
+                />
+              </div>
             </div>
             <Button onClick={handleAddTask}>Add Task</Button>
           </TabsContent>
