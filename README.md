@@ -1,7 +1,7 @@
 # Magic Kick
 
 Magic Kick is a Next.js App Router app with an offline-first Zustand store and Firebase backend sync.
-
+![screenshot](./public/magic-kick-demo.jpg)
 ## Stack
 
 - Next.js 16 + React 19 + TypeScript
