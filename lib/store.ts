@@ -20,6 +20,16 @@ import { getOrCreateDeviceId } from "@/lib/sync/deviceId"
 import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollbackTaskXP } from "@/lib/xp-engine"
 import { levelFromXP } from "@/lib/game-utils"
 import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achievement-engine"
+import {
+  seedAchievements,
+  seedGoals,
+  seedJournal,
+  seedProfile,
+  seedProjects,
+  seedResources,
+  seedSchedule,
+  seedTasks,
+} from "@/lib/seed-data"
 
 export const STORE_KEY = "magic-kick-store"
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
@@ -248,6 +258,10 @@ export interface AppState {
   setCurrentUid: (uid: string | null) => void
   setLastPulledAt: (timestamp: number | null) => void
   setLastSyncedAt: (timestamp: number | null) => void
+
+  isDemoMode: boolean
+  activateDemoMode: () => void
+  exitDemoMode: () => void
 }
 
 const initialData = createInitialData()
@@ -258,8 +272,47 @@ export const useAppStore = create<AppState>()(
       ...initialData,
       activeModule: "command-center",
       sync: createInitialSyncState(),
+      isDemoMode: false,
 
       setActiveModule: (m) => set({ activeModule: m }),
+
+      activateDemoMode: () => {
+        const ts = now()
+        const profile: Profile = {
+          ...seedProfile,
+          taskCategories: DEFAULT_TASK_CATEGORIES,
+          taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
+          deleted: false,
+          clientUpdatedAt: ts,
+          createdAt: ts,
+          updatedAt: ts,
+        }
+        const achievements = buildAchievementCatalog(
+          seedAchievements.map((a) => ({ ...a, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts }))
+        )
+        set({
+          isDemoMode: true,
+          profile,
+          tasks: seedTasks.map((t, i) => ({ ...t, order: t.order ?? i + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          goals: seedGoals.map((g) => ({ ...g, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          projects: seedProjects.map((p) => ({ ...p, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          achievements,
+          schedule: seedSchedule.map((s) => ({ ...s, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          resources: seedResources.map((r) => ({ ...r, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          journal: seedJournal.map((j) => ({ ...j, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          activeModule: "command-center",
+          sync: createInitialSyncState(),
+        })
+      },
+
+      exitDemoMode: () => {
+        set({
+          ...createInitialData(),
+          isDemoMode: false,
+          activeModule: "command-center",
+          sync: createInitialSyncState(),
+        })
+      },
 
       completeOnboarding: (name) => {
         const ts = now()

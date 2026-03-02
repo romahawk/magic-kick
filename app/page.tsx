@@ -10,17 +10,18 @@ export default function Home() {
   const router = useRouter()
   const { user, loading } = useRequireAuth()
   const onboardingCompleted = useAppStore((s) => s.profile.onboardingCompleted)
+  const isDemoMode = useAppStore((s) => s.isDemoMode)
 
   useEffect(() => {
-    if (!loading && user && !onboardingCompleted) {
+    if (!loading && !isDemoMode && user && !onboardingCompleted) {
       router.replace("/onboarding")
     }
-  }, [loading, onboardingCompleted, router, user])
+  }, [isDemoMode, loading, onboardingCompleted, router, user])
 
-  if (loading || !user) {
+  if (loading || (!user && !isDemoMode)) {
     return <main className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">Loading...</main>
   }
-  if (!onboardingCompleted) {
+  if (!onboardingCompleted && !isDemoMode) {
     return <main className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">Preparing onboarding...</main>
   }
   return <AppShell />
