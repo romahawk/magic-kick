@@ -1,5 +1,47 @@
 # Magic Kick
 
+**A gamified personal productivity OS** — unite your tasks, goals, projects, and journal into one command center that levels you up as you ship work.
+
+> Built with Next.js 16 + Firebase + Zustand. Offline-first. Works on mobile and desktop.
+
+---
+
+## What It Does
+
+Magic Kick replaces the scattered stack of Notion pages, Todoist lists, and forgotten habit apps with a single command center:
+
+- **Command Center** — today's tasks, XP progress bar, streak counter, and weekly project horizon at a glance
+- **Tasks + Goals** — capture what needs doing and why it matters, with priority and horizon labels
+- **Projects** — week-scoped projects with a milestone grid mapped to calendar days
+- **XP + Levels** — every completed task earns XP based on category, time estimate, and pomodoros; streaks multiply your gains
+- **Achievements** — rule-based badges and medals unlock automatically as you hit milestones
+- **Journal** — daily and weekly reflection entries with mood tracking
+- **Offline-first** — works without internet; syncs to Firebase when connected, with last-write-wins conflict resolution
+
+---
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) + React 19 + TypeScript |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| State | Zustand v5 with `persist` (localStorage) |
+| Auth | Firebase Auth — email/password + Google |
+| Database | Cloud Firestore |
+| Sync | Custom offline-first engine (`lib/sync/`) |
+| Analytics | Vercel Analytics |
+
+---
+
+## Quick Setup
+
+### Prerequisites
+- Node.js 20+
+- Firebase project (free tier works)
+- `pnpm` or `npm`
+
+### 1. Clone and install
 Magic Kick is a Next.js App Router app with an offline-first Zustand store and Firebase backend sync.
 ![screenshot](./public/magic-kick-demo.jpg)
 ## Stack
@@ -98,77 +140,85 @@ All entities include sync fields:
 1. Install dependencies:
 
 ```bash
+git clone https://github.com/romahawk/magic-kick.git
+cd magic-kick
 npm install
 ```
 
-2. Run Firebase emulators:
+### 2. Configure environment
 
 ```bash
-npm run emulators
+cp .env.example .env.local
 ```
 
-3. In another terminal, run app:
+Fill in your Firebase web app credentials in `.env.local`.
+
+### 3. Firebase project setup
+
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+2. Enable **Authentication** → Email/Password + Google providers
+3. Create a **Firestore** database (start in test mode, then deploy rules)
+4. Create a **Web app** and copy the config values into `.env.local`
+
+### 4. Run with local emulators (recommended)
 
 ```bash
+# Terminal 1 — Firebase emulators
+npm run emulators
+
+# Terminal 2 — Next.js dev server
 npm run dev
 ```
 
-4. Open app at `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy Rules
+Set `NEXT_PUBLIC_FIREBASE_USE_EMULATOR=true` in `.env.local` to point at local emulators.
+
+### 5. Deploy Firestore security rules
 
 ```bash
 npm run deploy:rules
 ```
 
-## Offline-First Sync Behavior
+---
 
-- UI always reads Zustand store (cached in localStorage).
-- When authenticated:
-  - On login: pull remote -> merge -> push local pending writes.
-  - Periodic sync every 45s.
-  - Sync also runs on tab focus.
-  - Manual sync available from top bar.
-- Conflict strategy:
-  - Last write wins using `clientUpdatedAt`.
-  - If tied, server `updatedAt` wins.
-  - Soft-deleted records are preserved for sync/tombstones.
+## Offline Sync Behavior
 
-## New User Experience
+- UI always reads from Zustand store (cached in localStorage) — no loading states for cached data
+- On login: pull remote → merge → push local pending writes
+- Auto-sync every 45 seconds and on tab focus
+- Manual sync available from the top bar
+- Conflict strategy: last `clientUpdatedAt` timestamp wins; soft deletes are preserved as tombstones
 
-- Fresh accounts start with a clean workspace (no Kyryll demo data).
-- After first login, users are redirected to `/onboarding`.
-- Onboarding sets profile name and can create optional first goal/task.
+---
 
-## XP Engine
+## Docs
 
-- Task XP is generated automatically from:
-  - task category baseline
-  - estimate minutes
-  - planned pomodoros
-  - linked project bonus
-- Completing tasks:
-  - awards task XP
-  - applies streak bonus
-  - updates level from total XP
-- Uncompleting a task rolls back base task XP.
+- [Product Requirements (PRD)](docs/PRD.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Decisions Log](docs/DECISIONS_LOG.md)
+- [Changelog](CHANGELOG.md)
 
-## Security Rules
+---
 
-`firestore.rules` enforces:
+## Roadmap (next 4 weeks)
 
-- Auth required for all access.
-- Users can only access `users/{uid}/**` where `uid == request.auth.uid`.
-- Deny-by-default for everything else.
-- Basic sync field and profile shape checks.
+| Week | Outcome |
+|---|---|
+| 1–2 | Stabilize — docs, error boundaries, onboarding polish |
+| 3–4 | Signal feature — middleware auth, sync error UX, empty states |
 
-## Sessions / Admin SDK Tradeoff
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full detail.
 
-This implementation is client-auth only (no secure HTTP session cookies yet).  
-It keeps integration lightweight and emulator-friendly, but server-side route/session verification is not implemented.
+---
 
-If needed later, add:
+## Contributing
 
-- Firebase Admin SDK init (`lib/firebase/admin.ts`)
-- Session login/logout route handlers
-- `middleware.ts` for cookie-based route protection
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit format, and PR checklist.
+
+---
+
+## License
+
+Private — all rights reserved.

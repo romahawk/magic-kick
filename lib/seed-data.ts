@@ -6,83 +6,83 @@ const d = (offset: number) => format(addDays(weekStart, offset), "yyyy-MM-dd")
 const today = format(new Date(), "yyyy-MM-dd")
 
 export const seedProfile: Profile = {
-  name: "Kyryll",
+  name: "Alex",
   onboardingCompleted: true,
-  level: 4,
-  xpTotal: 720,
-  xpThisWeek: 185,
-  streakDays: 5,
+  level: 7,
+  xpTotal: 1840,
+  xpThisWeek: 310,
+  streakDays: 12,
 }
 
 export const seedTasks: Task[] = [
-  { id: "t1", title: "Algorithms practice - Binary Trees", category: "Learning", dueDate: today, estimateMin: 45, pomodorosPlanned: 2, completed: false, linkedProjectId: "p1", xpValue: 30 },
-  { id: "t2", title: "Read Physics chapter 12", category: "Learning", dueDate: today, estimateMin: 30, completed: false, xpValue: 20 },
-  { id: "t3", title: "Football training drills", category: "Sport", dueDate: today, estimateMin: 60, completed: false, xpValue: 25 },
-  { id: "t4", title: "Clean room & organize desk", category: "Family/Home", dueDate: d(1), completed: false, xpValue: 10 },
-  { id: "t5", title: "Build portfolio project page", category: "Learning", dueDate: d(2), estimateMin: 90, pomodorosPlanned: 3, completed: false, linkedProjectId: "p1", xpValue: 40 },
-  { id: "t6", title: "Math homework - Calculus", category: "Learning", dueDate: d(1), estimateMin: 40, completed: true, xpValue: 20 },
-  { id: "t7", title: "Research summer CS camps", category: "Hobby", dueDate: d(3), completed: false, xpValue: 15 },
-  { id: "t8", title: "Sprint intervals at track", category: "Sport", dueDate: d(3), estimateMin: 45, completed: false, xpValue: 25 },
-  { id: "t9", title: "Plan family weekend trip", category: "Travel", dueDate: d(4), completed: false, xpValue: 10 },
-  { id: "t10", title: "Guitar practice - new song", category: "Hobby", dueDate: d(5), estimateMin: 30, completed: false, xpValue: 15 },
+  { id: "t1", title: "Implement Stripe webhook handler", category: "Build", dueDate: today, estimateMin: 60, pomodorosPlanned: 2, completed: false, linkedProjectId: "p1", xpValue: 40 },
+  { id: "t2", title: "Write landing page copy + hero section", category: "Marketing", dueDate: today, estimateMin: 45, pomodorosPlanned: 2, completed: false, linkedProjectId: "p1", xpValue: 30 },
+  { id: "t3", title: "Morning workout – strength", category: "Health", dueDate: today, estimateMin: 50, completed: false, xpValue: 20 },
+  { id: "t4", title: "Reply to 3 cold outreach emails", category: "Sales", dueDate: today, estimateMin: 20, completed: true, xpValue: 15 },
+  { id: "t5", title: "Record short product demo video", category: "Marketing", dueDate: d(1), estimateMin: 90, pomodorosPlanned: 3, completed: false, linkedProjectId: "p1", xpValue: 35 },
+  { id: "t6", title: "Fix auth bug on mobile Safari", category: "Build", dueDate: today, estimateMin: 30, completed: true, xpValue: 25 },
+  { id: "t7", title: "Publish weekly build-in-public tweet thread", category: "Marketing", dueDate: d(1), estimateMin: 25, completed: false, xpValue: 15 },
+  { id: "t8", title: "User interview – potential enterprise lead", category: "Research", dueDate: d(2), estimateMin: 45, completed: false, xpValue: 30 },
+  { id: "t9", title: "Review and merge open PRs", category: "Build", dueDate: d(2), estimateMin: 30, completed: false, linkedProjectId: "p1", xpValue: 20 },
+  { id: "t10", title: "Draft investor update email", category: "Growth", dueDate: d(3), estimateMin: 40, completed: false, xpValue: 25 },
 ]
 
 export const seedGoals: Goal[] = [
-  { id: "g1", title: "Master Data Structures & Algorithms", horizon: "mid", category: "CS", targetDate: d(60), priority: "high", notes: "Complete 50 LeetCode problems", status: "active", progress: 35 },
-  { id: "g2", title: "Get into CS program at university", horizon: "long", category: "Education", targetDate: "2027-09-01", priority: "high", notes: "Maintain GPA, build portfolio, get recommendations", status: "active", progress: 20 },
-  { id: "g3", title: "Run 5K under 22 minutes", horizon: "mid", category: "Sport", targetDate: d(45), priority: "medium", notes: "Current PB: 24:10", status: "active", progress: 55 },
-  { id: "g4", title: "Build 3 full-stack projects", horizon: "mid", category: "CS", targetDate: d(90), priority: "high", notes: "Portfolio pieces for applications", status: "active", progress: 15 },
-  { id: "g5", title: "Learn Japanese basics", horizon: "long", category: "Language", priority: "low", notes: "Would love to visit Japan", status: "wishlist", progress: 0 },
-  { id: "g6", title: "Start a tech YouTube channel", horizon: "long", category: "CS", priority: "low", notes: "Share learning journey", status: "wishlist", progress: 0 },
+  { id: "g1", title: "Launch MVP and get first 50 paying users", horizon: "mid", category: "Product", targetDate: d(45), priority: "high", notes: "Focus on activation — free trial to paid conversion", status: "active", progress: 42 },
+  { id: "g2", title: "Reach $5K MRR", horizon: "mid", category: "Revenue", targetDate: d(90), priority: "high", notes: "Current: $1,200 MRR. Need 3–4 more mid-tier customers.", status: "active", progress: 24 },
+  { id: "g3", title: "Build audience to 5K followers on X", horizon: "mid", category: "Marketing", targetDate: d(60), priority: "medium", notes: "Post daily, engage in founder/dev communities", status: "active", progress: 60 },
+  { id: "g4", title: "Ship v2 with team collaboration features", horizon: "long", category: "Product", targetDate: d(120), priority: "high", notes: "Key for enterprise deals — multiplayer editing + roles", status: "active", progress: 10 },
+  { id: "g5", title: "Apply to Y Combinator", horizon: "long", category: "Growth", priority: "medium", notes: "Next batch application opens in 3 months", status: "wishlist", progress: 0 },
+  { id: "g6", title: "Write a technical book or course", horizon: "long", category: "Learning", priority: "low", notes: "Passive income + authority building", status: "wishlist", progress: 0 },
 ]
 
 export const seedProjects: Project[] = [
-  { id: "p1", title: "Portfolio Website", objective: "Build personal dev portfolio with Next.js", weekStartISO: d(0), weekEndISO: d(6), milestones: [
-    { id: "m1", title: "Design mockup", dayIndex: 0, completed: true },
-    { id: "m2", title: "Setup project", dayIndex: 1, completed: true },
-    { id: "m3", title: "Build pages", dayIndex: 3, completed: false },
-    { id: "m4", title: "Deploy", dayIndex: 5, completed: false },
+  { id: "p1", title: "SaaS MVP Launch", objective: "Ship and market v1 to first 50 paying customers", weekStartISO: d(0), weekEndISO: d(6), milestones: [
+    { id: "m1", title: "Stripe billing live", dayIndex: 0, completed: true },
+    { id: "m2", title: "Landing page live", dayIndex: 1, completed: false },
+    { id: "m3", title: "Product Hunt draft ready", dayIndex: 3, completed: false },
+    { id: "m4", title: "Launch day", dayIndex: 5, completed: false },
   ], color: "bg-chart-1" },
-  { id: "p2", title: "5K Training Plan", objective: "Week 6 of 10-week plan", weekStartISO: d(0), weekEndISO: d(6), milestones: [
-    { id: "m5", title: "Easy run 3K", dayIndex: 1, completed: false },
-    { id: "m6", title: "Interval training", dayIndex: 3, completed: false },
-    { id: "m7", title: "Long run 5K", dayIndex: 5, completed: false },
+  { id: "p2", title: "Content Engine", objective: "Build consistent inbound via blog + social", weekStartISO: d(0), weekEndISO: d(6), milestones: [
+    { id: "m5", title: "Publish SEO article #3", dayIndex: 1, completed: false },
+    { id: "m6", title: "Tweet thread + LinkedIn post", dayIndex: 3, completed: false },
+    { id: "m7", title: "Record YouTube devlog", dayIndex: 5, completed: false },
   ], color: "bg-chart-4" },
 ]
 
 export const seedAchievements: Achievement[] = [
-  { id: "a1", type: "badge", title: "3-Day Streak", date: d(-5), description: "Completed tasks 3 days in a row", xpAwarded: 50, unlocked: true },
-  { id: "a2", type: "badge", title: "7-Day Streak", date: "", description: "Complete tasks 7 days in a row", xpAwarded: 100, unlocked: false },
-  { id: "a3", type: "badge", title: "First Project Milestone", date: d(-3), description: "Completed your first project milestone", xpAwarded: 30, unlocked: true },
-  { id: "a4", type: "badge", title: "10 Learning Tasks", date: d(-2), description: "Completed 10 learning tasks", xpAwarded: 75, unlocked: true },
-  { id: "a5", type: "badge", title: "Pomodoro Master", date: "", description: "Complete 5 pomodoros in one day", xpAwarded: 60, unlocked: false },
-  { id: "a6", type: "medal", title: "Regional Math Olympiad - 3rd Place", date: "2025-11-15", description: "Placed 3rd in regional math competition", xpAwarded: 150, unlocked: true },
-  { id: "a7", type: "diploma", title: "Web Dev Bootcamp Certificate", date: "2025-12-01", description: "Completed online web development bootcamp", xpAwarded: 200, unlocked: true },
-  { id: "a8", type: "badge", title: "Consistency King", date: "", description: "Maintain a 14-day streak", xpAwarded: 150, unlocked: false },
+  { id: "a1", type: "badge", title: "7-Day Streak", date: d(-5), description: "Showed up and shipped 7 days straight", xpAwarded: 100, unlocked: true },
+  { id: "a2", type: "badge", title: "14-Day Streak", date: "", description: "Two full weeks of consistent execution", xpAwarded: 200, unlocked: false },
+  { id: "a3", type: "badge", title: "First Paying Customer", date: d(-14), description: "Someone paid real money for your product", xpAwarded: 250, unlocked: true },
+  { id: "a4", type: "medal", title: "Product Hunt Top 5", date: d(-30), description: "Landed in the top 5 products of the day", xpAwarded: 300, unlocked: true },
+  { id: "a5", type: "badge", title: "Pomodoro Machine", date: d(-3), description: "Completed 5 focused Pomodoro sessions in a day", xpAwarded: 60, unlocked: true },
+  { id: "a6", type: "diploma", title: "Shipped 100 Commits", date: d(-10), description: "100 commits pushed to production branch", xpAwarded: 150, unlocked: true },
+  { id: "a7", type: "badge", title: "$1K MRR", date: d(-20), description: "Hit your first $1,000 in monthly recurring revenue", xpAwarded: 400, unlocked: true },
+  { id: "a8", type: "badge", title: "Consistency King", date: "", description: "Maintain a 30-day streak", xpAwarded: 300, unlocked: false },
 ]
 
 export const seedSchedule: ScheduleItem[] = [
-  { id: "s1", title: "Math Class", type: "school", startISO: `${today}T08:00`, endISO: `${today}T09:30`, color: "bg-chart-3" },
-  { id: "s2", title: "Physics Class", type: "school", startISO: `${today}T10:00`, endISO: `${today}T11:30`, color: "bg-chart-3" },
-  { id: "s3", title: "CS Study Session", type: "study", startISO: `${today}T14:00`, endISO: `${today}T16:00`, color: "bg-chart-1" },
-  { id: "s4", title: "Football Practice", type: "sport", startISO: `${today}T17:00`, endISO: `${today}T18:30`, color: "bg-chart-4" },
-  { id: "s5", title: "English Class", type: "school", startISO: `${d(1)}T08:00`, endISO: `${d(1)}T09:30`, color: "bg-chart-3" },
-  { id: "s6", title: "Gym Session", type: "sport", startISO: `${d(1)}T16:00`, endISO: `${d(1)}T17:30`, color: "bg-chart-4" },
-  { id: "s7", title: "Guitar Lesson", type: "hobby", startISO: `${d(2)}T18:00`, endISO: `${d(2)}T19:00`, color: "bg-chart-5" },
+  { id: "s1", title: "Deep Work — Stripe integration", type: "study", startISO: `${today}T08:00`, endISO: `${today}T10:00`, color: "bg-chart-1" },
+  { id: "s2", title: "Async standup + Slack triage", type: "school", startISO: `${today}T10:15`, endISO: `${today}T10:45`, color: "bg-chart-3" },
+  { id: "s3", title: "User interview call", type: "study", startISO: `${today}T14:00`, endISO: `${today}T14:45`, color: "bg-chart-2" },
+  { id: "s4", title: "Gym – strength training", type: "sport", startISO: `${today}T17:00`, endISO: `${today}T18:00`, color: "bg-chart-4" },
+  { id: "s5", title: "Deep Work — landing page copy", type: "study", startISO: `${d(1)}T08:00`, endISO: `${d(1)}T10:30`, color: "bg-chart-1" },
+  { id: "s6", title: "1:1 with advisor", type: "school", startISO: `${d(1)}T11:00`, endISO: `${d(1)}T11:45`, color: "bg-chart-3" },
+  { id: "s7", title: "Content creation block", type: "hobby", startISO: `${d(2)}T15:00`, endISO: `${d(2)}T16:30`, color: "bg-chart-5" },
 ]
 
 export const seedResources: Resource[] = [
-  { id: "r1", category: "CS", title: "LeetCode", url: "https://leetcode.com", description: "Algorithm practice platform", tags: ["algorithms", "interviews"] },
-  { id: "r2", category: "CS", title: "Next.js Documentation", url: "https://nextjs.org/docs", description: "Official Next.js docs", tags: ["react", "web-dev"] },
-  { id: "r3", category: "CS", title: "freeCodeCamp", url: "https://freecodecamp.org", description: "Free coding curriculum", tags: ["web-dev", "free"] },
-  { id: "r4", category: "Sport", title: "5K Training Guide", url: "https://example.com/5k", description: "10-week beginner to intermediate plan", tags: ["running", "fitness"] },
-  { id: "r5", category: "School", title: "Khan Academy - Calculus", url: "https://khanacademy.org", description: "Free math courses", tags: ["math", "free"] },
-  { id: "r6", category: "Tools", title: "Notion Templates", url: "https://notion.so", description: "Productivity templates", tags: ["productivity"] },
-  { id: "r7", category: "CS", title: "The Odin Project", url: "https://theodinproject.com", description: "Full stack curriculum", tags: ["web-dev", "free"] },
+  { id: "r1", category: "Build", title: "Stripe Docs", url: "https://stripe.com/docs", description: "Payments, subscriptions, webhooks", tags: ["payments", "saas"] },
+  { id: "r2", category: "Build", title: "Vercel Docs", url: "https://vercel.com/docs", description: "Deployment, edge functions, analytics", tags: ["deployment", "next.js"] },
+  { id: "r3", category: "Growth", title: "Indie Hackers", url: "https://indiehackers.com", description: "Founder stories, revenue numbers, community", tags: ["entrepreneurship", "saas"] },
+  { id: "r4", category: "Growth", title: "Y Combinator Startup Library", url: "https://www.ycombinator.com/library", description: "Essays and talks from YC founders", tags: ["startups", "growth"] },
+  { id: "r5", category: "Marketing", title: "Exploding Topics", url: "https://explodingtopics.com", description: "Trending topics before they blow up", tags: ["seo", "content"] },
+  { id: "r6", category: "Build", title: "Shadcn UI", url: "https://ui.shadcn.com", description: "Copy-paste component library for React", tags: ["ui", "react"] },
+  { id: "r7", category: "Growth", title: "Lenny's Newsletter", url: "https://lennysnewsletter.com", description: "Product growth strategy and benchmarks", tags: ["product", "growth"] },
 ]
 
 export const seedJournal: JournalEntry[] = [
-  { id: "j1", dateISO: today, type: "daily", mood: 4, highlights: "Crushed the binary tree problems. Feeling confident about CS path.", challenges: "Physics chapter was tough, need to rewatch the lecture.", nextSteps: "Finish portfolio design mockup tonight.", gratitude: "Grateful for the online CS community and free resources." },
-  { id: "j2", dateISO: d(-1), type: "daily", mood: 3, highlights: "Good football training session. Beat my sprint time.", challenges: "Struggled with calculus homework.", nextSteps: "Ask teacher for help with integration by parts.", gratitude: "Family support for my goals." },
-  { id: "j3", dateISO: d(-7), type: "weekly", mood: 4, highlights: "Completed 5 LeetCode problems. Started portfolio project. PB on 3K run.", challenges: "Time management between school and coding projects.", nextSteps: "Set up strict Pomodoro schedule. Start with hardest tasks first.", gratitude: "Getting closer to my goals every week." },
+  { id: "j1", dateISO: today, type: "daily", mood: 4, highlights: "Stripe billing is finally live. Had a great user call — they confirmed the pain point is real.", challenges: "Landing page copy is still weak. Need to rewrite the value prop — too generic.", nextSteps: "Send landing page draft to 3 trusted users for brutal feedback tonight.", gratitude: "Grateful for the solo founder communities that share real revenue numbers. It keeps me grounded." },
+  { id: "j2", dateISO: d(-1), type: "daily", mood: 3, highlights: "Fixed the Safari auth bug. Shipped two small UX improvements based on user feedback.", challenges: "Distracted in the afternoon. Wasted ~90 min on Twitter vs. building.", nextSteps: "Block social media from 8am–12pm. Use the time for deep work only.", gratitude: "Had a good gym session. Physical energy directly impacts mental clarity." },
+  { id: "j3", dateISO: d(-7), type: "weekly", mood: 4, highlights: "Crossed $1,200 MRR. Closed two new customers from inbound. Product Hunt prep is on track.", challenges: "Scope creep on v2 features. Keep shipping what's needed for now, not what's exciting.", nextSteps: "Freeze v2 feature list. Focus 100% on launch and customer success this week.", gratitude: "Every user who pays is a vote of confidence. Remember why this matters." },
 ]

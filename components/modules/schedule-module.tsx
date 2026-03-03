@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, type DragEvent } from "react"
 import { useAppStore } from "@/lib/store"
 import { getWeekDays } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
-import { format, parseISO, isToday, isSameDay } from "date-fns"
+import { format, parseISO, isSameDay } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,12 +13,53 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, Clock, Play, Pause, RotateCcw, Timer, Pencil } from "lucide-react"
-import type { TaskCategory } from "@/lib/types"
+import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink } from "lucide-react"
+import type { ScheduleItem, TaskCategory } from "@/lib/types"
 
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
+const DAY_START_HOUR = 6
+const DAY_END_HOUR = 23
+const MINUTES_PER_DAY = 24 * 60
+const GRID_SNAP_MINUTES = 30
+const HOUR_ROW_HEIGHT_PX = 64
+const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
+
+function clampMinutes(minutes: number) {
+  return Math.max(0, Math.min(MINUTES_PER_DAY - 1, minutes))
+}
+
+function snapMinutes(minutes: number) {
+  return Math.round(minutes / GRID_SNAP_MINUTES) * GRID_SNAP_MINUTES
+}
+
+function minutesToHHmm(totalMinutes: number) {
+  const clamped = clampMinutes(totalMinutes)
+  const hours = Math.floor(clamped / 60)
+  const minutes = clamped % 60
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+}
+
+function clampToDayWindow(minutes: number) {
+  const start = DAY_START_HOUR * 60
+  const end = DAY_END_HOUR * 60
+  return Math.max(start, Math.min(end, minutes))
+}
+
+function dateToMinutes(valueISO: string) {
+  const date = parseISO(valueISO)
+  return date.getHours() * 60 + date.getMinutes()
+}
+
+function getDurationMinutes(item: ScheduleItem, fallbackMinutes: number) {
+  if (item.hasExplicitTime === false) return Math.max(15, fallbackMinutes)
+  const start = parseISO(item.startISO).getTime()
+  const end = parseISO(item.endISO).getTime()
+  const diff = Math.round((end - start) / 60000)
+  if (!Number.isFinite(diff)) return Math.max(15, fallbackMinutes)
+  return Math.max(15, diff)
+}
 
 export function ScheduleModule() {
   const allSchedule = useAppStore((s) => s.schedule)
@@ -41,6 +82,9 @@ export function ScheduleModule() {
   const [editStartTime, setEditStartTime] = useState("09:00")
   const [editEndTime, setEditEndTime] = useState("09:30")
   const [editEstimate, setEditEstimate] = useState("")
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
+  const [isGridDragOver, setIsGridDragOver] = useState(false)
+  const dayGridRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!categories.includes(editCategory)) {
@@ -48,24 +92,84 @@ export function ScheduleModule() {
     }
   }, [categories, editCategory])
 
-  const dayItems = schedule.filter((item) => {
-    const itemDate = parseISO(item.startISO)
-    return format(itemDate, "yyyy-MM-dd") === selectedDay
-  }).sort((a, b) => a.startISO.localeCompare(b.startISO))
+  const dayItems = useMemo(
+    () =>
+      schedule
+        .filter((item) => {
+          const itemDate = parseISO(item.startISO)
+          return format(itemDate, "yyyy-MM-dd") === selectedDay
+        })
+        .sort((a, b) => a.startISO.localeCompare(b.startISO)),
+    [schedule, selectedDay]
+  )
 
-  const weekItems = [...schedule].sort((a, b) => a.startISO.localeCompare(b.startISO))
+  const timedDayItems = useMemo(() => dayItems.filter((item) => item.hasExplicitTime !== false), [dayItems])
+  const noTimeDayItems = useMemo(() => dayItems.filter((item) => item.hasExplicitTime === false), [dayItems])
+  const weekItems = useMemo(() => [...schedule].sort((a, b) => a.startISO.localeCompare(b.startISO)), [schedule])
+  const hourMarkers = useMemo(
+    () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, idx) => DAY_START_HOUR + idx),
+    []
+  )
+
+  function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
+    const item = schedule.find((entry) => entry.id === scheduleItemId)
+    if (!item?.linkedTaskId) return
+    const linkedTask = tasks.find((entry) => entry.id === item.linkedTaskId)
+    const duration = getDurationMinutes(item, linkedTask?.estimateMin ?? 30)
+    const windowStart = DAY_START_HOUR * 60
+    const windowEnd = DAY_END_HOUR * 60
+    const maxStart = Math.max(windowStart, windowEnd - duration)
+    const snappedStart = clampToDayWindow(snapMinutes(minutesFromStartOfDay))
+    const startMinutes = Math.min(snappedStart, maxStart)
+    const endMinutes = clampToDayWindow(startMinutes + duration)
+
+    updateTask(
+      item.linkedTaskId,
+      {
+        dueDate: selectedDay,
+      },
+      {
+        startHHmm: minutesToHHmm(startMinutes),
+        endHHmm: minutesToHHmm(endMinutes),
+      }
+    )
+  }
+
+  function onGridDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsGridDragOver(true)
+  }
+
+  function onGridDragLeave() {
+    setIsGridDragOver(false)
+  }
+
+  function onGridDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const draggedId = draggedItemId ?? event.dataTransfer.getData("text/plain")
+    setIsGridDragOver(false)
+    setDraggedItemId(null)
+    if (!draggedId) return
+    const grid = dayGridRef.current
+    if (!grid) return
+    const rect = grid.getBoundingClientRect()
+    const y = event.clientY - rect.top + grid.scrollTop
+    const minutes = DAY_START_HOUR * 60 + Math.floor(y / PIXELS_PER_MINUTE)
+    moveItemToSlot(draggedId, minutes)
+  }
 
   function openTaskEditor(scheduleItemId: string) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
     if (!item?.linkedTaskId) return
     const task = tasks.find((entry) => entry.id === item.linkedTaskId)
     if (!task) return
+    const hasExplicitTime = item.hasExplicitTime !== false
     setEditingTaskId(task.id)
     setEditTitle(task.title)
     setEditCategory(task.category)
     setEditDate(task.dueDate ?? format(parseISO(item.startISO), "yyyy-MM-dd"))
-    setEditStartTime(format(parseISO(item.startISO), "HH:mm"))
-    setEditEndTime(format(parseISO(item.endISO), "HH:mm"))
+    setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "")
+    setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "")
     setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
   }
 
@@ -101,9 +205,17 @@ export function ScheduleModule() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-        <p className="text-sm text-muted-foreground">Plan your day and stay focused.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
+          <p className="text-sm text-muted-foreground">Plan your day and stay focused.</p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
+            Google Calendar
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </Button>
       </div>
 
       <Tabs defaultValue="day">
@@ -144,33 +256,138 @@ export function ScheduleModule() {
               </CardContent>
             </Card>
           ) : (
-            <div className="flex flex-col gap-2">
-              {dayItems.map((item) => {
-                const start = parseISO(item.startISO)
-                const end = parseISO(item.endISO)
-                return (
-                  <Card key={item.id}>
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className={cn("h-12 w-1 rounded-full", item.color || "bg-primary")} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{item.title}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {format(start, "HH:mm")} - {format(end, "HH:mm")}
-                        </div>
+            <div className="flex flex-col gap-3">
+              {noTimeDayItems.length > 0 ? (
+                <Card>
+                  <CardContent className="space-y-2 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">No Exact Time</p>
+                    {noTimeDayItems.map((item) => (
+                      <div
+                        key={item.id}
+                        draggable={Boolean(item.linkedTaskId)}
+                        onDragStart={(event) => {
+                          setDraggedItemId(item.id)
+                          event.dataTransfer.setData("text/plain", item.id)
+                        }}
+                        onDragEnd={() => {
+                          setDraggedItemId(null)
+                          setIsGridDragOver(false)
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2",
+                          item.linkedTaskId ? "cursor-grab active:cursor-grabbing" : ""
+                        )}
+                      >
+                        <div className={cn("h-8 w-1 rounded-full", item.color || "bg-primary")} />
+                        <p className="flex-1 text-sm font-medium">{item.title}</p>
+                        <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
+                        {item.linkedTaskId ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTaskEditor(item.id)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
                       </div>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {item.type}
-                      </Badge>
-                      {item.linkedTaskId ? (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openTaskEditor(item.id)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                    ))}
+                    <p className="text-[11px] text-muted-foreground">
+                      Drag a task into the time grid to assign a time slot.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <Card>
+                <CardContent className="p-0">
+                  <div
+                    ref={dayGridRef}
+                    onDragOver={onGridDragOver}
+                    onDragLeave={onGridDragLeave}
+                    onDrop={onGridDrop}
+                    className={cn(
+                      "max-h-[70vh] overflow-y-auto rounded-lg border border-border/60",
+                      isGridDragOver ? "bg-primary/5" : ""
+                    )}
+                  >
+                    <div
+                      className="grid grid-cols-[3.25rem_1fr]"
+                      style={{ height: `${(DAY_END_HOUR - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
+                    >
+                      <div className="relative border-r border-border/70 bg-muted/20">
+                        {hourMarkers.map((hour) => (
+                          <div
+                            key={`label-${hour}`}
+                            className="absolute left-1 top-0 -translate-y-1/2 text-[10px] text-muted-foreground"
+                            style={{ top: `${(hour - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
+                          >
+                            {String(hour).padStart(2, "0")}:00
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="relative">
+                        {hourMarkers.map((hour) => (
+                          <div
+                            key={`line-${hour}`}
+                            className="absolute left-0 right-0 border-t border-border/80"
+                            style={{ top: `${(hour - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
+                          />
+                        ))}
+                        {hourMarkers.slice(0, -1).map((hour) => (
+                          <div
+                            key={`half-${hour}`}
+                            className="absolute left-0 right-0 border-t border-dashed border-border/40"
+                            style={{ top: `${((hour - DAY_START_HOUR) * 60 + 30) * PIXELS_PER_MINUTE}px` }}
+                          />
+                        ))}
+
+                        {timedDayItems.map((item) => {
+                          const start = parseISO(item.startISO)
+                          const end = parseISO(item.endISO)
+                          const startMinutes = dateToMinutes(item.startISO)
+                          const rawEndMinutes = dateToMinutes(item.endISO)
+                          const durationMinutes = Math.max(15, rawEndMinutes - startMinutes)
+                          if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
+                          const top = (startMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
+                          const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
+                          return (
+                            <div
+                              key={item.id}
+                              draggable={Boolean(item.linkedTaskId)}
+                              onDragStart={(event) => {
+                                setDraggedItemId(item.id)
+                                event.dataTransfer.setData("text/plain", item.id)
+                              }}
+                              onDragEnd={() => {
+                                setDraggedItemId(null)
+                                setIsGridDragOver(false)
+                              }}
+                              className={cn(
+                                "absolute left-2 right-2 overflow-hidden rounded-md border border-border bg-card px-3 py-2 shadow-sm",
+                                item.linkedTaskId ? "cursor-grab active:cursor-grabbing" : ""
+                              )}
+                              style={{ top: `${top}px`, height: `${height}px` }}
+                            >
+                              <div className="flex h-full items-start gap-2">
+                                <div className={cn("mt-0.5 h-full w-1 rounded-full", item.color || "bg-primary")} />
+                                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                                  <p className="truncate text-xs font-medium leading-tight">{item.title}</p>
+                                  <p className="text-[10px] leading-tight text-muted-foreground">
+                                    {format(start, "HH:mm")} - {format(end, "HH:mm")}
+                                  </p>
+                                </div>
+                                {item.linkedTaskId ? (
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>
@@ -197,14 +414,17 @@ export function ScheduleModule() {
                       items.map((item) => {
                         const start = parseISO(item.startISO)
                         const end = parseISO(item.endISO)
+                        const hasExplicitTime = item.hasExplicitTime !== false
                         return (
                           <div key={item.id} className="flex items-center gap-2 rounded-md border border-border p-2">
                             <div className={cn("h-6 w-0.5 rounded-full", item.color || "bg-primary")} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium truncate">{item.title}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {format(start, "HH:mm")} - {format(end, "HH:mm")}
-                              </p>
+                              {hasExplicitTime ? (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {format(start, "HH:mm")} - {format(end, "HH:mm")}
+                                </p>
+                              ) : null}
                             </div>
                             {item.linkedTaskId ? (
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>

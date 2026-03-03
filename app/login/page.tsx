@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth"
 import { auth, firebaseInitError } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppStore } from "@/lib/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label"
 export default function LoginPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
+  const activateDemoMode = useAppStore((s) => s.activateDemoMode)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -87,6 +89,26 @@ export default function LoginPage() {
               Continue with Google
             </Button>
           </form>
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            disabled={submitting}
+            onClick={() => {
+              activateDemoMode()
+              router.replace("/")
+            }}
+          >
+            Try Demo
+          </Button>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link className="text-primary underline-offset-4 hover:underline" href="/signup">
