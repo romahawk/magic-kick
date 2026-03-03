@@ -67,6 +67,7 @@ export function ScheduleModule() {
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
   const updateTask = useAppStore((s) => s.updateTask)
+  const updateScheduleItem = useAppStore((s) => s.updateScheduleItem)
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
   const weekDays = getWeekDays()
@@ -84,6 +85,7 @@ export function ScheduleModule() {
   const [editEstimate, setEditEstimate] = useState("")
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [isGridDragOver, setIsGridDragOver] = useState(false)
+  const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
   const dayGridRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -156,6 +158,53 @@ export function ScheduleModule() {
     const y = event.clientY - rect.top + grid.scrollTop
     const minutes = DAY_START_HOUR * 60 + Math.floor(y / PIXELS_PER_MINUTE)
     moveItemToSlot(draggedId, minutes)
+  }
+
+  function moveItemToDay(scheduleItemId: string, targetDayISO: string) {
+    const item = schedule.find((entry) => entry.id === scheduleItemId)
+    if (!item) return
+    if (!item.linkedTaskId) {
+      const startHHmm = format(parseISO(item.startISO), "HH:mm")
+      const endHHmm = format(parseISO(item.endISO), "HH:mm")
+      updateScheduleItem(item.id, {
+        startISO: `${targetDayISO}T${startHHmm}`,
+        endISO: `${targetDayISO}T${endHHmm}`,
+      })
+      return
+    }
+    const hasExplicitTime = item.hasExplicitTime !== false
+    if (!hasExplicitTime) {
+      updateTask(item.linkedTaskId, { dueDate: targetDayISO })
+      return
+    }
+    const startHHmm = format(parseISO(item.startISO), "HH:mm")
+    const endHHmm = format(parseISO(item.endISO), "HH:mm")
+    updateTask(
+      item.linkedTaskId,
+      { dueDate: targetDayISO },
+      { startHHmm, endHHmm }
+    )
+  }
+
+  function startWeekItemDrag(event: DragEvent<HTMLElement>, scheduleItemId: string) {
+    setDraggedItemId(scheduleItemId)
+    event.dataTransfer.setData("text/plain", scheduleItemId)
+    event.dataTransfer.effectAllowed = "move"
+  }
+
+  function onWeekDayDragOver(event: DragEvent<HTMLElement>, dayISO: string) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    if (weekDragOverDay !== dayISO) setWeekDragOverDay(dayISO)
+  }
+
+  function onWeekDayDrop(event: DragEvent<HTMLElement>, dayISO: string) {
+    event.preventDefault()
+    const draggedId = draggedItemId ?? event.dataTransfer.getData("text/plain")
+    setWeekDragOverDay(null)
+    setDraggedItemId(null)
+    if (!draggedId) return
+    moveItemToDay(draggedId, dayISO)
   }
 
   function openTaskEditor(scheduleItemId: string) {
@@ -400,14 +449,25 @@ export function ScheduleModule() {
                 return isSameDay(itemDate, day.date)
               })
               return (
-                <Card key={day.iso} className={cn(day.isToday && "ring-2 ring-primary")}>
+                <Card
+                  key={day.iso}
+                  className={cn(
+                    day.isToday && "ring-2 ring-primary",
+                    weekDragOverDay === day.iso && "ring-2 ring-primary/70 bg-primary/5"
+                  )}
+                  onDragOver={(event) => onWeekDayDragOver(event, day.iso)}
+                  onDragLeave={() => {
+                    if (weekDragOverDay === day.iso) setWeekDragOverDay(null)
+                  }}
+                  onDrop={(event) => onWeekDayDrop(event, day.iso)}
+                >
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center justify-between text-sm">
                       <span>{day.label} {day.short}</span>
                       {day.isToday && <Badge className="bg-primary text-primary-foreground text-[10px]">Today</Badge>}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="flex flex-col gap-1.5">
+                  <CardContent className="flex flex-col gap-1.5" onDragOver={(event) => onWeekDayDragOver(event, day.iso)} onDrop={(event) => onWeekDayDrop(event, day.iso)}>
                     {items.length === 0 ? (
                       <p className="py-2 text-center text-xs text-muted-foreground">Free day</p>
                     ) : (
@@ -416,7 +476,20 @@ export function ScheduleModule() {
                         const end = parseISO(item.endISO)
                         const hasExplicitTime = item.hasExplicitTime !== false
                         return (
-                          <div key={item.id} className="flex items-center gap-2 rounded-md border border-border p-2">
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "flex items-center gap-2 rounded-md border border-border p-2 cursor-grab active:cursor-grabbing"
+                            )}
+                            draggable
+                            onDragStart={(event) => {
+                              startWeekItemDrag(event, item.id)
+                            }}
+                            onDragEnd={() => {
+                              setDraggedItemId(null)
+                              setWeekDragOverDay(null)
+                            }}
+                          >
                             <div className={cn("h-6 w-0.5 rounded-full", item.color || "bg-primary")} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium truncate">{item.title}</p>

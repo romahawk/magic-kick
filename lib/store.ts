@@ -257,6 +257,7 @@ export interface AppState {
   deleteResource: (id: string) => void
   addJournalEntry: (j: Omit<JournalEntry, "id">) => void
   addScheduleItem: (s: Omit<ScheduleItem, "id">) => void
+  updateScheduleItem: (id: string, updates: Partial<Omit<ScheduleItem, "id" | "deleted" | "clientUpdatedAt">>) => void
   toggleMilestone: (projectId: string, milestoneId: string) => void
 
   setSyncStatus: (status: SyncState["status"], error?: string | null) => void
@@ -1205,6 +1206,29 @@ export const useAppStore = create<AppState>()(
             pending: {
               ...s.sync.pending,
               schedule: { ...s.sync.pending.schedule, [id]: item.clientUpdatedAt ?? now() },
+            },
+          },
+        }))
+      },
+
+      updateScheduleItem: (id, updates) => {
+        const ts = now()
+        set((s) => ({
+          schedule: s.schedule.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  ...updates,
+                  deleted: false,
+                  clientUpdatedAt: ts,
+                }
+              : item
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              schedule: { ...s.sync.pending.schedule, [id]: ts },
             },
           },
         }))
