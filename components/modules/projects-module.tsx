@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { addDays, format, startOfWeek } from "date-fns"
+import { addDays, format, isAfter, isBefore, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { getWeekDays } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
@@ -89,6 +89,8 @@ export function ProjectsModule() {
   const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
   const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
   const [timelineView, setTimelineView] = useState<"weekly" | "yearly">("weekly")
+  const [focusMode, setFocusMode] = useState(false)
+  const [showDetails, setShowDetails] = useState(true)
 
   const defaultWeekRange = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -98,6 +100,27 @@ export function ProjectsModule() {
       end: format(end, "yyyy-MM-dd"),
     }
   }, [])
+
+  const displayProjects = useMemo(() => {
+    if (!focusMode) return projects
+    const today = new Date()
+    const current = [...projects].sort((a, b) => {
+      const aStart = parseISO(a.weekStartISO)
+      const aEnd = parseISO(a.weekEndISO)
+      const bStart = parseISO(b.weekStartISO)
+      const bEnd = parseISO(b.weekEndISO)
+      const aCompleted = a.milestones.length > 0 && a.milestones.every((m) => m.completed)
+      const bCompleted = b.milestones.length > 0 && b.milestones.every((m) => m.completed)
+
+      const aPriority = aCompleted ? 3 : isBefore(aEnd, today) ? 0 : isAfter(aStart, today) ? 2 : 1
+      const bPriority = bCompleted ? 3 : isBefore(bEnd, today) ? 0 : isAfter(bStart, today) ? 2 : 1
+      if (aPriority !== bPriority) return aPriority - bPriority
+      return aEnd.getTime() - bEnd.getTime()
+    })
+    return current.slice(0, 3)
+  }, [focusMode, projects])
+
+  const hiddenProjectsCount = Math.max(0, projects.length - displayProjects.length)
 
   function openCreateDialog() {
     setEditingId(null)
@@ -340,7 +363,16 @@ export function ProjectsModule() {
         <Button type="button" size="sm" variant={timelineView === "yearly" ? "default" : "outline"} onClick={() => setTimelineView("yearly")}>
           Yearly
         </Button>
+        <Button type="button" size="sm" variant={focusMode ? "default" : "outline"} onClick={() => setFocusMode((value) => !value)}>
+          {focusMode ? "Focus: ON" : "Focus Mode"}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => setShowDetails((value) => !value)}>
+          {showDetails ? "Hide Details" : "Show Details"}
+        </Button>
       </div>
+      {focusMode && hiddenProjectsCount > 0 ? (
+        <p className="text-xs text-muted-foreground">Focus mode shows 3 current projects. Hidden: {hiddenProjectsCount}.</p>
+      ) : null}
 
       {/* Weekly timeline header */}
       {timelineView === "weekly" ? (
@@ -360,13 +392,13 @@ export function ProjectsModule() {
               </div>
             </div>
 
-            {projects.length === 0 ? (
+            {displayProjects.length === 0 ? (
               <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
                 No projects yet. Use <strong>New Project</strong> to create one and populate this timeline.
               </p>
             ) : null}
 
-            {projects.map((project) => {
+            {displayProjects.map((project) => {
               const sortedMilestones = sortMilestonesByDay(project.milestones)
               const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
               const completedTasks = projectTasks.filter((t) => t.completed).length
@@ -433,12 +465,12 @@ export function ProjectsModule() {
           </CardContent>
         </Card>
       ) : (
-        <ProjectsTimelineChart projects={projects} />
+        <ProjectsTimelineChart projects={displayProjects} />
       )}
 
       {/* Project details cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {projects.map((project) => {
+      {showDetails ? <div className="grid gap-4 sm:grid-cols-2">
+        {displayProjects.map((project) => {
           const sortedMilestones = sortMilestonesByDay(project.milestones)
           const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
           const completedTasks = projectTasks.filter((t) => t.completed).length
@@ -546,7 +578,7 @@ export function ProjectsModule() {
             </Card>
           )
         })}
-      </div>
+      </div> : null}
     </div>
   )
 }
