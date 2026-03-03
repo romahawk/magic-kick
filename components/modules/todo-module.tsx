@@ -40,6 +40,8 @@ export function TodoModule() {
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("date-asc")
+  const [archiveOpen, setArchiveOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -57,11 +59,39 @@ export function TodoModule() {
     return tasks.filter((t) => {
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterCategory !== "all" && t.category !== filterCategory) return false
-      if (filterStatus === "active" && t.completed) return false
-      if (filterStatus === "completed" && !t.completed) return false
       return true
     })
-  }, [tasks, search, filterCategory, filterStatus])
+  }, [tasks, search, filterCategory])
+
+  const sortedTasks = useMemo(() => {
+    const items = [...filteredTasks]
+    const dueToTs = (task: Task) => (task.dueDate ? new Date(`${task.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY)
+    items.sort((a, b) => {
+      if (sortBy === "date-asc") {
+        const diff = dueToTs(a) - dueToTs(b)
+        if (diff !== 0) return diff
+      } else if (sortBy === "date-desc") {
+        const aTs = a.dueDate ? new Date(`${a.dueDate}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY
+        const bTs = b.dueDate ? new Date(`${b.dueDate}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY
+        const diff = bTs - aTs
+        if (diff !== 0) return diff
+      } else {
+        const diff = (a.order ?? 0) - (b.order ?? 0)
+        if (diff !== 0) return diff
+      }
+      return a.title.localeCompare(b.title)
+    })
+    return items
+  }, [filteredTasks, sortBy])
+
+  const activeTasks = useMemo(() => sortedTasks.filter((task) => !task.completed), [sortedTasks])
+  const archivedTasks = useMemo(() => sortedTasks.filter((task) => task.completed), [sortedTasks])
+
+  const listTasks = useMemo(() => {
+    if (filterStatus === "active") return activeTasks
+    if (filterStatus === "completed") return archivedTasks
+    return activeTasks
+  }, [activeTasks, archivedTasks, filterStatus])
 
   const groupedByCategory = useMemo(() => {
     const map: Record<string, Task[]> = {}
@@ -145,9 +175,19 @@ export function TodoModule() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">Active + Archive</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date-asc">Date: earliest</SelectItem>
+            <SelectItem value="date-desc">Date: latest</SelectItem>
+            <SelectItem value="manual">Manual order</SelectItem>
           </SelectContent>
         </Select>
         <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
@@ -252,14 +292,14 @@ export function TodoModule() {
         </TabsList>
 
         <TabsContent value="list" className="mt-4 flex flex-col gap-2">
-          {filteredTasks.length === 0 && (
+          {listTasks.length === 0 && (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 No tasks found. Try adjusting your filters.
               </CardContent>
             </Card>
           )}
-          {filteredTasks.map((task) => (
+          {listTasks.map((task) => (
             <TaskRow
               key={task.id}
               task={task}
@@ -268,13 +308,44 @@ export function TodoModule() {
               onSelect={openTask}
               onDragStart={(taskId) => setDraggedTaskId(taskId)}
               onDropOnTask={(targetTaskId) => {
+                if (sortBy !== "manual") return
                 if (!draggedTaskId || draggedTaskId === targetTaskId) return
                 reorderTasks(draggedTaskId, targetTaskId)
                 setDraggedTaskId(null)
               }}
+              draggable={sortBy === "manual" && !task.completed}
               onDragEnd={() => setDraggedTaskId(null)}
             />
           ))}
+          {(filterStatus === "all" || filterStatus === "completed") && archivedTasks.length > 0 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <span>Archive</span>
+                  <Button variant="outline" size="sm" onClick={() => setArchiveOpen((value) => !value)}>
+                    {archiveOpen ? "Hide" : "Show"} ({archivedTasks.length})
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              {archiveOpen ? (
+                <CardContent className="flex flex-col gap-2">
+                  {archivedTasks.map((task) => (
+                    <TaskRow
+                      key={`arch-${task.id}`}
+                      task={task}
+                      categoryColor={categoryColors[task.category]}
+                      onToggle={toggleTask}
+                      onSelect={openTask}
+                      onDragStart={() => {}}
+                      onDropOnTask={() => {}}
+                      onDragEnd={() => {}}
+                      draggable={false}
+                    />
+                  ))}
+                </CardContent>
+              ) : null}
+            </Card>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="board" className="mt-4">
@@ -436,6 +507,7 @@ function TaskRow({
   onSelect,
   onDragStart,
   onDropOnTask,
+  draggable = true,
   onDragEnd,
 }: {
   task: Task
@@ -444,16 +516,18 @@ function TaskRow({
   onSelect: (t: Task) => void
   onDragStart: (taskId: string) => void
   onDropOnTask: (taskId: string) => void
+  draggable?: boolean
   onDragEnd: () => void
 }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30 cursor-grab active:cursor-grabbing",
+        "flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30",
+        draggable ? "cursor-grab active:cursor-grabbing" : "",
         task.completed && "opacity-50"
       )}
       onClick={() => onSelect(task)}
-      draggable
+      draggable={draggable}
       onDragStart={() => onDragStart(task.id)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
