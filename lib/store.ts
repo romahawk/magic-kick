@@ -103,6 +103,13 @@ function touchEntity<T extends LocalEntity>(entity: T): T {
   }
 }
 
+function sortProjectMilestones<T extends Pick<ProjectMilestone, "dayIndex" | "title">>(milestones: T[]): T[] {
+  return [...milestones].sort((a, b) => {
+    if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
+    return a.title.localeCompare(b.title)
+  })
+}
+
 function createInitialData() {
   const profile: Profile = {
     name: "New Player",
@@ -559,17 +566,18 @@ export const useAppStore = create<AppState>()(
           const ts = item.clientUpdatedAt ?? now()
 
           if (item.dueDate) {
-            const startHHmm = normalizeTimeHHmm(timeHHmm) ?? "09:00"
-            const start = parseISO(`${item.dueDate}T${startHHmm}`)
-            const end = addMinutes(start, item.estimateMin ?? 30)
+            const startHHmm = normalizeTimeHHmm(timeHHmm)
             const scheduleId = `task-${item.id}`
             nextSchedule.push(
               touchEntity({
                 id: scheduleId,
                 title: item.title,
                 type: "task",
-                startISO: format(start, "yyyy-MM-dd'T'HH:mm"),
-                endISO: format(end, "yyyy-MM-dd'T'HH:mm"),
+                startISO: startHHmm ? format(parseISO(`${item.dueDate}T${startHHmm}`), "yyyy-MM-dd'T'HH:mm") : `${item.dueDate}T00:00`,
+                endISO: startHHmm
+                  ? format(addMinutes(parseISO(`${item.dueDate}T${startHHmm}`), item.estimateMin ?? 30), "yyyy-MM-dd'T'HH:mm")
+                  : `${item.dueDate}T00:00`,
+                hasExplicitTime: Boolean(startHHmm),
                 color: "bg-chart-1",
                 linkedTaskId: item.id,
                 deleted: false,
@@ -705,11 +713,15 @@ export const useAppStore = create<AppState>()(
 
           if (merged.dueDate) {
             const existing = scheduleIndex >= 0 ? schedule[scheduleIndex] : null
-            const existingStart = existing ? format(parseISO(existing.startISO), "HH:mm") : undefined
-            const existingEnd = existing ? format(parseISO(existing.endISO), "HH:mm") : undefined
-            const startHHmm = timing?.startHHmm ?? existingStart ?? "09:00"
+            const existingHasExplicitTime = existing?.hasExplicitTime ?? true
+            const existingStart = existingHasExplicitTime && existing ? format(parseISO(existing.startISO), "HH:mm") : undefined
+            const existingEnd = existingHasExplicitTime && existing ? format(parseISO(existing.endISO), "HH:mm") : undefined
+            const requestedStart = normalizeTimeHHmm(timing?.startHHmm)
+            const requestedEnd = normalizeTimeHHmm(timing?.endHHmm)
+            const hasExplicitTime = Boolean(requestedStart || requestedEnd || existingStart || existingEnd)
+            const startHHmm = requestedStart ?? existingStart ?? "09:00"
             const endHHmm =
-              timing?.endHHmm ??
+              requestedEnd ??
               existingEnd ??
               format(addMinutes(parseISO(`${merged.dueDate}T${startHHmm}`), merged.estimateMin ?? 30), "HH:mm")
 
@@ -717,8 +729,9 @@ export const useAppStore = create<AppState>()(
               id: existing?.id ?? `task-${id}`,
               title: merged.title,
               type: "task",
-              startISO: `${merged.dueDate}T${startHHmm}`,
-              endISO: `${merged.dueDate}T${endHHmm}`,
+              startISO: hasExplicitTime ? `${merged.dueDate}T${startHHmm}` : `${merged.dueDate}T00:00`,
+              endISO: hasExplicitTime ? `${merged.dueDate}T${endHHmm}` : `${merged.dueDate}T00:00`,
+              hasExplicitTime,
               color: existing?.color ?? "bg-chart-1",
               linkedTaskId: id,
               deleted: false,
@@ -916,12 +929,14 @@ export const useAppStore = create<AppState>()(
       addProject: (project) => {
         const id = generateId()
         const ts = now()
-        const milestones = (project.milestones ?? []).map((milestone) => ({
-          id: generateId(),
-          title: milestone.title,
-          dayIndex: milestone.dayIndex,
-          completed: false,
-        }))
+        const milestones = sortProjectMilestones(
+          (project.milestones ?? []).map((milestone) => ({
+            id: generateId(),
+            title: milestone.title,
+            dayIndex: milestone.dayIndex,
+            completed: false,
+          }))
+        )
         const item = touchEntity({
           id,
           title: project.title,
@@ -1015,7 +1030,7 @@ export const useAppStore = create<AppState>()(
                   ...project,
                   clientUpdatedAt: ts,
                   deleted: false,
-                  milestones: [...project.milestones, nextMilestone],
+                  milestones: sortProjectMilestones([...project.milestones, nextMilestone]),
                 }
               : project
           ),
@@ -1038,19 +1053,21 @@ export const useAppStore = create<AppState>()(
                   ...project,
                   clientUpdatedAt: ts,
                   deleted: false,
-                  milestones: project.milestones.map((milestone) =>
-                    milestone.id === milestoneId
-                      ? {
-                          ...milestone,
-                          ...(typeof updates.title === "string"
-                            ? { title: updates.title.trim() || milestone.title }
-                            : {}),
-                          ...(typeof updates.dayIndex === "number"
-                            ? { dayIndex: Math.max(0, Math.min(6, updates.dayIndex)) }
-                            : {}),
-                          ...(typeof updates.completed === "boolean" ? { completed: updates.completed } : {}),
-                        }
-                      : milestone
+                  milestones: sortProjectMilestones(
+                    project.milestones.map((milestone) =>
+                      milestone.id === milestoneId
+                        ? {
+                            ...milestone,
+                            ...(typeof updates.title === "string"
+                              ? { title: updates.title.trim() || milestone.title }
+                              : {}),
+                            ...(typeof updates.dayIndex === "number"
+                              ? { dayIndex: Math.max(0, Math.min(6, updates.dayIndex)) }
+                              : {}),
+                            ...(typeof updates.completed === "boolean" ? { completed: updates.completed } : {}),
+                          }
+                        : milestone
+                    )
                   ),
                 }
               : project
@@ -1362,12 +1379,14 @@ export const useAppStore = create<AppState>()(
         const goals = normalizeCollection(merged.goals)
         const projects = normalizeCollection(merged.projects).map((project) => ({
           ...project,
-          milestones: (project.milestones ?? []).map((milestone) => ({
-            id: milestone.id ?? generateId(),
-            title: milestone.title ?? "Milestone",
-            dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
-            completed: Boolean(milestone.completed),
-          })),
+          milestones: sortProjectMilestones(
+            (project.milestones ?? []).map((milestone) => ({
+              id: milestone.id ?? generateId(),
+              title: milestone.title ?? "Milestone",
+              dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
+              completed: Boolean(milestone.completed),
+            }))
+          ),
         }))
         const achievements = buildAchievementCatalog(normalizeCollection(merged.achievements))
         const schedule = normalizeCollection(merged.schedule)

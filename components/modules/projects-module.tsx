@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X } from "lucide-react"
 import type { Project, ProjectMilestone } from "@/lib/types"
+import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DEFAULT_PROJECT_COLOR = "#3b82f6"
@@ -53,6 +54,13 @@ function gradientStyleFromColor(color: string | undefined) {
   }
 }
 
+function sortMilestonesByDay(milestones: ProjectMilestone[]) {
+  return [...milestones].sort((a, b) => {
+    if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
+    return a.title.localeCompare(b.title)
+  })
+}
+
 export function ProjectsModule() {
   const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
@@ -80,6 +88,7 @@ export function ProjectsModule() {
   const [editingMilestone, setEditingMilestone] = useState<{ projectId: string; milestoneId: string } | null>(null)
   const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
   const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
+  const [timelineView, setTimelineView] = useState<"weekly" | "yearly">("weekly")
 
   const defaultWeekRange = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -107,7 +116,7 @@ export function ProjectsModule() {
     setTitle(project.title)
     setObjective(project.objective)
     setColor(normalizeProjectColor(project.color))
-    setMilestones(project.milestones.map((m) => `${DAY_LABELS[m.dayIndex]}:${m.title}`).join(", "))
+    setMilestones(sortMilestonesByDay(project.milestones).map((m) => `${DAY_LABELS[m.dayIndex]}:${m.title}`).join(", "))
     setNewLinkLabel("")
     setNewLinkUrl("")
     setNewLinks(getProjectLinks(project))
@@ -226,7 +235,7 @@ export function ProjectsModule() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="font-serif text-2xl font-bold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">Weekly Gantt view of your active projects.</p>
+          <p className="text-sm text-muted-foreground">{timelineView === "weekly" ? "Weekly Gantt view of your active projects." : "Yearly timeline dashboard."}</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -324,86 +333,113 @@ export function ProjectsModule() {
         </Dialog>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant={timelineView === "weekly" ? "default" : "outline"} onClick={() => setTimelineView("weekly")}>
+          Weekly Gantt
+        </Button>
+        <Button type="button" size="sm" variant={timelineView === "yearly" ? "default" : "outline"} onClick={() => setTimelineView("yearly")}>
+          Yearly
+        </Button>
+      </div>
+
       {/* Weekly timeline header */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
-            <div className="text-xs font-medium text-muted-foreground">Project</div>
-            <div className="grid grid-cols-7 gap-1 text-center">
-              {weekDays.map((d) => (
-                <div key={d.iso} className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">{d.label}</span>
-                  <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-xs", d.isToday ? "bg-primary text-primary-foreground font-bold" : "text-foreground")}>
-                    {d.short}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {projects.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-              No projects yet. Use <strong>New Project</strong> to create one and populate this timeline.
-            </p>
-          ) : null}
-
-          {projects.map((project) => {
-            const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
-            const completedTasks = projectTasks.filter((t) => t.completed).length
-            const completedMilestones = project.milestones.filter((m) => m.completed).length
-            const totalMilestones = project.milestones.length
-            const progressPercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
-
-            return (
-              <div key={project.id} className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
-                <div className="flex flex-col justify-center">
-                  <div className="flex items-center gap-1">
-                    <p className="text-sm font-medium truncate">{project.title}</p>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(project)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteProject(project.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground truncate">{project.objective}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
-                    <span className="text-[10px] text-muted-foreground">
-                      {completedMilestones}/{totalMilestones}
+      {timelineView === "weekly" ? (
+        <Card>
+          <CardContent className="p-4">
+            <div className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
+              <div className="text-xs font-medium text-muted-foreground">Project</div>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {weekDays.map((d) => (
+                  <div key={d.iso} className="flex flex-col items-center">
+                    <span className="text-[10px] text-muted-foreground">{d.label}</span>
+                    <span className={cn("flex h-6 w-6 items-center justify-center rounded-full text-xs", d.isToday ? "bg-primary text-primary-foreground font-bold" : "text-foreground")}>
+                      {d.short}
                     </span>
                   </div>
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {weekDays.map((_, i) => {
-                    const milestone = project.milestones.find((m) => m.dayIndex === i)
-                    return (
-                      <div
-                        key={i}
-                        className={cn(
-                          "flex h-14 flex-col items-center justify-center rounded-md border border-border text-center transition-colors",
-                          milestone ? (milestone.completed ? "border-primary/50 bg-primary/15" : "border-primary/30 bg-primary/5 hover:bg-primary/10") : "bg-secondary/30"
-                        )}
-                      >
-                        {milestone ? (
-                          <button onClick={() => toggleMilestone(project.id, milestone.id)} className="flex flex-col items-center gap-0.5 p-1" aria-label={`Toggle milestone: ${milestone.title}`}>
-                            <CheckCircle2 className={cn("h-4 w-4", milestone.completed ? "text-primary" : "text-muted-foreground")} />
-                            <span className="text-[8px] leading-tight text-muted-foreground line-clamp-2">{milestone.title}</span>
-                          </button>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
+                ))}
               </div>
-            )
-          })}
-        </CardContent>
-      </Card>
+            </div>
+
+            {projects.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No projects yet. Use <strong>New Project</strong> to create one and populate this timeline.
+              </p>
+            ) : null}
+
+            {projects.map((project) => {
+              const sortedMilestones = sortMilestonesByDay(project.milestones)
+              const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
+              const completedTasks = projectTasks.filter((t) => t.completed).length
+              const completedMilestones = project.milestones.filter((m) => m.completed).length
+              const totalMilestones = project.milestones.length
+              const progressPercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
+
+              return (
+                <div key={project.id} className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
+                  <div className="flex flex-col justify-center">
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm font-medium truncate">{project.title}</p>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(project)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteProject(project.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate">{project.objective}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
+                      <span className="text-[10px] text-muted-foreground">
+                        {completedMilestones}/{totalMilestones}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {weekDays.map((_, i) => {
+                      const dayMilestones = sortedMilestones.filter((m) => m.dayIndex === i)
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "min-h-14 rounded-md border border-border p-1 text-center transition-colors",
+                            dayMilestones.length > 0 ? "border-primary/30 bg-primary/5" : "bg-secondary/30"
+                          )}
+                        >
+                          {dayMilestones.length > 0 ? (
+                            <div className="flex max-h-16 flex-col gap-1 overflow-y-auto pr-0.5">
+                              {dayMilestones.map((milestone) => (
+                                <button
+                                  key={milestone.id}
+                                  onClick={() => toggleMilestone(project.id, milestone.id)}
+                                  className={cn(
+                                    "flex items-center gap-1 rounded px-1 py-0.5 text-left transition-colors",
+                                    milestone.completed ? "bg-primary/20" : "hover:bg-primary/10"
+                                  )}
+                                  aria-label={`Toggle milestone: ${milestone.title}`}
+                                >
+                                  <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", milestone.completed ? "text-primary" : "text-muted-foreground")} />
+                                  <span className="line-clamp-1 text-[9px] leading-tight text-muted-foreground">{milestone.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      ) : (
+        <ProjectsTimelineChart projects={projects} />
+      )}
 
       {/* Project details cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         {projects.map((project) => {
+          const sortedMilestones = sortMilestonesByDay(project.milestones)
           const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
           const completedTasks = projectTasks.filter((t) => t.completed).length
 
@@ -464,7 +500,7 @@ export function ProjectsModule() {
                     </Button>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {project.milestones.map((m) => (
+                    {sortedMilestones.map((m) => (
                       <div key={m.id} className="flex items-center gap-2">
                         <Checkbox checked={m.completed} onCheckedChange={() => toggleMilestone(project.id, m.id)} aria-label={`Toggle milestone: ${m.title}`} />
                         {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
