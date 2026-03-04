@@ -475,11 +475,16 @@ export function ScheduleModule() {
                         const start = parseISO(item.startISO)
                         const end = parseISO(item.endISO)
                         const hasExplicitTime = item.hasExplicitTime !== false
+                        const linkedTask = item.linkedTaskId
+                          ? tasks.find((entry) => entry.id === item.linkedTaskId)
+                          : null
+                        const isCompletedTask = Boolean(linkedTask?.completed)
                         return (
                           <div
                             key={item.id}
                             className={cn(
-                              "flex items-center gap-2 rounded-md border border-border p-2 cursor-grab active:cursor-grabbing"
+                              "flex items-center gap-2 rounded-md border border-border p-2 cursor-grab active:cursor-grabbing",
+                              isCompletedTask && "border-emerald-500/50 bg-emerald-500/10"
                             )}
                             draggable
                             onDragStart={(event) => {
@@ -492,13 +497,18 @@ export function ScheduleModule() {
                           >
                             <div className={cn("h-6 w-0.5 rounded-full", item.color || "bg-primary")} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{item.title}</p>
+                              <p className={cn("text-xs font-medium truncate", isCompletedTask && "line-through text-muted-foreground")}>{item.title}</p>
                               {hasExplicitTime ? (
                                 <p className="text-[10px] text-muted-foreground">
                                   {format(start, "HH:mm")} - {format(end, "HH:mm")}
                                 </p>
                               ) : null}
                             </div>
+                            {isCompletedTask ? (
+                              <Badge className="h-5 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
+                                Completed
+                              </Badge>
+                            ) : null}
                             {item.linkedTaskId ? (
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
                                 <Pencil className="h-3.5 w-3.5" />
