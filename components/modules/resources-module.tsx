@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { BookOpen, ExternalLink, Search, Plus, Tag, Trash2, Pencil } from "lucide-react"
 
@@ -162,6 +163,39 @@ export function ResourcesModule() {
     setEditingResourceId(null)
   }
 
+  function renderEditableLinks(
+    links: Array<{ label: string; url: string }>,
+    onRemove: (index: number) => void
+  ) {
+    if (links.length === 0) return null
+
+    return (
+      <div className="mt-3 flex max-h-56 flex-col gap-2 overflow-y-auto pr-1">
+        {links.map((link, index) => (
+          <div
+            key={`${link.url}-${index}`}
+            className="flex items-start gap-3 rounded-lg border border-border/80 bg-secondary/20 px-3 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium leading-5">{link.label}</p>
+              <p className="break-all text-xs leading-5 text-muted-foreground">{link.url}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="mt-0.5 h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={() => onRemove(index)}
+              aria-label={`Remove ${link.label} link`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
@@ -175,18 +209,18 @@ export function ResourcesModule() {
               <Plus className="h-4 w-4" /> Add Resource
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-2xl">
+            <DialogHeader className="border-b px-6 pt-6 pb-4">
               <DialogTitle>Add Resource</DialogTitle>
             </DialogHeader>
-            <div className="flex flex-col gap-3">
+            <div className="flex max-h-[calc(85vh-4.5rem)] flex-col gap-4 overflow-y-auto px-6 pb-6">
               <div>
                 <Label htmlFor="res-title">Title</Label>
-                <Input id="res-title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Resource name" />
+                <Input id="res-title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Resource name" className="mt-1" />
               </div>
               <div>
                 <Label>Links (optional)</Label>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
                   <Input
                     value={newLinkLabel}
                     onChange={(e) => setNewLinkLabel(e.target.value)}
@@ -201,41 +235,29 @@ export function ResourcesModule() {
                     Add
                   </Button>
                 </div>
-                {newLinks.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {newLinks.map((link, index) => (
-                      <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
-                        <span className="truncate">
-                          {link.label}: {link.url}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => setNewLinks((prev) => prev.filter((_, i) => i !== index))}
-                          aria-label={`Remove ${link.label} link`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {renderEditableLinks(newLinks, (index) => setNewLinks((prev) => prev.filter((_, i) => i !== index)))}
               </div>
               <div>
                 <Label htmlFor="res-cat">Category</Label>
-                <Input id="res-cat" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="CS, Sport, Tools..." />
+                <Input id="res-cat" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="CS, Sport, Tools..." className="mt-1" />
               </div>
               <div>
                 <Label htmlFor="res-desc">Description</Label>
-                <Input id="res-desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description" />
+                <Textarea
+                  id="res-desc"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Short description"
+                  className="mt-1 min-h-24 resize-y"
+                />
               </div>
               <div>
                 <Label htmlFor="res-tags">Tags (comma-separated)</Label>
-                <Input id="res-tags" value={newTags} onChange={(e) => setNewTags(e.target.value)} placeholder="web-dev, free, algorithms" />
+                <Input id="res-tags" value={newTags} onChange={(e) => setNewTags(e.target.value)} placeholder="web-dev, free, algorithms" className="mt-1" />
               </div>
-              <Button onClick={handleAdd}>Add Resource</Button>
+              <Button onClick={handleAdd} className="w-full">
+                Add Resource
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -380,18 +402,18 @@ export function ResourcesModule() {
         ))
       )}
       <Dialog open={Boolean(editingResourceId)} onOpenChange={(open) => !open && setEditingResourceId(null)}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
             <DialogTitle>Edit Resource</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-3">
+          <div className="flex max-h-[calc(85vh-4.5rem)] flex-col gap-4 overflow-y-auto px-6 pb-6">
             <div>
               <Label htmlFor="edit-res-title">Title</Label>
-              <Input id="edit-res-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              <Input id="edit-res-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1" />
             </div>
             <div>
               <Label>Links (optional)</Label>
-              <div className="mt-1 flex gap-2">
+              <div className="mt-1 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
                 <Input
                   value={editLinkLabel}
                   onChange={(e) => setEditLinkLabel(e.target.value)}
@@ -406,41 +428,28 @@ export function ResourcesModule() {
                   Add
                 </Button>
               </div>
-              {editLinks.length > 0 && (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  {editLinks.map((link, index) => (
-                    <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
-                      <span className="truncate">
-                        {link.label}: {link.url}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        onClick={() => setEditLinks((prev) => prev.filter((_, i) => i !== index))}
-                        aria-label={`Remove ${link.label} link`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {renderEditableLinks(editLinks, (index) => setEditLinks((prev) => prev.filter((_, i) => i !== index)))}
             </div>
             <div>
               <Label htmlFor="edit-res-cat">Category</Label>
-              <Input id="edit-res-cat" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
+              <Input id="edit-res-cat" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="mt-1" />
             </div>
             <div>
               <Label htmlFor="edit-res-desc">Description</Label>
-              <Input id="edit-res-desc" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+              <Textarea
+                id="edit-res-desc"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="mt-1 min-h-24 resize-y"
+              />
             </div>
             <div>
               <Label htmlFor="edit-res-tags">Tags (comma-separated)</Label>
-              <Input id="edit-res-tags" value={editTags} onChange={(e) => setEditTags(e.target.value)} />
+              <Input id="edit-res-tags" value={editTags} onChange={(e) => setEditTags(e.target.value)} className="mt-1" />
             </div>
-            <Button onClick={handleSaveEdit}>Save Changes</Button>
+            <Button onClick={handleSaveEdit} className="w-full">
+              Save Changes
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
