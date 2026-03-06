@@ -18,14 +18,12 @@ const AuthContext = createContext<AuthContextValue>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(auth))
   const setCurrentUid = useAppStore((s) => s.setCurrentUid)
 
   useEffect(() => {
     if (!auth) {
-      setUser(null)
       setCurrentUid(null)
-      setLoading(false)
       return
     }
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {

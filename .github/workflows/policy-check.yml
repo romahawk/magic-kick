@@ -1,0 +1,42 @@
+name: Policy Check
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  required-files:
+    name: Verify Required Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check governance and docs files
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "CLAUDE.md"
+            "CONTRIBUTING.md"
+            "CHANGELOG.md"
+            "docs/ROADMAP.md"
+            "docs/SPRINT_BACKLOG.md"
+            "docs/ARCHITECTURE.md"
+            "docs/DAILY_CHECKLIST.md"
+            "docs/NEXT_SESSION_START.md"
+            "docs/WORKFLOW_AUTOMATION_PLAYBOOK.md"
+            ".github/PULL_REQUEST_TEMPLATE.md"
+          )
+          for path in "${required[@]}"; do
+            if [ ! -f "$path" ]; then
+              echo "Missing required file: $path"
+              exit 1
+            fi
+          done
+
+          if [ ! -d ".github/ISSUE_TEMPLATE" ]; then
+            echo "Missing required directory: .github/ISSUE_TEMPLATE"
+            exit 1
+          fi

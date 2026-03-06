@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useAppStore } from "@/lib/store"
 import { isOverdue, isDueToday } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
@@ -54,14 +54,22 @@ export function TodoModule() {
   const [newCategory, setNewCategory] = useState("")
   const [renameFrom, setRenameFrom] = useState("")
   const [renameTo, setRenameTo] = useState("")
+  const activeFilterCategory = useMemo(
+    () => (filterCategory === "all" || categories.includes(filterCategory) ? filterCategory : "all"),
+    [categories, filterCategory]
+  )
+  const activeEditCategory = useMemo(
+    () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
+    [categories, editCategory]
+  )
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
-      if (filterCategory !== "all" && t.category !== filterCategory) return false
+      if (activeFilterCategory !== "all" && t.category !== activeFilterCategory) return false
       return true
     })
-  }, [tasks, search, filterCategory])
+  }, [tasks, search, activeFilterCategory])
 
   const sortedTasks = useMemo(() => {
     const items = [...filteredTasks]
@@ -102,15 +110,6 @@ export function TodoModule() {
     return map
   }, [filteredTasks])
 
-  useEffect(() => {
-    if (filterCategory !== "all" && !categories.includes(filterCategory)) {
-      setFilterCategory("all")
-    }
-    if (!categories.includes(editCategory)) {
-      setEditCategory(categories[0] ?? "General")
-    }
-  }, [categories, editCategory, filterCategory])
-
   function openTask(task: Task) {
     setSelectedTask(task)
     setIsEditing(false)
@@ -125,7 +124,7 @@ export function TodoModule() {
     if (!selectedTask) return
     updateTask(selectedTask.id, {
       title: editTitle.trim() || selectedTask.title,
-      category: editCategory,
+      category: activeEditCategory,
       dueDate: editDueDate || undefined,
       estimateMin: editEstimate ? Number(editEstimate) : undefined,
       pomodorosPlanned: editPomodoros ? Number(editPomodoros) : undefined,
@@ -133,7 +132,7 @@ export function TodoModule() {
     setSelectedTask({
       ...selectedTask,
       title: editTitle.trim() || selectedTask.title,
-      category: editCategory,
+      category: activeEditCategory,
       dueDate: editDueDate || undefined,
       estimateMin: editEstimate ? Number(editEstimate) : undefined,
       pomodorosPlanned: editPomodoros ? Number(editPomodoros) : undefined,
@@ -159,7 +158,7 @@ export function TodoModule() {
             className="pl-9"
           />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
+        <Select value={activeFilterCategory} onValueChange={setFilterCategory}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
@@ -409,7 +408,7 @@ export function TodoModule() {
                   </div>
                   <div>
                     <Label>Category</Label>
-                    <Select value={editCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
+                    <Select value={activeEditCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (

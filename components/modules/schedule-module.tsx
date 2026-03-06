@@ -87,12 +87,10 @@ export function ScheduleModule() {
   const [isGridDragOver, setIsGridDragOver] = useState(false)
   const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
   const dayGridRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!categories.includes(editCategory)) {
-      setEditCategory(categories[0] ?? "General")
-    }
-  }, [categories, editCategory])
+  const activeEditCategory = useMemo(
+    () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
+    [categories, editCategory]
+  )
 
   const dayItems = useMemo(
     () =>
@@ -228,7 +226,7 @@ export function ScheduleModule() {
       editingTaskId,
       {
         title: editTitle.trim(),
-        category: editCategory,
+        category: activeEditCategory,
         dueDate: editDate || undefined,
         estimateMin: editEstimate ? Number(editEstimate) : undefined,
       },
@@ -542,7 +540,7 @@ export function ScheduleModule() {
             </div>
             <div>
               <Label>Category</Label>
-              <Select value={editCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
+              <Select value={activeEditCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

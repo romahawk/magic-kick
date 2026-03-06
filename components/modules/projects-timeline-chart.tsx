@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { addDays, differenceInCalendarDays, differenceInCalendarWeeks, endOfYear, format, isAfter, isBefore, parseISO, startOfYear } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { Badge } from "@/components/ui/badge"
@@ -80,7 +80,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [flashPhase, setFlashPhase] = useState(false)
   const [weekLabels] = useState(() => Array.from({ length: TOTAL_WEEKS }, (_, idx) => `W${idx + 1}`))
-  const [draftRanges, setDraftRanges] = useState<Record<string, DraftWeeks>>({})
+  const [draftOverrides, setDraftOverrides] = useState<Record<string, DraftWeeks>>({})
   const [interaction, setInteraction] = useState<{
     projectId: string
     mode: InteractionMode
@@ -137,15 +137,12 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
   }, [projects, selectedYear, alertOnly, sortKey, sortDirection])
 
   const pageCount = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE))
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, pageCount))
-  }, [pageCount])
+  const activePage = Math.min(currentPage, pageCount)
 
   const pageRows = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    const start = (activePage - 1) * ITEMS_PER_PAGE
     return rows.slice(start, start + ITEMS_PER_PAGE)
-  }, [rows, currentPage])
+  }, [rows, activePage])
 
   const statusCounts = useMemo(
     () =>
@@ -170,28 +167,33 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
     return () => window.clearInterval(interval)
   }, [pageRows])
 
-  useEffect(() => {
+  const baseDraftRanges = useMemo(() => {
     const nextDrafts: Record<string, DraftWeeks> = {}
     for (const row of rows) {
       nextDrafts[row.id] = normalizeRange(dateToWeekInYear(row.start, selectedYear), dateToWeekInYear(row.end, selectedYear))
     }
-    setDraftRanges(nextDrafts)
+    return nextDrafts
   }, [rows, selectedYear])
 
-  function commitProjectRange(projectId: string, range: DraftWeeks) {
+  const draftRanges = useMemo(
+    () => ({ ...baseDraftRanges, ...draftOverrides }),
+    [baseDraftRanges, draftOverrides]
+  )
+
+  const commitProjectRange = useCallback((projectId: string, range: DraftWeeks) => {
     const normalized = normalizeRange(range.startWeek, range.endWeek)
     updateProject(projectId, {
       weekStartISO: format(yearWeekToDate(selectedYear, normalized.startWeek), "yyyy-MM-dd"),
       weekEndISO: format(yearWeekToDate(selectedYear, normalized.endWeek, true), "yyyy-MM-dd"),
     })
-  }
+  }, [selectedYear, updateProject])
 
   useEffect(() => {
     if (!interaction) return
     const active = interaction
     function onPointerMove(event: MouseEvent) {
       const deltaWeeks = Math.round((event.clientX - active.startX) / 22)
-      setDraftRanges((prev) => {
+      setDraftOverrides((prev) => {
         const current = prev[active.projectId] ?? active.origin
         if (!current) return prev
         let next: DraftWeeks = current
@@ -211,6 +213,11 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
     function onPointerUp() {
       const latest = draftRanges[active.projectId] ?? active.origin
       commitProjectRange(active.projectId, latest)
+      setDraftOverrides((prev) => {
+        const next = { ...prev }
+        delete next[active.projectId]
+        return next
+      })
       setInteraction(null)
     }
     window.addEventListener("mousemove", onPointerMove)
@@ -219,7 +226,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
       window.removeEventListener("mousemove", onPointerMove)
       window.removeEventListener("mouseup", onPointerUp)
     }
-  }, [interaction, draftRanges, selectedYear])
+  }, [commitProjectRange, draftRanges, interaction])
 
   function startInteraction(projectId: string, mode: InteractionMode, clientX: number) {
     const origin = draftRanges[projectId]
@@ -249,6 +256,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
               onChange={(event) => {
                 setSelectedYear(Number(event.target.value))
                 setCurrentPage(1)
+                setDraftOverrides({})
               }}
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
               aria-label="Filter timeline by year"
@@ -346,7 +354,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
                         onChange={(event) => {
                           const nextWeek = dateToWeekInYear(parseISO(event.target.value), selectedYear)
                           const next = normalizeRange(nextWeek, range.endWeek)
-                          setDraftRanges((prev) => ({ ...prev, [row.id]: next }))
+                          setDraftOverrides((prev) => ({ ...prev, [row.id]: next }))
                           commitProjectRange(row.id, next)
                         }}
                         aria-label={`${row.label} start date`}
@@ -358,7 +366,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
                         onChange={(event) => {
                           const nextWeek = dateToWeekInYear(parseISO(event.target.value), selectedYear)
                           const next = normalizeRange(range.startWeek, nextWeek)
-                          setDraftRanges((prev) => ({ ...prev, [row.id]: next }))
+                          setDraftOverrides((prev) => ({ ...prev, [row.id]: next }))
                           commitProjectRange(row.id, next)
                         }}
                         aria-label={`${row.label} end date`}
@@ -396,13 +404,13 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
         </div>
 
         <div className="flex items-center justify-between">
-          <Button type="button" size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+          <Button type="button" size="sm" variant="outline" disabled={activePage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
             Prev
           </Button>
           <p className="text-xs text-muted-foreground">
-            Page {currentPage} / {pageCount} ({rows.length} items)
+            Page {activePage} / {pageCount} ({rows.length} items)
           </p>
-          <Button type="button" size="sm" variant="outline" disabled={currentPage >= pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}>
+          <Button type="button" size="sm" variant="outline" disabled={activePage >= pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}>
             Next
           </Button>
         </div>

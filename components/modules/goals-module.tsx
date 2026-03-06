@@ -160,7 +160,7 @@ export function GoalsModule() {
             <Card>
               <CardContent className="flex flex-col items-center gap-2 py-8">
                 <Sparkles className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No wishlist items yet. Use "Add Goal / Wishlist".</p>
+                <p className="text-sm text-muted-foreground">No wishlist items yet. Use &quot;Add Goal / Wishlist&quot;.</p>
               </CardContent>
             </Card>
           )}
