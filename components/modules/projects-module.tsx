@@ -300,27 +300,29 @@ export function ProjectsModule() {
               </div>
               <div>
                 <Label>Links (optional)</Label>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                   <Input
                     value={newLinkLabel}
                     onChange={(e) => setNewLinkLabel(e.target.value)}
                     placeholder="Label (e.g. Figma)"
+                    className="sm:w-44 sm:flex-none"
                   />
                   <Input
                     value={newLinkUrl}
                     onChange={(e) => setNewLinkUrl(e.target.value)}
                     placeholder="https://..."
+                    className="min-w-0"
                   />
-                  <Button type="button" variant="secondary" onClick={addStagedLink}>
+                  <Button type="button" variant="secondary" onClick={addStagedLink} className="sm:flex-none">
                     Add
                   </Button>
                 </div>
                 {newLinks.length > 0 && (
                   <div className="mt-2 flex flex-col gap-1.5">
                     {newLinks.map((link, index) => (
-                      <div key={`${link.url}-${index}`} className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs">
-                        <span className="truncate">
-                          {link.label}: {link.url}
+                      <div key={`${link.url}-${index}`} className="flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs">
+                        <span className="min-w-0 flex-1 break-all pr-1">
+                          <span className="font-medium">{link.label}:</span> {link.url}
                         </span>
                         <Button
                           type="button"
@@ -499,9 +501,9 @@ export function ProjectsModule() {
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                         >
-                          <span>{link.label || "Link"}</span>
+                          <span className="truncate">{link.label || "Link"}</span>
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ))}
