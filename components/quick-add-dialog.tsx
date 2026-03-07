@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -28,12 +28,17 @@ export function QuickAddDialog() {
   const [taskTime, setTaskTime] = useState("")
   const [goalTitle, setGoalTitle] = useState("")
   const [journalHighlights, setJournalHighlights] = useState("")
+  const activeTaskCategory = useMemo(
+    () => (categories.includes(taskCategory) ? taskCategory : (categories[0] ?? "General")),
+    [categories, taskCategory]
+  )
+  const activeGoalCategory = categories[0] ?? "General"
 
   function handleAddTask() {
     if (!taskTitle.trim()) return
     addTask({
       title: taskTitle.trim(),
-      category: taskCategory,
+      category: activeTaskCategory,
       completed: false,
       dueDate: taskDay || undefined,
       timeHHmm: taskDay ? taskTime || undefined : undefined,
@@ -46,7 +51,7 @@ export function QuickAddDialog() {
 
   function handleAddGoal() {
     if (!goalTitle.trim()) return
-    addGoal({ title: goalTitle, horizon: "mid", category: "General", priority: "medium", notes: "", status: "active", progress: 0 })
+    addGoal({ title: goalTitle, horizon: "mid", category: activeGoalCategory, priority: "medium", notes: "", status: "active", progress: 0 })
     setGoalTitle("")
     setOpen(false)
   }
@@ -57,12 +62,6 @@ export function QuickAddDialog() {
     setJournalHighlights("")
     setOpen(false)
   }
-
-  useEffect(() => {
-    if (!categories.includes(taskCategory)) {
-      setTaskCategory(categories[0] ?? "General")
-    }
-  }, [categories, taskCategory])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -90,7 +89,7 @@ export function QuickAddDialog() {
             </div>
             <div>
               <Label>Category</Label>
-              <Select value={taskCategory} onValueChange={(v) => setTaskCategory(v as TaskCategory)}>
+              <Select value={activeTaskCategory} onValueChange={(v) => setTaskCategory(v as TaskCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (

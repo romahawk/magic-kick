@@ -1,0 +1,36 @@
+name: Weekly Roadmap Sync
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  open-weekly-planning-issue:
+    name: Open Weekly Planning Issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create planning issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10)
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly roadmap sync - ${today}`,
+              body: [
+                "Review this week's roadmap and sprint backlog.",
+                "",
+                "Checklist:",
+                "- Confirm current priorities still match docs/ROADMAP.md",
+                "- Update docs/SPRINT_BACKLOG.md for the active sprint",
+                "- Close or defer stale issues",
+                "- Confirm README and CHANGELOG still reflect shipped behavior",
+              ].join("\n"),
+              labels: ["chore"],
+            })

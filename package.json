@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "npm run typecheck",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "emulators": "firebase emulators:start",
     "deploy:rules": "firebase deploy --only firestore:rules"
   },
@@ -68,6 +69,8 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "eslint": "^9.37.0",
+    "eslint-config-next": "16.1.6",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22",
     "@types/react": "19.2.14",

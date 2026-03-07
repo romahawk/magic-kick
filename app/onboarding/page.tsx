@@ -18,6 +18,8 @@ export default function OnboardingPage() {
   const completeOnboarding = useAppStore((s) => s.completeOnboarding)
   const addGoal = useAppStore((s) => s.addGoal)
   const addTask = useAppStore((s) => s.addTask)
+  const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const firstCategory = taskCategories?.[0] ?? "General"
 
   const [name, setName] = useState(profile.name === "New Player" ? "" : profile.name)
   const [firstGoal, setFirstGoal] = useState("")
@@ -43,7 +45,7 @@ export default function OnboardingPage() {
       addGoal({
         title: firstGoal.trim(),
         horizon: firstGoalHorizon,
-        category: "General",
+        category: firstCategory,
         priority: "medium",
         notes: "",
         status: firstGoalStatus,
