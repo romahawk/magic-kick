@@ -239,7 +239,9 @@ export interface AppState {
   moveTaskToTodo: (id: string) => void
   deleteTask: (id: string) => void
   addGoal: (goal: Omit<Goal, "id">) => void
+  updateGoal: (id: string, updates: Partial<Omit<Goal, "id" | "deleted" | "clientUpdatedAt">>) => void
   updateGoalProgress: (id: string, progress: number) => void
+  reorderGoals: (draggedGoalId: string, targetGoalId: string) => void
   convertWishlistToGoal: (id: string) => void
   addProject: (project: Omit<Project, "id" | "milestones"> & { milestones?: Array<{ title: string; dayIndex: number }> }) => void
   updateProject: (projectId: string, updates: Partial<Omit<Project, "id" | "milestones">>) => void
@@ -403,6 +405,7 @@ export const useAppStore = create<AppState>()(
           nextColors[nextName] = colors[from] ?? colorFromCategoryName(nextName)
           delete nextColors[from]
           const changedTaskIds: string[] = []
+          const changedGoalIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
             if (task.category !== from) return task
             changedTaskIds.push(task.id)
@@ -413,8 +416,20 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             }
           })
+          const nextGoals = s.goals.map((goal) => {
+            if (goal.category !== from) return goal
+            changedGoalIds.push(goal.id)
+            return {
+              ...goal,
+              category: nextName,
+              clientUpdatedAt: ts,
+              deleted: false,
+            }
+          })
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const taskId of changedTaskIds) pendingTasks[taskId] = ts
+          const pendingGoals = { ...s.sync.pending.goals }
+          for (const goalId of changedGoalIds) pendingGoals[goalId] = ts
 
           return {
             profile: {
@@ -425,12 +440,14 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             },
             tasks: nextTasks,
+            goals: nextGoals,
             sync: {
               ...s.sync,
               pending: {
                 ...s.sync.pending,
                 profile: { ...s.sync.pending.profile, profile: ts },
                 tasks: pendingTasks,
+                goals: pendingGoals,
               },
             },
           }
@@ -453,6 +470,7 @@ export const useAppStore = create<AppState>()(
           }
 
           const changedTaskIds: string[] = []
+          const changedGoalIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
             if (task.category !== name) return task
             changedTaskIds.push(task.id)
@@ -463,8 +481,20 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             }
           })
+          const nextGoals = s.goals.map((goal) => {
+            if (goal.category !== name) return goal
+            changedGoalIds.push(goal.id)
+            return {
+              ...goal,
+              category: fallback,
+              clientUpdatedAt: ts,
+              deleted: false,
+            }
+          })
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const taskId of changedTaskIds) pendingTasks[taskId] = ts
+          const pendingGoals = { ...s.sync.pending.goals }
+          for (const goalId of changedGoalIds) pendingGoals[goalId] = ts
 
           return {
             profile: {
@@ -475,12 +505,14 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             },
             tasks: nextTasks,
+            goals: nextGoals,
             sync: {
               ...s.sync,
               pending: {
                 ...s.sync.pending,
                 profile: { ...s.sync.pending.profile, profile: ts },
                 tasks: pendingTasks,
+                goals: pendingGoals,
               },
             },
           }
@@ -866,7 +898,9 @@ export const useAppStore = create<AppState>()(
 
       addGoal: (goal) => {
         const id = generateId()
-        const item = touchEntity({ ...goal, id, deleted: false })
+        const current = get()
+        const maxOrder = current.goals.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
+        const item = touchEntity({ ...goal, id, order: maxOrder + 1, deleted: false })
         set((s) => {
           const nextGoals = [...s.goals, item]
           const ts = item.clientUpdatedAt ?? now()
@@ -897,6 +931,29 @@ export const useAppStore = create<AppState>()(
         })
       },
 
+      updateGoal: (id, updates) => {
+        const ts = now()
+        set((s) => ({
+          goals: s.goals.map((goal) =>
+            goal.id === id
+              ? {
+                  ...goal,
+                  ...updates,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                }
+              : goal
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              goals: { ...s.sync.pending.goals, [id]: ts },
+            },
+          },
+        }))
+      },
+
       updateGoalProgress: (id, progress) => {
         const ts = now()
         set((s) => ({
@@ -911,6 +968,61 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+      },
+
+      reorderGoals: (draggedGoalId, targetGoalId) => {
+        if (draggedGoalId === targetGoalId) return
+        const ts = now()
+        set((s) => {
+          const visibleGoals = s.goals.filter((goal) => !goal.deleted)
+          const draggedGoal = visibleGoals.find((goal) => goal.id === draggedGoalId)
+          const targetGoal = visibleGoals.find((goal) => goal.id === targetGoalId)
+          if (!draggedGoal || !targetGoal) return {}
+          if (draggedGoal.status !== targetGoal.status) return {}
+          if (draggedGoal.status === "active" && draggedGoal.horizon !== targetGoal.horizon) return {}
+
+          const groupGoals = visibleGoals
+            .filter((goal) =>
+              goal.status === draggedGoal.status &&
+              (goal.status !== "active" || goal.horizon === draggedGoal.horizon)
+            )
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          const fromIndex = groupGoals.findIndex((goal) => goal.id === draggedGoalId)
+          const toIndex = groupGoals.findIndex((goal) => goal.id === targetGoalId)
+          if (fromIndex < 0 || toIndex < 0) return {}
+
+          const reordered = [...groupGoals]
+          const [moved] = reordered.splice(fromIndex, 1)
+          reordered.splice(toIndex, 0, moved)
+
+          const nextOrderById = reordered.reduce<Record<string, number>>((acc, goal, index) => {
+            acc[goal.id] = index + 1
+            return acc
+          }, {})
+
+          const pendingGoals = { ...s.sync.pending.goals }
+          for (const goalId of Object.keys(nextOrderById)) pendingGoals[goalId] = ts
+
+          return {
+            goals: s.goals.map((goal) =>
+              nextOrderById[goal.id]
+                ? {
+                    ...goal,
+                    order: nextOrderById[goal.id],
+                    clientUpdatedAt: ts,
+                    deleted: false,
+                  }
+                : goal
+            ),
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                goals: pendingGoals,
+              },
+            },
+          }
+        })
       },
 
       convertWishlistToGoal: (id) => {
@@ -1400,7 +1512,10 @@ export const useAppStore = create<AppState>()(
           order: task.order ?? index + 1,
           xpValue: task.xpValue ?? calculateTaskXP(task),
         }))
-        const goals = normalizeCollection(merged.goals)
+        const goals = normalizeCollection(merged.goals).map((goal, index) => ({
+          ...goal,
+          order: goal.order ?? index + 1,
+        }))
         const projects = normalizeCollection(merged.projects).map((project) => ({
           ...project,
           milestones: sortProjectMilestones(

@@ -25,6 +25,7 @@ export interface Goal extends SyncFields {
   title: string
   horizon: "mid" | "long"
   category: string
+  order?: number
   targetDate?: string
   priority: "high" | "medium" | "low"
   notes: string

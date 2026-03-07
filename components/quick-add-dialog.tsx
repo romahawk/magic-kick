@@ -32,6 +32,7 @@ export function QuickAddDialog() {
     () => (categories.includes(taskCategory) ? taskCategory : (categories[0] ?? "General")),
     [categories, taskCategory]
   )
+  const activeGoalCategory = categories[0] ?? "General"
 
   function handleAddTask() {
     if (!taskTitle.trim()) return
@@ -50,7 +51,7 @@ export function QuickAddDialog() {
 
   function handleAddGoal() {
     if (!goalTitle.trim()) return
-    addGoal({ title: goalTitle, horizon: "mid", category: "General", priority: "medium", notes: "", status: "active", progress: 0 })
+    addGoal({ title: goalTitle, horizon: "mid", category: activeGoalCategory, priority: "medium", notes: "", status: "active", progress: 0 })
     setGoalTitle("")
     setOpen(false)
   }
