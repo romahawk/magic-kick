@@ -1,4 +1,5 @@
 export type TaskCategory = string
+export type TaskLane = "daily-focus" | "backlog" | "parking-lot"
 
 export interface SyncFields {
   deleted?: boolean
@@ -11,6 +12,7 @@ export interface Task extends SyncFields {
   id: string
   title: string
   category: TaskCategory
+  lane?: TaskLane
   order?: number
   dueDate?: string
   estimateMin?: number
