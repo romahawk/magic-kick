@@ -1,12 +1,40 @@
 import { isBefore, parseISO } from "date-fns"
-import type { Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
+import type { ExecutionBlockTemplate, Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
 import { isDueToday, isDueThisWeek } from "@/lib/game-utils"
+
+export const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
+  {
+    id: "deep-work-1",
+    title: "Deep Work 1",
+    purpose: "Primary execution",
+    duration: 90,
+  },
+  {
+    id: "deep-work-2",
+    title: "Deep Work 2",
+    purpose: "Secondary execution",
+    duration: 90,
+  },
+  {
+    id: "admin",
+    title: "Admin Block",
+    purpose: "Maintenance and logistics",
+    duration: 45,
+  },
+  {
+    id: "optional-build",
+    title: "Optional Build",
+    purpose: "Experiment or build time",
+    duration: 60,
+  },
+]
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   maxActiveProjects: 3,
   dailyFocusLimit: 3,
   weeklyOutcomeLimit: 5,
   priorityTiers: ["Income", "Career", "Learning", "Health", "Personal"],
+  executionBlocks: DEFAULT_EXECUTION_BLOCKS,
   xpMode: "standard",
 }
 
@@ -27,6 +55,18 @@ export interface WeeklyOutcomeView {
 }
 
 export function normalizeSystemConfig(config?: Partial<SystemConfig>): SystemConfig {
+  const executionBlocks =
+    config?.executionBlocks && config.executionBlocks.length > 0
+      ? config.executionBlocks
+          .map((block, index) => ({
+            id: block.id?.trim() || `block-${index + 1}`,
+            title: block.title?.trim() || DEFAULT_EXECUTION_BLOCKS[index]?.title || `Block ${index + 1}`,
+            purpose: block.purpose?.trim() || DEFAULT_EXECUTION_BLOCKS[index]?.purpose || "Execution block",
+            duration: Math.max(15, Math.min(240, Number(block.duration) || DEFAULT_EXECUTION_BLOCKS[index]?.duration || 60)),
+          }))
+          .slice(0, 6)
+      : DEFAULT_EXECUTION_BLOCKS
+
   return {
     maxActiveProjects: Math.max(1, config?.maxActiveProjects ?? DEFAULT_SYSTEM_CONFIG.maxActiveProjects),
     dailyFocusLimit: Math.max(1, config?.dailyFocusLimit ?? DEFAULT_SYSTEM_CONFIG.dailyFocusLimit),
@@ -35,6 +75,7 @@ export function normalizeSystemConfig(config?: Partial<SystemConfig>): SystemCon
       config?.priorityTiers && config.priorityTiers.length > 0
         ? config.priorityTiers.filter(Boolean)
         : DEFAULT_SYSTEM_CONFIG.priorityTiers,
+    executionBlocks,
     xpMode: "standard",
   }
 }

@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink } from "lucide-react"
-import type { ScheduleItem, TaskCategory } from "@/lib/types"
+import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink, Briefcase, FolderKanban, Mail, Rocket, Target, AlertTriangle, ChevronDown, SlidersHorizontal } from "lucide-react"
+import type { ExecutionBlockTemplate, ScheduleItem, TaskCategory } from "@/lib/types"
+import { DEFAULT_EXECUTION_BLOCKS } from "@/lib/execution-os"
 
 const POMODORO_WORK = 25 * 60
 const POMODORO_BREAK = 5 * 60
@@ -25,6 +26,15 @@ const MINUTES_PER_DAY = 24 * 60
 const GRID_SNAP_MINUTES = 30
 const HOUR_ROW_HEIGHT_PX = 64
 const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
+const EXECUTION_BLOCK_MINUTES = 45
+const DEEP_WORK_BLOCK_MINUTES = 90
+
+const EXECUTION_BLOCK_STYLES = [
+  { icon: Briefcase, tone: "text-sky-300 border-sky-500/30 bg-sky-500/10" },
+  { icon: FolderKanban, tone: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" },
+  { icon: Mail, tone: "text-amber-200 border-amber-500/30 bg-amber-500/10" },
+  { icon: Rocket, tone: "text-violet-200 border-violet-500/30 bg-violet-500/10" },
+] as const
 
 function clampMinutes(minutes: number) {
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, minutes))
@@ -65,8 +75,10 @@ export function ScheduleModule() {
   const allSchedule = useAppStore((s) => s.schedule)
   const allTasks = useAppStore((s) => s.tasks)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const systemConfig = useAppStore((s) => s.profile.systemConfig)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
   const updateTask = useAppStore((s) => s.updateTask)
+  const updateSystemConfig = useAppStore((s) => s.updateSystemConfig)
   const updateScheduleItem = useAppStore((s) => s.updateScheduleItem)
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
@@ -86,10 +98,17 @@ export function ScheduleModule() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [isGridDragOver, setIsGridDragOver] = useState(false)
   const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
+  const [showRecommendedStructure, setShowRecommendedStructure] = useState(true)
+  const [isBlockEditorOpen, setIsBlockEditorOpen] = useState(false)
+  const [draftExecutionBlocks, setDraftExecutionBlocks] = useState<ExecutionBlockTemplate[]>([])
   const dayGridRef = useRef<HTMLDivElement | null>(null)
   const activeEditCategory = useMemo(
     () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
     [categories, editCategory]
+  )
+  const executionBlockTemplate = useMemo(
+    () => systemConfig?.executionBlocks?.length ? systemConfig.executionBlocks : DEFAULT_EXECUTION_BLOCKS,
+    [systemConfig]
   )
 
   const dayItems = useMemo(
@@ -110,6 +129,43 @@ export function ScheduleModule() {
     () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, idx) => DAY_START_HOUR + idx),
     []
   )
+  const selectedDayExecutionItems = useMemo(
+    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= EXECUTION_BLOCK_MINUTES),
+    [timedDayItems]
+  )
+  const selectedDayDeepWorkItems = useMemo(
+    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= DEEP_WORK_BLOCK_MINUTES),
+    [timedDayItems]
+  )
+  const selectedDayMicroItems = useMemo(
+    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) < EXECUTION_BLOCK_MINUTES),
+    [timedDayItems]
+  )
+  const selectedDayExecutionMinutes = useMemo(
+    () => selectedDayExecutionItems.reduce((total, item) => total + getDurationMinutes(item, 30), 0),
+    [selectedDayExecutionItems]
+  )
+  const selectedDayBlockHealth = useMemo(() => {
+    if (selectedDayExecutionMinutes >= 240 && selectedDayDeepWorkItems.length >= 2 && selectedDayMicroItems.length <= 2) {
+      return {
+        label: "Execution-ready",
+        description: "The day is shaped around meaningful blocks with limited fragmentation.",
+        tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+      }
+    }
+    if (selectedDayExecutionMinutes >= 180 && selectedDayDeepWorkItems.length >= 1) {
+      return {
+        label: "Workable",
+        description: "The day has real execution blocks, but it could use one more deep-work window.",
+        tone: "border-sky-500/30 bg-sky-500/10 text-sky-200",
+      }
+    }
+    return {
+      label: "Fragmented",
+      description: "Too much of the day is still shaped like small tasks instead of execution blocks.",
+      tone: "border-amber-500/30 bg-amber-500/10 text-amber-100",
+    }
+  }, [selectedDayDeepWorkItems.length, selectedDayExecutionMinutes, selectedDayMicroItems.length])
 
   function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
@@ -250,12 +306,49 @@ export function ScheduleModule() {
     setEditingTaskId(null)
   }
 
+  function openBlockEditor() {
+    setDraftExecutionBlocks(executionBlockTemplate.map((block) => ({ ...block })))
+    setIsBlockEditorOpen(true)
+  }
+
+  function updateDraftBlock(index: number, field: keyof ExecutionBlockTemplate, value: string) {
+    setDraftExecutionBlocks((current) =>
+      current.map((block, blockIndex) =>
+        blockIndex === index
+          ? {
+              ...block,
+              [field]:
+                field === "duration"
+                  ? Math.max(15, Math.min(240, Number(value) || 15))
+                  : value,
+            }
+          : block
+      )
+    )
+  }
+
+  function saveExecutionBlocks() {
+    updateSystemConfig({
+      executionBlocks: draftExecutionBlocks.map((block, index) => ({
+        id: block.id || executionBlockTemplate[index]?.id || `block-${index + 1}`,
+        title: block.title.trim() || `Block ${index + 1}`,
+        purpose: block.purpose.trim() || "Execution block",
+        duration: Math.max(15, Math.min(240, Number(block.duration) || 60)),
+      })),
+    })
+    setIsBlockEditorOpen(false)
+  }
+
+  function resetExecutionBlocks() {
+    setDraftExecutionBlocks(DEFAULT_EXECUTION_BLOCKS.map((block) => ({ ...block })))
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-sm text-muted-foreground">Plan your day and stay focused.</p>
+          <p className="text-sm text-muted-foreground">Plan execution blocks first, then fit microtasks around them.</p>
         </div>
         <Button asChild variant="outline" size="sm" className="gap-1.5">
           <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
@@ -265,6 +358,94 @@ export function ScheduleModule() {
         </Button>
       </div>
 
+      <Card className="border-border/70 bg-gradient-to-br from-card via-card to-primary/5">
+        <CardContent className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRecommendedStructure((current) => !current)}
+                  className="flex items-center gap-2 text-left text-sm font-medium text-primary transition-opacity hover:opacity-80"
+                  aria-expanded={showRecommendedStructure}
+                >
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", showRecommendedStructure ? "rotate-0" : "-rotate-90")} />
+                  <Target className="h-4 w-4" />
+                  Recommended Daily Structure
+                </button>
+                <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={openBlockEditor}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Customize
+                </Button>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Your schedule should contain execution blocks, not microtasks.</h2>
+                <p className="text-sm text-muted-foreground">
+                  Define your own block names, durations, and purposes so the schedule matches your execution style.
+                </p>
+              </div>
+            </div>
+            <div className={cn("rounded-full border px-3 py-1 text-xs font-medium", selectedDayBlockHealth.tone)}>
+              {selectedDayBlockHealth.label}
+            </div>
+          </div>
+
+          {showRecommendedStructure ? (
+            <div className="grid gap-3 lg:grid-cols-4">
+              {executionBlockTemplate.map((block, index) => {
+                const style = EXECUTION_BLOCK_STYLES[index % EXECUTION_BLOCK_STYLES.length]
+                const Icon = style.icon
+                return (
+                  <div key={block.id} className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", style.tone)}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <Badge variant="outline" className="border-border/70 text-xs">
+                        {block.duration} min
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">{block.title}</p>
+                      <p className="text-sm text-muted-foreground">{block.purpose}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr]">
+            <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Today&apos;s Shape</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-2xl font-semibold text-foreground">{selectedDayDeepWorkItems.length}</p>
+                  <p className="text-sm text-muted-foreground">Deep-work blocks</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-foreground">{Math.round(selectedDayExecutionMinutes / 60)}</p>
+                  <p className="text-sm text-muted-foreground">Execution hours</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold text-foreground">{selectedDayMicroItems.length + noTimeDayItems.length}</p>
+                  <p className="text-sm text-muted-foreground">Microtasks / loose items</p>
+                </div>
+              </div>
+            </div>
+            <div className={cn("rounded-2xl border p-4", selectedDayBlockHealth.tone)}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4" />
+                <div>
+                  <p className="font-medium">{selectedDayBlockHealth.label}</p>
+                  <p className="mt-1 text-sm opacity-90">{selectedDayBlockHealth.description}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="day">
         <TabsList>
           <TabsTrigger value="day">Day View</TabsTrigger>
@@ -273,6 +454,32 @@ export function ScheduleModule() {
         </TabsList>
 
         <TabsContent value="day" className="mt-4 flex flex-col gap-4">
+          <Card className="border-border/70">
+            <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Block-First Rule</p>
+                <h3 className="text-base font-semibold text-foreground">Protect the large blocks. Push small tasks to the edges.</h3>
+                <p className="text-sm text-muted-foreground">
+                  Use the time grid for 45 to 90 minute execution blocks. Keep emails, errands, and loose follow-ups in the no-time area unless they truly need a slot.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+                  <p className="text-xs text-muted-foreground">Execution blocks</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{selectedDayExecutionItems.length}</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+                  <p className="text-xs text-muted-foreground">Microtasks</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{selectedDayMicroItems.length}</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+                  <p className="text-xs text-muted-foreground">Loose items</p>
+                  <p className="mt-1 text-xl font-semibold text-foreground">{noTimeDayItems.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Day selector */}
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {weekDays.map((d) => (
@@ -327,6 +534,9 @@ export function ScheduleModule() {
                       >
                         <div className={cn("h-8 w-1 rounded-full", item.color || "bg-primary")} />
                         <p className="flex-1 text-sm font-medium">{item.title}</p>
+                        <Badge variant="outline" className="text-[10px]">
+                          Loose task
+                        </Badge>
                         <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
                         {item.linkedTaskId ? (
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTaskEditor(item.id)}>
@@ -392,6 +602,7 @@ export function ScheduleModule() {
                           const startMinutes = dateToMinutes(item.startISO)
                           const rawEndMinutes = dateToMinutes(item.endISO)
                           const durationMinutes = Math.max(15, rawEndMinutes - startMinutes)
+                          const isExecutionBlock = durationMinutes >= EXECUTION_BLOCK_MINUTES
                           if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
                           const top = (startMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
                           const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
@@ -420,6 +631,18 @@ export function ScheduleModule() {
                                   <p className="text-[10px] leading-tight text-muted-foreground">
                                     {format(start, "HH:mm")} - {format(end, "HH:mm")}
                                   </p>
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "h-5 border-border/70 px-1.5 text-[9px] uppercase tracking-wide",
+                                        isExecutionBlock ? "text-emerald-300" : "text-amber-200"
+                                      )}
+                                    >
+                                      {isExecutionBlock ? "Execution block" : "Microtask"}
+                                    </Badge>
+                                    <span className="text-[9px] text-muted-foreground">{durationMinutes} min</span>
+                                  </div>
                                 </div>
                                 {item.linkedTaskId ? (
                                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
@@ -574,6 +797,63 @@ export function ScheduleModule() {
             <Button variant="secondary" onClick={handleMoveToTodo} className="w-full">
               Move to ToDo List
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBlockEditorOpen} onOpenChange={setIsBlockEditorOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Customize Daily Structure</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Rename blocks and update their purpose and duration so the schedule template fits the user, whether that means focused study, training, coding, or admin.
+            </p>
+            <div className="space-y-3">
+              {draftExecutionBlocks.map((block, index) => (
+                <div key={block.id} className="grid gap-3 rounded-xl border border-border/70 bg-background/50 p-4 md:grid-cols-[1.2fr_1.5fr_120px]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`block-title-${block.id}`}>Block Name</Label>
+                    <Input
+                      id={`block-title-${block.id}`}
+                      value={block.title}
+                      onChange={(event) => updateDraftBlock(index, "title", event.target.value)}
+                      placeholder={`Block ${index + 1}`}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`block-purpose-${block.id}`}>Purpose</Label>
+                    <Input
+                      id={`block-purpose-${block.id}`}
+                      value={block.purpose}
+                      onChange={(event) => updateDraftBlock(index, "purpose", event.target.value)}
+                      placeholder="What this block is for"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`block-duration-${block.id}`}>Minutes</Label>
+                    <Input
+                      id={`block-duration-${block.id}`}
+                      type="number"
+                      min={15}
+                      max={240}
+                      step={15}
+                      value={String(block.duration)}
+                      onChange={(event) => updateDraftBlock(index, "duration", event.target.value)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Button type="button" variant="outline" onClick={resetExecutionBlocks}>
+                Reset Defaults
+              </Button>
+              <Button type="button" onClick={saveExecutionBlocks}>
+                Save Structure
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
