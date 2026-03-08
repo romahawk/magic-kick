@@ -44,11 +44,19 @@ export interface ProjectMilestone {
 
 export type ProjectStatus = "active" | "paused" | "parked" | "completed"
 
+export interface ExecutionBlockTemplate {
+  id: string
+  title: string
+  purpose: string
+  duration: number
+}
+
 export interface SystemConfig {
   maxActiveProjects: number
   dailyFocusLimit: number
   weeklyOutcomeLimit: number
   priorityTiers: string[]
+  executionBlocks: ExecutionBlockTemplate[]
   xpMode: "standard"
 }
 
