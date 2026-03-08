@@ -40,10 +40,22 @@ export interface ProjectMilestone {
   completed: boolean
 }
 
+export type ProjectStatus = "active" | "paused" | "parked" | "completed"
+
+export interface SystemConfig {
+  maxActiveProjects: number
+  dailyFocusLimit: number
+  weeklyOutcomeLimit: number
+  priorityTiers: string[]
+  xpMode: "standard"
+}
+
 export interface Project extends SyncFields {
   id: string
   title: string
   objective: string
+  status?: ProjectStatus
+  weeklyOutcome?: string
   weekStartISO: string
   weekEndISO: string
   milestones: ProjectMilestone[]
@@ -106,6 +118,7 @@ export interface Profile extends SyncFields {
   onboardingCompleted: boolean
   taskCategories?: string[]
   taskCategoryColors?: Record<string, string>
+  systemConfig?: SystemConfig
   level: number
   xpTotal: number
   xpThisWeek: number

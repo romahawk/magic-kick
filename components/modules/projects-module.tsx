@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { addDays, format, isAfter, isBefore, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
+import { calculateCognitiveLoad, getProjectStatus, selectActiveProjects } from "@/lib/execution-os"
 import { getWeekDays } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X } from "lucide-react"
 import type { Project, ProjectMilestone } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
@@ -71,14 +73,19 @@ export function ProjectsModule() {
   const addMilestone = useAppStore((s) => s.addMilestone)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
   const deleteMilestone = useAppStore((s) => s.deleteMilestone)
+  const systemConfig = useAppStore((s) => s.profile.systemConfig)
   const weekDays = getWeekDays()
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
+  const activeProjects = selectActiveProjects(projects)
+  const load = calculateCognitiveLoad({ projects, tasks, config: systemConfig })
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [objective, setObjective] = useState("")
+  const [weeklyOutcome, setWeeklyOutcome] = useState("")
+  const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
@@ -101,7 +108,7 @@ export function ProjectsModule() {
     }
   }, [])
 
-  const displayProjects = useMemo(() => {
+  const displayProjects = (() => {
     if (!focusMode) return projects
     const today = new Date()
     const current = [...projects].sort((a, b) => {
@@ -118,7 +125,7 @@ export function ProjectsModule() {
       return aEnd.getTime() - bEnd.getTime()
     })
     return current.slice(0, 3)
-  }, [focusMode, projects])
+  })()
 
   const hiddenProjectsCount = Math.max(0, projects.length - displayProjects.length)
 
@@ -126,6 +133,8 @@ export function ProjectsModule() {
     setEditingId(null)
     setTitle("")
     setObjective("")
+    setWeeklyOutcome("")
+    setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
     setMilestones("")
     setNewLinkLabel("")
@@ -138,6 +147,8 @@ export function ProjectsModule() {
     setEditingId(project.id)
     setTitle(project.title)
     setObjective(project.objective)
+    setWeeklyOutcome(project.weeklyOutcome ?? project.objective)
+    setStatus(getProjectStatus(project))
     setColor(normalizeProjectColor(project.color))
     setMilestones(sortMilestonesByDay(project.milestones).map((m) => `${DAY_LABELS[m.dayIndex]}:${m.title}`).join(", "))
     setNewLinkLabel("")
@@ -187,6 +198,8 @@ export function ProjectsModule() {
       addProject({
         title: title.trim(),
         objective: objective.trim() || "Project objective",
+        weeklyOutcome: weeklyOutcome.trim() || objective.trim() || "Project outcome",
+        status: status ?? "active",
         weekStartISO: defaultWeekRange.start,
         weekEndISO: defaultWeekRange.end,
         color: selectedColor,
@@ -198,6 +211,8 @@ export function ProjectsModule() {
       updateProject(editingId, {
         title: title.trim(),
         objective: objective.trim() || "Project objective",
+        weeklyOutcome: weeklyOutcome.trim() || objective.trim() || "Project outcome",
+        status: status ?? "active",
         color: selectedColor,
         url: normalizedLinks[0]?.url,
         links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
@@ -278,6 +293,29 @@ export function ProjectsModule() {
               <div>
                 <Label htmlFor="project-objective">Objective</Label>
                 <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="project-weekly-outcome">Weekly Outcome</Label>
+                <Input
+                  id="project-weekly-outcome"
+                  value={weeklyOutcome}
+                  onChange={(e) => setWeeklyOutcome(e.target.value)}
+                  placeholder="Finalize architecture diagram"
+                />
+              </div>
+              <div>
+                <Label>Project Status</Label>
+                <Select value={status ?? "active"} onValueChange={(value) => setStatus(value as Project["status"])}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="parked">Parked</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="project-color">Card color</Label>
@@ -372,6 +410,19 @@ export function ProjectsModule() {
           {showDetails ? "Hide Details" : "Show Details"}
         </Button>
       </div>
+      {load.overCapacity ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+            <div>
+              <p className="font-medium">Cognitive overload warning</p>
+              <p className="text-muted-foreground">
+                {activeProjects.length} active projects exceeds the limit of {systemConfig?.maxActiveProjects ?? 3}. Focus score reduced to {load.focusScore}.
+              </p>
+            </div>
+            <Badge className="bg-amber-500 text-black">Over capacity</Badge>
+          </CardContent>
+        </Card>
+      ) : null}
       {focusMode && hiddenProjectsCount > 0 ? (
         <p className="text-xs text-muted-foreground">Focus mode shows 3 current projects. Hidden: {hiddenProjectsCount}.</p>
       ) : null}
@@ -422,6 +473,7 @@ export function ProjectsModule() {
                     </div>
                     <p className="text-[10px] text-muted-foreground truncate">{project.objective}</p>
                     <div className="mt-1 flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                       <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
                       <span className="text-[10px] text-muted-foreground">
                         {completedMilestones}/{totalMilestones}
@@ -488,9 +540,13 @@ export function ProjectsModule() {
               <CardContent className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">{project.objective}</p>
                 <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                   <Badge variant="secondary" className="text-[10px]">
                     {projectTasks.length} tasks ({completedTasks} done)
                   </Badge>
+                </div>
+                <div className="rounded-md border border-border/60 bg-background/60 p-2 text-xs text-muted-foreground">
+                  Weekly Outcome: <span className="font-medium text-foreground">{project.weeklyOutcome ?? project.objective}</span>
                 </div>
                 <div>
                   {getProjectLinks(project).length > 0 && (

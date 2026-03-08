@@ -1,96 +1,99 @@
-# Product Requirements Document — Magic Kick
+# Product Requirements Document - Magic Kick
 
-**Version:** 1.0
-**Date:** 2026-03-02
-**Status:** Active
+**Version:** 1.1  
+**Date:** 2026-03-08  
+**Status:** Active  
 **Owner:** Solo founder
-
----
 
 ## Problem
 
-Knowledge workers and solo founders struggle to maintain momentum across the many fronts of their life — tasks pile up in separate tools, goals sit forgotten in Notion pages, and there's no feedback loop that makes daily execution feel meaningful. Existing tools either track tasks (Todoist) or life goals (Notion) or habits (Habitica) — but none unify them into a single, daily-use command center with a progress feedback loop.
-
----
+People do not need another disconnected productivity tool. They need an execution framework that turns goals into bounded work, bounded work into weekly outcomes, and weekly outcomes into clear daily action with feedback.
 
 ## Target User
 
-**Primary:** Solo founder or remote-first professional transitioning careers
-**Profile:**
-- Manages 3–10 active areas of life simultaneously (work, learning, health, projects)
-- Already uses some combination of Notion, Todoist, calendar apps, and journals
-- Motivated by progress visibility and streaks
-- Needs to operate across devices without constant internet access
+Magic Kick must remain configurable enough to support:
+- professionals
+- students
+- athletes
+- entrepreneurs
+- children and teens
 
-**Out of scope for MVP:** Teams, students, enterprise users
+Common traits:
+- managing multiple priorities at once
+- vulnerable to cognitive overload
+- benefits from visible progress and streak feedback
+- needs offline-first access across devices
 
----
+## Product Position
 
-## Killer Feature
-
-A unified command center that turns your daily tasks, goals, and projects into a leveling game — with offline-first sync so it works anywhere.
-
----
+Magic Kick is a configurable Execution OS, not a hardcoded workflow.
 
 ## Core Loop
 
-1. **Open** → Command Center shows today's tasks, XP progress, streak, and weekly project horizon
-2. **Execute** → Complete a task → earn XP + streak bonus → achievements unlock automatically
-3. **Plan** → Add/update goals and projects → milestone grid populates the weekly horizon view
-4. **Reflect** → End-of-day journal entry with mood, highlights, challenges, next steps
-5. **Sync** → All changes persist locally first, then sync to Firestore when online (auto every 45s or on tab focus)
+1. Goals define strategic direction.
+2. Projects represent active work areas.
+3. Weekly Outcomes define proof of progress.
+4. Daily Focus limits what the user should execute today.
+5. Execution updates tasks, milestones, and schedule.
+6. Feedback updates XP, streak, achievements, and cognitive load.
 
----
+## Current Included Modules
 
-## MVP Scope
+| Module | Role in Execution OS |
+|---|---|
+| Command Center | Daily execution surface |
+| Goals | Strategic direction |
+| ToDo | Backlog and task inventory |
+| Projects | Active work areas |
+| Achievements | Motivation layer |
+| Schedule | Time allocation |
+| Resources | Knowledge base |
+| Journal | Reflection layer |
+| XP / Levels | Progress feedback |
 
-The following must be fully functional for MVP:
+## Current Deferred Modules
 
-| Module | Required for MVP | Notes |
-|---|---|---|
-| Auth (login/signup/onboarding) | Yes | Email + Google |
-| Command Center | Yes | KPIs + today's focus + weekly horizon |
-| Todo / Tasks | Yes | CRUD, categories, XP values, due dates |
-| Goals | Yes | CRUD, horizons, priority, status |
-| Projects | Yes | CRUD, milestones, weekly grid |
-| XP + Leveling | Yes | Auto-calculated on task completion |
-| Achievements | Yes | Rule-based unlocks, badge/medal/diploma |
-| Offline sync | Yes | localStorage → Firestore, conflict resolution |
-| Journal | No | V2 — capture loop works without it |
-| Schedule | No | V2 — calendar view is enhancement |
-| Resources | No | V2 — nice to have |
+These must stay architecturally compatible but are not implemented now:
+- achievement complexity
+- family supervision logic
+- team collaboration
+- AI coach
+- advanced analytics
+- drag-and-drop dashboard customization
+- public accountability
 
----
+## Execution OS Requirements
 
-## Non-Goals
+### System Rules
+- Rules must be stored as user-configurable system configuration.
+- Rules must influence dashboard behavior, project capacity, daily focus limits, weekly outcome limits, and XP behavior.
+- The intended future editing surface is `Settings -> System Rules`.
 
-- No team or multi-user features
-- No native mobile app (responsive web only)
-- No AI-generated task suggestions or smart scheduling
-- No social features, sharing, or leaderboards
-- No third-party calendar integrations (Google Calendar, etc.)
+### Project Capacity
+- Projects must support `active`, `paused`, `parked`, and `completed`.
+- `parked` projects do not count toward cognitive load.
+- Exceeding active project capacity must trigger a warning and reduce focus health.
 
----
+### Weekly Outcomes
+- Each project should carry a `weeklyOutcome`.
+- Weekly outcomes act as the bridge between project planning and daily execution.
 
-## Acceptance Criteria for MVP
+### Daily Focus
+- Command Center must show a limited daily focus list selected from backlog and project-linked work.
+- Items beyond the configured limit remain in the backlog.
 
-1. **Auth:** New user can sign up, complete onboarding, and land on Command Center within 2 minutes
-2. **Task loop:** User can create a task, complete it, and see XP + streak update immediately without refresh
-3. **Offline:** User can create and complete tasks with no internet connection; data syncs correctly when reconnected
-4. **Sync:** Sync cycle completes without error in < 5 seconds on typical home broadband
-5. **Goals/Projects:** User can create a goal and a project with milestones; both appear on Command Center weekly horizon
-6. **Achievements:** At least 3 achievements unlock naturally during a typical first session
-7. **Responsive:** App is usable on mobile (375px+) and desktop (1280px+) without horizontal scroll
-8. **Security:** Firestore rules prevent cross-user data access (verified by emulator rules test)
+### Gamification Alignment
+- XP should reward execution:
+  - daily focus completion
+  - weekly outcome completion
+  - streak consistency
+- XP should not reward passive setup behavior such as task creation or project creation.
 
----
+## Acceptance Criteria
 
-## Risks
-
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Sync conflicts corrupt user data | Low | High | Last-write-wins + soft deletes + cursor-based pull already implemented |
-| Module sprawl dilutes core loop | Medium | High | Freeze Journal, Schedule, Resources until post-MVP |
-| Cold-start UX confusion (empty state) | Medium | Medium | Onboarding creates first goal/task; Command Center shows empty-state guidance |
-| Firebase Auth token expiry breaks sync silently | Medium | Medium | Add token refresh detection in sync engine error handler |
-| XP values feel arbitrary, not motivating | Medium | Medium | Validate category base XP values with 5 user sessions; tune in V1.1 |
+1. Existing modules continue to work without data loss.
+2. Existing users migrate automatically with safe defaults.
+3. Command Center emphasizes execution over inventory browsing.
+4. Project status and weekly outcome fields are available without breaking existing project records.
+5. Cognitive load is visible and understandable without requiring analytics infrastructure.
+6. Architecture remains compatible with a future multi-user workspace layer.
