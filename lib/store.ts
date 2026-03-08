@@ -307,7 +307,7 @@ export const useAppStore = create<AppState>()(
         set({
           isDemoMode: true,
           profile,
-          tasks: seedTasks.map((t, i) => ({ ...t, order: t.order ?? i + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          tasks: seedTasks.map((t, i) => ({ ...t, lane: t.lane ?? "backlog", order: t.order ?? i + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           goals: seedGoals.map((g) => ({ ...g, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           projects: seedProjects.map((p) => ({ ...p, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           achievements,
@@ -598,7 +598,7 @@ export const useAppStore = create<AppState>()(
         const xpValue = taskInput.xpValue ?? calculateTaskXP(taskInput)
         set((s) => {
           const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
-          const item = touchEntity({ ...taskInput, id, xpValue, order: maxOrder + 1, deleted: false })
+          const item = touchEntity({ ...taskInput, lane: taskInput.lane ?? "backlog", id, xpValue, order: maxOrder + 1, deleted: false })
           const nextTasks = [...s.tasks, item]
           const nextSchedule = [...s.schedule]
           const ts = item.clientUpdatedAt ?? now()
@@ -1541,6 +1541,7 @@ export const useAppStore = create<AppState>()(
 
         const tasks = normalizeCollection(merged.tasks).map((task, index) => ({
           ...task,
+          lane: task.lane ?? "backlog",
           order: task.order ?? index + 1,
           xpValue: task.xpValue ?? calculateTaskXP(task),
         }))

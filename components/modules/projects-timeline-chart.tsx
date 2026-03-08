@@ -6,7 +6,9 @@ import { useAppStore } from "@/lib/store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { ArrowDownAZ, ArrowUpDown, AlertTriangle, CalendarDays, Info, Sparkles } from "lucide-react"
 import type { Project } from "@/lib/types"
 
 type SortKey = "date" | "name"
@@ -160,6 +162,9 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
       ),
     [rows]
   )
+  const lateCount = rows.filter((row) => row.lateCompletion).length
+  const dueSoonCount = rows.filter((row) => row.dueSoon).length
+  const alertCount = statusCounts.overdue + lateCount + dueSoonCount
 
   useEffect(() => {
     if (!pageRows.some((row) => row.status === "overdue")) return
@@ -248,8 +253,43 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
 
   return (
     <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="grid gap-3 md:grid-cols-3 md:items-center">
+      <CardContent className="space-y-4 p-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-border/70 bg-secondary/20 p-3">
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              <CalendarDays className="h-3.5 w-3.5" />
+              Timeline Year
+            </div>
+            <p className="text-2xl font-semibold">{selectedYear}</p>
+            <p className="text-xs text-muted-foreground">{rows.length} visible projects</p>
+          </div>
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Alerts
+            </div>
+            <p className="text-2xl font-semibold">{alertCount}</p>
+            <p className="text-xs text-muted-foreground">Overdue, late completion, and due soon</p>
+          </div>
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3">
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-emerald-200">
+              <Sparkles className="h-3.5 w-3.5" />
+              Progress
+            </div>
+            <p className="text-2xl font-semibold">{statusCounts["in-progress"] + statusCounts.completed}</p>
+            <p className="text-xs text-muted-foreground">In progress or completed this year</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-secondary/20 p-3">
+            <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              Sort Mode
+            </div>
+            <p className="text-2xl font-semibold">{sortKey === "date" ? "Date" : "Name"}</p>
+            <p className="text-xs text-muted-foreground">{sortDirection === "asc" ? "Ascending" : "Descending"}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-[auto_1fr_auto] xl:items-center">
           <div className="flex items-center gap-2">
             <select
               value={selectedYear}
@@ -269,39 +309,71 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
             </select>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button type="button" size="sm" variant={sortKey === "date" ? "default" : "outline"} onClick={() => setSort("date")}>
-              Date {sortArrow("date")}
-            </Button>
-            <Button type="button" size="sm" variant={sortKey === "name" ? "default" : "outline"} onClick={() => setSort("name")}>
-              Name {sortArrow("name")}
-            </Button>
-            <Button type="button" size="sm" variant={alertOnly ? "destructive" : "outline"} onClick={() => setAlertOnly((value) => !value)}>
-              Alerts
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 xl:justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" size="icon" variant={sortKey === "date" ? "default" : "outline"} onClick={() => setSort("date")} aria-label={`Sort by date ${sortArrow("date")}`}>
+                  <CalendarDays className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>Sort by Date {sortArrow("date")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" size="icon" variant={sortKey === "name" ? "default" : "outline"} onClick={() => setSort("name")} aria-label={`Sort by name ${sortArrow("name")}`}>
+                  <ArrowDownAZ className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>Sort by Name {sortArrow("name")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" size="icon" variant={alertOnly ? "destructive" : "outline"} onClick={() => setAlertOnly((value) => !value)} aria-label={alertOnly ? "Alert filter on" : "Show alert projects only"}>
+                  <AlertTriangle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>{alertOnly ? "Alert Filter On" : "Only Show Alert Projects"}</TooltipContent>
+            </Tooltip>
+            <div className="flex flex-wrap items-center gap-1.5 pl-1">
+              <Badge variant="outline" className="gap-1">
+                <span className="h-2 w-2 rounded-full bg-slate-300" />
+                Not started {statusCounts["not-started"]}
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                In progress {statusCounts["in-progress"]}
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                Completed {statusCounts.completed}
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <span className="h-2 w-2 rounded-full bg-red-400" />
+                Overdue {statusCounts.overdue}
+              </Badge>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 md:justify-end">
-            {[
-              { key: "not-started", label: "Not started", className: "bg-slate-300/70 border-slate-400", count: statusCounts["not-started"] },
-              { key: "in-progress", label: "In progress", className: "bg-emerald-500/60 border-emerald-500", count: statusCounts["in-progress"] },
-              { key: "completed", label: "Completed", className: "bg-blue-500/60 border-blue-500", count: statusCounts.completed },
-              { key: "overdue", label: "Overdue", className: "bg-red-300/60 border-red-500", count: statusCounts.overdue },
-              { key: "late", label: "Late completion", className: "bg-red-200/70 border-red-300", count: rows.filter((row) => row.lateCompletion).length },
-              { key: "due-soon", label: "Due soon", className: "bg-amber-300/80 border-amber-400", count: rows.filter((row) => row.dueSoon).length },
-            ].map((legend) => (
-              <div key={legend.key} className="flex items-center gap-1.5 text-xs">
-                <span className={cn("h-3 w-3 rounded-sm border", legend.className)} />
-                <span>{legend.label}</span>
-                {"count" in legend ? <span className="text-muted-foreground">({legend.count})</span> : null}
-              </div>
-            ))}
+          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+            <Badge className="bg-red-500/15 text-red-200 hover:bg-red-500/20">Late completion {lateCount}</Badge>
+            <Badge className="bg-amber-500/15 text-amber-100 hover:bg-amber-500/20">Due soon {dueSoonCount}</Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-100 transition-colors hover:bg-sky-500/15"
+                  aria-label="View status rules"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                  Status rules
+                </button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8} className="max-w-sm leading-relaxed">
+                Completed: all milestones done. Overdue: end date is in the past and not completed. Not started: starts in the future with no completed milestones. In progress: everything else. Alerts cover overdue, late completion, and due soon within {DUE_SOON_DAYS} days.
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          Status rules: Completed = all milestones done; Overdue = end date in past and not completed; Not started = starts in future with no completed milestones; In progress = otherwise. Alerts show overdue, late completion, and due soon ({DUE_SOON_DAYS}d).
-        </p>
 
         <div className="sticky top-0 z-10 rounded-md border border-border/80 bg-card/95 py-1 backdrop-blur">
           <div className="grid gap-0.5 text-center text-[10px] text-muted-foreground" style={{ gridTemplateColumns: "repeat(52, minmax(0, 1fr))" }}>

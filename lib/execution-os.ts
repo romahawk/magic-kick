@@ -1,5 +1,5 @@
 import { isBefore, parseISO } from "date-fns"
-import type { Project, ProjectStatus, SystemConfig, Task } from "@/lib/types"
+import type { Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
 import { isDueToday, isDueThisWeek } from "@/lib/game-utils"
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
@@ -11,6 +11,11 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
 }
 
 export type LoadStatus = "Stable" | "Busy" | "Strained" | "Overloaded"
+export const TASK_LANE_LABELS: Record<TaskLane, string> = {
+  "daily-focus": "Daily Focus",
+  backlog: "Backlog",
+  "parking-lot": "Parking Lot",
+}
 
 export interface WeeklyOutcomeView {
   projectId: string
@@ -45,10 +50,18 @@ export function selectActiveProjects(projects: Project[]) {
   return projects.filter((project) => !project.deleted && getProjectStatus(project) === "active")
 }
 
+export function hasDefinedWeeklyOutcome(project: Project) {
+  return Boolean(project.weeklyOutcome?.trim())
+}
+
+export function selectActiveProjectsMissingWeeklyOutcome(projects: Project[]) {
+  return selectActiveProjects(projects).filter((project) => !hasDefinedWeeklyOutcome(project))
+}
+
 export function selectWeeklyOutcomes(projects: Project[], config?: Partial<SystemConfig>): WeeklyOutcomeView[] {
   const rules = normalizeSystemConfig(config)
-  return projects
-    .filter((project) => !project.deleted && getProjectStatus(project) !== "parked")
+  return selectActiveProjects(projects)
+    .filter((project) => hasDefinedWeeklyOutcome(project))
     .map((project) => {
       const completed = getProjectStatus(project) === "completed"
       const overdue = !completed && isBefore(parseISO(project.weekEndISO), new Date())
@@ -56,7 +69,7 @@ export function selectWeeklyOutcomes(projects: Project[], config?: Partial<Syste
         projectId: project.id,
         projectTitle: project.title,
         status: getProjectStatus(project),
-        title: project.weeklyOutcome?.trim() || project.objective,
+        title: project.weeklyOutcome!.trim(),
         completed,
         overdue,
       }
@@ -72,9 +85,21 @@ export function selectWeeklyOutcomes(projects: Project[], config?: Partial<Syste
 export function selectDailyFocus(tasks: Task[], projects: Project[], config?: Partial<SystemConfig>) {
   const rules = normalizeSystemConfig(config)
   const projectById = new Map(projects.filter((project) => !project.deleted).map((project) => [project.id, project]))
+  const explicitFocus = tasks
+    .filter((task) => !task.deleted && !task.completed && task.lane === "daily-focus")
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .slice(0, rules.dailyFocusLimit)
 
-  return tasks
-    .filter((task) => !task.deleted && !task.completed)
+  if (explicitFocus.length >= rules.dailyFocusLimit) {
+    return explicitFocus.map((task) => ({
+      task,
+      linkedProject: task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined,
+      score: Number.MAX_SAFE_INTEGER,
+    }))
+  }
+
+  const derived = tasks
+    .filter((task) => !task.deleted && !task.completed && task.lane !== "parking-lot" && task.lane !== "daily-focus")
     .map((task) => {
       const linkedProject = task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined
       const linkedStatus = linkedProject ? getProjectStatus(linkedProject) : undefined
@@ -82,7 +107,7 @@ export function selectDailyFocus(tasks: Task[], projects: Project[], config?: Pa
         (isDueToday(task.dueDate) ? 100 : 0) +
         (isDueThisWeek(task.dueDate) ? 40 : 0) +
         (linkedStatus === "active" ? 35 : 0) +
-        (linkedProject?.weeklyOutcome ? 20 : 0) +
+        (linkedProject && hasDefinedWeeklyOutcome(linkedProject) ? 20 : 0) +
         Math.min(task.xpValue, 30)
 
       return {
@@ -92,7 +117,16 @@ export function selectDailyFocus(tasks: Task[], projects: Project[], config?: Pa
       }
     })
     .sort((a, b) => b.score - a.score || a.task.title.localeCompare(b.task.title))
-    .slice(0, rules.dailyFocusLimit)
+    .slice(0, Math.max(0, rules.dailyFocusLimit - explicitFocus.length))
+
+  return [
+    ...explicitFocus.map((task) => ({
+      task,
+      linkedProject: task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined,
+      score: Number.MAX_SAFE_INTEGER,
+    })),
+    ...derived,
+  ]
 }
 
 export function calculateCognitiveLoad(input: {
