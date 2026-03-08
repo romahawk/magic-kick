@@ -26,7 +26,6 @@ const MINUTES_PER_DAY = 24 * 60
 const GRID_SNAP_MINUTES = 30
 const HOUR_ROW_HEIGHT_PX = 64
 const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
-const EXECUTION_BLOCK_MINUTES = 45
 const DEEP_WORK_BLOCK_MINUTES = 90
 
 const EXECUTION_BLOCK_STYLES = [
@@ -95,6 +94,7 @@ export function ScheduleModule() {
   const [editStartTime, setEditStartTime] = useState("09:00")
   const [editEndTime, setEditEndTime] = useState("09:30")
   const [editEstimate, setEditEstimate] = useState("")
+  const [editBlockTypeId, setEditBlockTypeId] = useState("none")
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [isGridDragOver, setIsGridDragOver] = useState(false)
   const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
@@ -109,6 +109,10 @@ export function ScheduleModule() {
   const executionBlockTemplate = useMemo(
     () => systemConfig?.executionBlocks?.length ? systemConfig.executionBlocks : DEFAULT_EXECUTION_BLOCKS,
     [systemConfig]
+  )
+  const executionBlockById = useMemo(
+    () => new Map(executionBlockTemplate.map((block) => [block.id, block])),
+    [executionBlockTemplate]
   )
 
   const dayItems = useMemo(
@@ -130,16 +134,21 @@ export function ScheduleModule() {
     []
   )
   const selectedDayExecutionItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= EXECUTION_BLOCK_MINUTES),
-    [timedDayItems]
+    () => timedDayItems.filter((item) => item.blockTypeId && executionBlockById.has(item.blockTypeId)),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayDeepWorkItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= DEEP_WORK_BLOCK_MINUTES),
-    [timedDayItems]
+    () =>
+      timedDayItems.filter((item) => {
+        if (!item.blockTypeId) return false
+        const block = executionBlockById.get(item.blockTypeId)
+        return Boolean(block && block.duration >= DEEP_WORK_BLOCK_MINUTES)
+      }),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayMicroItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) < EXECUTION_BLOCK_MINUTES),
-    [timedDayItems]
+    () => timedDayItems.filter((item) => !item.blockTypeId || !executionBlockById.has(item.blockTypeId)),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayExecutionMinutes = useMemo(
     () => selectedDayExecutionItems.reduce((total, item) => total + getDurationMinutes(item, 30), 0),
@@ -274,6 +283,7 @@ export function ScheduleModule() {
     setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "")
     setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "")
     setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
+    setEditBlockTypeId(item.blockTypeId ?? "none")
   }
 
   function saveTaskFromSchedule() {
@@ -289,6 +299,7 @@ export function ScheduleModule() {
       {
         startHHmm: editStartTime,
         endHHmm: editEndTime,
+        blockTypeId: editBlockTypeId === "none" ? "" : editBlockTypeId,
       }
     )
     setEditingTaskId(null)
@@ -460,7 +471,7 @@ export function ScheduleModule() {
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Block-First Rule</p>
                 <h3 className="text-base font-semibold text-foreground">Protect the large blocks. Push small tasks to the edges.</h3>
                 <p className="text-sm text-muted-foreground">
-                  Use the time grid for 45 to 90 minute execution blocks. Keep emails, errands, and loose follow-ups in the no-time area unless they truly need a slot.
+                  Assign scheduled work to one of your execution block types when it deserves real protected time. Leave quick items unassigned so they stay treated as microtasks.
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -602,7 +613,7 @@ export function ScheduleModule() {
                           const startMinutes = dateToMinutes(item.startISO)
                           const rawEndMinutes = dateToMinutes(item.endISO)
                           const durationMinutes = Math.max(15, rawEndMinutes - startMinutes)
-                          const isExecutionBlock = durationMinutes >= EXECUTION_BLOCK_MINUTES
+                          const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
                           if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
                           const top = (startMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
                           const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
@@ -636,10 +647,10 @@ export function ScheduleModule() {
                                       variant="outline"
                                       className={cn(
                                         "h-5 border-border/70 px-1.5 text-[9px] uppercase tracking-wide",
-                                        isExecutionBlock ? "text-emerald-300" : "text-amber-200"
+                                        assignedBlock ? "text-emerald-300" : "text-amber-200"
                                       )}
                                     >
-                                      {isExecutionBlock ? "Execution block" : "Microtask"}
+                                      {assignedBlock ? assignedBlock.title : "Microtask"}
                                     </Badge>
                                     <span className="text-[9px] text-muted-foreground">{durationMinutes} min</span>
                                   </div>
@@ -699,6 +710,7 @@ export function ScheduleModule() {
                         const linkedTask = item.linkedTaskId
                           ? tasks.find((entry) => entry.id === item.linkedTaskId)
                           : null
+                        const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
                         const isCompletedTask = Boolean(linkedTask?.completed)
                         return (
                           <div
@@ -723,6 +735,9 @@ export function ScheduleModule() {
                                 <p className="text-[10px] text-muted-foreground">
                                   {format(start, "HH:mm")} - {format(end, "HH:mm")}
                                 </p>
+                              ) : null}
+                              {assignedBlock ? (
+                                <p className="text-[10px] text-emerald-300">{assignedBlock.title}</p>
                               ) : null}
                             </div>
                             {isCompletedTask ? (
@@ -789,6 +804,20 @@ export function ScheduleModule() {
             <div>
               <Label htmlFor="schedule-task-estimate">Estimate (min)</Label>
               <Input id="schedule-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} />
+            </div>
+            <div>
+              <Label>Execution Block Type</Label>
+              <Select value={editBlockTypeId} onValueChange={setEditBlockTypeId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None / Microtask</SelectItem>
+                  {executionBlockTemplate.map((block) => (
+                    <SelectItem key={block.id} value={block.id}>
+                      {block.title} ({block.duration} min)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={saveTaskFromSchedule} className="w-full">Save Task</Button>
             <Button variant="outline" onClick={handleRemoveTimeAssignment} className="w-full">

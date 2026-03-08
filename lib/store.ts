@@ -60,6 +60,20 @@ function buildCategoryColors(categories: string[], existing?: Record<string, str
   return result
 }
 
+function inferScheduleBlockTypeId(
+  item: Pick<ScheduleItem, "hasExplicitTime" | "startISO" | "endISO" | "blockTypeId">,
+  blockIds: string[]
+) {
+  if (item.blockTypeId && blockIds.includes(item.blockTypeId)) return item.blockTypeId
+  if (item.hasExplicitTime === false || blockIds.length === 0) return undefined
+  const start = parseISO(item.startISO).getTime()
+  const end = parseISO(item.endISO).getTime()
+  const durationMinutes = Math.round((end - start) / 60000)
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 45) return undefined
+  if (durationMinutes >= 90) return blockIds[0]
+  return blockIds[Math.min(2, blockIds.length - 1)] ?? blockIds[0]
+}
+
 const ENTITY_COLLECTIONS: Exclude<SyncCollection, "profile">[] = [
   "tasks",
   "goals",
@@ -236,7 +250,7 @@ export interface AppState {
   updateTask: (
     id: string,
     updates: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>,
-    timing?: { startHHmm?: string; endHHmm?: string }
+    timing?: { startHHmm?: string; endHHmm?: string; blockTypeId?: string }
   ) => void
   unscheduleTask: (id: string) => void
   moveTaskToTodo: (id: string) => void
@@ -763,18 +777,22 @@ export const useAppStore = create<AppState>()(
               existingEnd ??
               format(addMinutes(parseISO(`${merged.dueDate}T${startHHmm}`), merged.estimateMin ?? 30), "HH:mm")
 
-            const nextSchedule: ScheduleItem = {
-              id: existing?.id ?? `task-${id}`,
-              title: merged.title,
-              type: "task",
-              startISO: hasExplicitTime ? `${merged.dueDate}T${startHHmm}` : `${merged.dueDate}T00:00`,
-              endISO: hasExplicitTime ? `${merged.dueDate}T${endHHmm}` : `${merged.dueDate}T00:00`,
-              hasExplicitTime,
-              color: existing?.color ?? "bg-chart-1",
-              linkedTaskId: id,
-              deleted: false,
-              clientUpdatedAt: ts,
-            }
+              const nextSchedule: ScheduleItem = {
+                id: existing?.id ?? `task-${id}`,
+                title: merged.title,
+                type: "task",
+                startISO: hasExplicitTime ? `${merged.dueDate}T${startHHmm}` : `${merged.dueDate}T00:00`,
+                endISO: hasExplicitTime ? `${merged.dueDate}T${endHHmm}` : `${merged.dueDate}T00:00`,
+                hasExplicitTime,
+                color: existing?.color ?? "bg-chart-1",
+                blockTypeId:
+                  timing?.blockTypeId !== undefined
+                    ? timing.blockTypeId || undefined
+                    : existing?.blockTypeId,
+                linkedTaskId: id,
+                deleted: false,
+                clientUpdatedAt: ts,
+              }
 
             if (scheduleIndex >= 0) {
               schedule[scheduleIndex] = nextSchedule
@@ -1476,7 +1494,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 4,
+      version: 5,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -1509,6 +1527,8 @@ export const useAppStore = create<AppState>()(
           }
         }
 
+        const normalizedConfig = normalizeSystemConfig(merged.profile?.systemConfig)
+
         const profile: Profile = {
           ...base.profile,
           ...merged.profile,
@@ -1527,7 +1547,7 @@ export const useAppStore = create<AppState>()(
                 : DEFAULT_TASK_CATEGORIES
             return buildCategoryColors(categories, merged.profile?.taskCategoryColors)
           })(),
-          systemConfig: normalizeSystemConfig(merged.profile?.systemConfig),
+          systemConfig: normalizedConfig,
           deleted: false,
           clientUpdatedAt: merged.profile?.clientUpdatedAt ?? now(),
         }
@@ -1563,7 +1583,11 @@ export const useAppStore = create<AppState>()(
           ),
         }))
         const achievements = buildAchievementCatalog(normalizeCollection(merged.achievements))
-        const schedule = normalizeCollection(merged.schedule)
+        const scheduleBlockIds = normalizedConfig.executionBlocks.map((block) => block.id)
+        const schedule = normalizeCollection(merged.schedule).map((item) => ({
+          ...item,
+          blockTypeId: inferScheduleBlockTypeId(item, scheduleBlockIds),
+        }))
         const resources = normalizeCollection(merged.resources)
         const journal = normalizeCollection(merged.journal)
 
