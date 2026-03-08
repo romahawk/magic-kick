@@ -1,5 +1,6 @@
 import { format, addDays, startOfWeek } from "date-fns"
 import type { Task, Goal, Project, Achievement, ScheduleItem, Resource, JournalEntry, Profile } from "./types"
+import { DEFAULT_SYSTEM_CONFIG } from "./execution-os"
 
 const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
 const d = (offset: number) => format(addDays(weekStart, offset), "yyyy-MM-dd")
@@ -8,6 +9,7 @@ const today = format(new Date(), "yyyy-MM-dd")
 export const seedProfile: Profile = {
   name: "Alex",
   onboardingCompleted: true,
+  systemConfig: DEFAULT_SYSTEM_CONFIG,
   level: 7,
   xpTotal: 1840,
   xpThisWeek: 310,
@@ -42,12 +44,12 @@ export const seedProjects: Project[] = [
     { id: "m2", title: "Landing page live", dayIndex: 1, completed: false },
     { id: "m3", title: "Product Hunt draft ready", dayIndex: 3, completed: false },
     { id: "m4", title: "Launch day", dayIndex: 5, completed: false },
-  ], color: "bg-chart-1" },
+  ], color: "bg-chart-1", status: "active", weeklyOutcome: "Finalize launch-ready billing and landing page" },
   { id: "p2", title: "Content Engine", objective: "Build consistent inbound via blog + social", weekStartISO: d(0), weekEndISO: d(6), milestones: [
     { id: "m5", title: "Publish SEO article #3", dayIndex: 1, completed: false },
     { id: "m6", title: "Tweet thread + LinkedIn post", dayIndex: 3, completed: false },
     { id: "m7", title: "Record YouTube devlog", dayIndex: 5, completed: false },
-  ], color: "bg-chart-4" },
+  ], color: "bg-chart-4", status: "active", weeklyOutcome: "Publish one article and one distribution batch" },
 ]
 
 export const seedAchievements: Achievement[] = [

@@ -16,6 +16,7 @@ import type {
   Task,
 } from "./types"
 import { generateId } from "./game-utils"
+import { normalizeSystemConfig } from "./execution-os"
 import { getOrCreateDeviceId } from "@/lib/sync/deviceId"
 import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollbackTaskXP } from "@/lib/xp-engine"
 import { levelFromXP } from "@/lib/game-utils"
@@ -116,6 +117,7 @@ function createInitialData() {
     onboardingCompleted: false,
     taskCategories: DEFAULT_TASK_CATEGORIES,
     taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
+    systemConfig: normalizeSystemConfig(),
     level: 1,
     xpTotal: 0,
     xpThisWeek: 0,
@@ -223,6 +225,7 @@ export interface AppState {
 
   setActiveModule: (m: ModuleId) => void
   completeOnboarding: (name: string) => void
+  updateSystemConfig: (updates: Partial<NonNullable<Profile["systemConfig"]>>) => void
   addCategory: (name: string) => void
   renameCategory: (from: string, to: string) => void
   deleteCategory: (name: string) => void
@@ -292,6 +295,7 @@ export const useAppStore = create<AppState>()(
           ...seedProfile,
           taskCategories: DEFAULT_TASK_CATEGORIES,
           taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
+          systemConfig: normalizeSystemConfig(seedProfile.systemConfig),
           deleted: false,
           clientUpdatedAt: ts,
           createdAt: ts,
@@ -332,6 +336,7 @@ export const useAppStore = create<AppState>()(
             ...s.profile,
             name: safeName,
             onboardingCompleted: true,
+            systemConfig: normalizeSystemConfig(s.profile.systemConfig),
             clientUpdatedAt: ts,
             deleted: false,
           }
@@ -931,6 +936,28 @@ export const useAppStore = create<AppState>()(
         })
       },
 
+      updateSystemConfig: (updates) => {
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            systemConfig: normalizeSystemConfig({
+              ...s.profile.systemConfig,
+              ...updates,
+            }),
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
       updateGoal: (id, updates) => {
         const ts = now()
         set((s) => ({
@@ -1054,6 +1081,8 @@ export const useAppStore = create<AppState>()(
           id,
           title: project.title,
           objective: project.objective,
+          status: project.status ?? "active",
+          weeklyOutcome: project.weeklyOutcome?.trim() || undefined,
           weekStartISO: project.weekStartISO,
           weekEndISO: project.weekEndISO,
           color: project.color,
@@ -1099,6 +1128,8 @@ export const useAppStore = create<AppState>()(
               ? {
                   ...p,
                   ...updates,
+                  weeklyOutcome:
+                    typeof updates.weeklyOutcome === "string" ? updates.weeklyOutcome.trim() || undefined : p.weeklyOutcome,
                   clientUpdatedAt: ts,
                   deleted: false,
                 }
@@ -1445,7 +1476,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -1496,6 +1527,7 @@ export const useAppStore = create<AppState>()(
                 : DEFAULT_TASK_CATEGORIES
             return buildCategoryColors(categories, merged.profile?.taskCategoryColors)
           })(),
+          systemConfig: normalizeSystemConfig(merged.profile?.systemConfig),
           deleted: false,
           clientUpdatedAt: merged.profile?.clientUpdatedAt ?? now(),
         }
@@ -1518,6 +1550,8 @@ export const useAppStore = create<AppState>()(
         }))
         const projects = normalizeCollection(merged.projects).map((project) => ({
           ...project,
+          status: project.status ?? "active",
+          weeklyOutcome: project.weeklyOutcome?.trim() || project.objective,
           milestones: sortProjectMilestones(
             (project.milestones ?? []).map((milestone) => ({
               id: milestone.id ?? generateId(),
