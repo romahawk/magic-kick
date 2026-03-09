@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink, Briefcase, FolderKanban, Mail, Rocket, Target, AlertTriangle, ChevronDown, SlidersHorizontal } from "lucide-react"
+import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink, Briefcase, FolderKanban, Mail, Rocket, Target, AlertTriangle, ChevronDown, SlidersHorizontal, CalendarCheck2, CheckCircle2, Maximize2, Minimize2 } from "lucide-react"
 import type { ExecutionBlockTemplate, ScheduleItem, TaskCategory } from "@/lib/types"
 import { DEFAULT_EXECUTION_BLOCKS } from "@/lib/execution-os"
 
@@ -26,7 +26,6 @@ const MINUTES_PER_DAY = 24 * 60
 const GRID_SNAP_MINUTES = 30
 const HOUR_ROW_HEIGHT_PX = 64
 const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
-const EXECUTION_BLOCK_MINUTES = 45
 const DEEP_WORK_BLOCK_MINUTES = 90
 
 const EXECUTION_BLOCK_STYLES = [
@@ -80,6 +79,7 @@ export function ScheduleModule() {
   const updateTask = useAppStore((s) => s.updateTask)
   const updateSystemConfig = useAppStore((s) => s.updateSystemConfig)
   const updateScheduleItem = useAppStore((s) => s.updateScheduleItem)
+  const addScheduleItem = useAppStore((s) => s.addScheduleItem)
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
   const weekDays = getWeekDays()
@@ -95,11 +95,15 @@ export function ScheduleModule() {
   const [editStartTime, setEditStartTime] = useState("09:00")
   const [editEndTime, setEditEndTime] = useState("09:30")
   const [editEstimate, setEditEstimate] = useState("")
+  const [editBlockTypeId, setEditBlockTypeId] = useState("none")
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [isGridDragOver, setIsGridDragOver] = useState(false)
   const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
-  const [showRecommendedStructure, setShowRecommendedStructure] = useState(true)
+  const [showScheduleSurface, setShowScheduleSurface] = useState(true)
+  const [showRecommendedStructure, setShowRecommendedStructure] = useState(false)
+  const [showWeeklyReviewChecklist, setShowWeeklyReviewChecklist] = useState(false)
   const [isBlockEditorOpen, setIsBlockEditorOpen] = useState(false)
+  const [isCalendarFullscreen, setIsCalendarFullscreen] = useState(false)
   const [draftExecutionBlocks, setDraftExecutionBlocks] = useState<ExecutionBlockTemplate[]>([])
   const dayGridRef = useRef<HTMLDivElement | null>(null)
   const activeEditCategory = useMemo(
@@ -109,6 +113,10 @@ export function ScheduleModule() {
   const executionBlockTemplate = useMemo(
     () => systemConfig?.executionBlocks?.length ? systemConfig.executionBlocks : DEFAULT_EXECUTION_BLOCKS,
     [systemConfig]
+  )
+  const executionBlockById = useMemo(
+    () => new Map(executionBlockTemplate.map((block) => [block.id, block])),
+    [executionBlockTemplate]
   )
 
   const dayItems = useMemo(
@@ -130,20 +138,32 @@ export function ScheduleModule() {
     []
   )
   const selectedDayExecutionItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= EXECUTION_BLOCK_MINUTES),
-    [timedDayItems]
+    () => timedDayItems.filter((item) => item.blockTypeId && executionBlockById.has(item.blockTypeId)),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayDeepWorkItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) >= DEEP_WORK_BLOCK_MINUTES),
-    [timedDayItems]
+    () =>
+      timedDayItems.filter((item) => {
+        if (!item.blockTypeId) return false
+        const block = executionBlockById.get(item.blockTypeId)
+        return Boolean(block && block.duration >= DEEP_WORK_BLOCK_MINUTES)
+      }),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayMicroItems = useMemo(
-    () => timedDayItems.filter((item) => getDurationMinutes(item, 30) < EXECUTION_BLOCK_MINUTES),
-    [timedDayItems]
+    () => timedDayItems.filter((item) => !item.blockTypeId || !executionBlockById.has(item.blockTypeId)),
+    [executionBlockById, timedDayItems]
   )
   const selectedDayExecutionMinutes = useMemo(
     () => selectedDayExecutionItems.reduce((total, item) => total + getDurationMinutes(item, 30), 0),
     [selectedDayExecutionItems]
+  )
+  const sunday = weekDays[weekDays.length - 1]
+  const sundayIso = sunday.iso
+  const sundayReview = schedule.find(
+    (item) =>
+      item.startISO.startsWith(`${sundayIso}T`) &&
+      item.title.toLowerCase().includes("weekly review")
   )
   const selectedDayBlockHealth = useMemo(() => {
     if (selectedDayExecutionMinutes >= 240 && selectedDayDeepWorkItems.length >= 2 && selectedDayMicroItems.length <= 2) {
@@ -274,6 +294,7 @@ export function ScheduleModule() {
     setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "")
     setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "")
     setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
+    setEditBlockTypeId(item.blockTypeId ?? "none")
   }
 
   function saveTaskFromSchedule() {
@@ -289,6 +310,7 @@ export function ScheduleModule() {
       {
         startHHmm: editStartTime,
         endHHmm: editEndTime,
+        blockTypeId: editBlockTypeId === "none" ? "" : editBlockTypeId,
       }
     )
     setEditingTaskId(null)
@@ -304,6 +326,18 @@ export function ScheduleModule() {
     if (!editingTaskId) return
     moveTaskToTodo(editingTaskId)
     setEditingTaskId(null)
+  }
+
+  function scheduleWeeklyReview() {
+    if (sundayReview) return
+    addScheduleItem({
+      title: "Weekly Review Ritual",
+      type: "review",
+      startISO: `${sundayIso}T18:00`,
+      endISO: `${sundayIso}T18:30`,
+      hasExplicitTime: true,
+      color: "bg-chart-3",
+    })
   }
 
   function openBlockEditor() {
@@ -344,162 +378,114 @@ export function ScheduleModule() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-sm text-muted-foreground">Plan execution blocks first, then fit microtasks around them.</p>
+    <Tabs defaultValue="day" className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
+            <p className="text-sm text-muted-foreground">Plan execution blocks first, then fit microtasks around them.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+            <TabsList className="w-full justify-start sm:w-auto">
+              <TabsTrigger value="day">Day View</TabsTrigger>
+              <TabsTrigger value="week">Week View</TabsTrigger>
+              <TabsTrigger value="pomodoro">Pomodoro</TabsTrigger>
+            </TabsList>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setIsCalendarFullscreen((current) => !current)}
+            >
+              {isCalendarFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {isCalendarFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
+                Google Calendar
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </Button>
+          </div>
         </div>
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
-            Google Calendar
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </Button>
-      </div>
 
-      <Card className="border-border/70 bg-gradient-to-br from-card via-card to-primary/5">
-        <CardContent className="flex flex-col gap-5 p-5">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <button
+        <div className={cn("grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start", isCalendarFullscreen && "xl:grid-cols-1")}>
+          <div
+            className={cn(
+              "flex min-w-0 flex-col gap-4",
+              isCalendarFullscreen &&
+                "fixed inset-4 z-50 overflow-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+            )}
+          >
+            {isCalendarFullscreen ? (
+              <div className="flex items-center justify-between rounded-xl border border-border bg-background/80 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Schedule Fullscreen</p>
+                  <p className="text-xs text-muted-foreground">Focus on the calendar surface only.</p>
+                </div>
+                <Button
                   type="button"
-                  onClick={() => setShowRecommendedStructure((current) => !current)}
-                  className="flex items-center gap-2 text-left text-sm font-medium text-primary transition-opacity hover:opacity-80"
-                  aria-expanded={showRecommendedStructure}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setIsCalendarFullscreen(false)}
                 >
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", showRecommendedStructure ? "rotate-0" : "-rotate-90")} />
-                  <Target className="h-4 w-4" />
-                  Recommended Daily Structure
-                </button>
-                <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={openBlockEditor}>
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Customize
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  Exit Fullscreen
                 </Button>
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Your schedule should contain execution blocks, not microtasks.</h2>
-                <p className="text-sm text-muted-foreground">
-                  Define your own block names, durations, and purposes so the schedule matches your execution style.
-                </p>
-              </div>
-            </div>
-            <div className={cn("rounded-full border px-3 py-1 text-xs font-medium", selectedDayBlockHealth.tone)}>
-              {selectedDayBlockHealth.label}
-            </div>
-          </div>
+            ) : null}
 
-          {showRecommendedStructure ? (
-            <div className="grid gap-3 lg:grid-cols-4">
-              {executionBlockTemplate.map((block, index) => {
-                const style = EXECUTION_BLOCK_STYLES[index % EXECUTION_BLOCK_STYLES.length]
-                const Icon = style.icon
-                return (
-                  <div key={block.id} className="rounded-2xl border border-border/70 bg-background/60 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", style.tone)}>
-                        <Icon className="h-4 w-4" />
+            <TabsContent value="day" className="mt-0 flex flex-col gap-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-stretch">
+                <Card className="border-border/70 xl:min-w-[460px] xl:max-w-[620px]">
+                  <CardContent className="p-3">
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
+                        <p className="text-[11px] text-muted-foreground">Deep work</p>
+                        <p className="text-lg font-semibold text-foreground">{selectedDayDeepWorkItems.length}</p>
                       </div>
-                      <Badge variant="outline" className="border-border/70 text-xs">
-                        {block.duration} min
-                      </Badge>
+                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
+                        <p className="text-[11px] text-muted-foreground">Execution hrs</p>
+                        <p className="text-lg font-semibold text-foreground">{Math.round(selectedDayExecutionMinutes / 60)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
+                        <p className="text-[11px] text-muted-foreground">Micro / loose</p>
+                        <p className="text-lg font-semibold text-foreground">{selectedDayMicroItems.length + noTimeDayItems.length}</p>
+                      </div>
+                      <div className={cn("rounded-xl border px-3 py-2", selectedDayBlockHealth.tone)}>
+                        <p className="text-[11px] opacity-80">Status</p>
+                        <p className="text-lg font-semibold">{selectedDayBlockHealth.label}</p>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <p className="font-medium text-foreground">{block.title}</p>
-                      <p className="text-sm text-muted-foreground">{block.purpose}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/70 xl:flex-1">
+                  <CardContent className="p-3">
+                    <div className="flex gap-1.5 overflow-x-auto">
+                      {weekDays.map((d) => (
+                        <button
+                          key={d.iso}
+                          onClick={() => setSelectedDay(d.iso)}
+                          className={cn(
+                            "flex min-w-[3.75rem] flex-col items-center rounded-xl px-3 py-2 text-xs transition-colors",
+                            selectedDay === d.iso
+                              ? "bg-primary text-primary-foreground"
+                              : d.isToday
+                                ? "bg-primary/10 text-primary"
+                                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                          )}
+                        >
+                          <span className="font-medium">{d.label}</span>
+                          <span className="text-lg font-bold">{d.short}</span>
+                        </button>
+                      ))}
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : null}
-
-          <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr]">
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Today&apos;s Shape</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-2xl font-semibold text-foreground">{selectedDayDeepWorkItems.length}</p>
-                  <p className="text-sm text-muted-foreground">Deep-work blocks</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold text-foreground">{Math.round(selectedDayExecutionMinutes / 60)}</p>
-                  <p className="text-sm text-muted-foreground">Execution hours</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold text-foreground">{selectedDayMicroItems.length + noTimeDayItems.length}</p>
-                  <p className="text-sm text-muted-foreground">Microtasks / loose items</p>
-                </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-            <div className={cn("rounded-2xl border p-4", selectedDayBlockHealth.tone)}>
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4" />
-                <div>
-                  <p className="font-medium">{selectedDayBlockHealth.label}</p>
-                  <p className="mt-1 text-sm opacity-90">{selectedDayBlockHealth.description}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="day">
-        <TabsList>
-          <TabsTrigger value="day">Day View</TabsTrigger>
-          <TabsTrigger value="week">Week View</TabsTrigger>
-          <TabsTrigger value="pomodoro">Pomodoro</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="day" className="mt-4 flex flex-col gap-4">
-          <Card className="border-border/70">
-            <CardContent className="grid gap-4 p-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Block-First Rule</p>
-                <h3 className="text-base font-semibold text-foreground">Protect the large blocks. Push small tasks to the edges.</h3>
-                <p className="text-sm text-muted-foreground">
-                  Use the time grid for 45 to 90 minute execution blocks. Keep emails, errands, and loose follow-ups in the no-time area unless they truly need a slot.
-                </p>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
-                  <p className="text-xs text-muted-foreground">Execution blocks</p>
-                  <p className="mt-1 text-xl font-semibold text-foreground">{selectedDayExecutionItems.length}</p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
-                  <p className="text-xs text-muted-foreground">Microtasks</p>
-                  <p className="mt-1 text-xl font-semibold text-foreground">{selectedDayMicroItems.length}</p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
-                  <p className="text-xs text-muted-foreground">Loose items</p>
-                  <p className="mt-1 text-xl font-semibold text-foreground">{noTimeDayItems.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Day selector */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {weekDays.map((d) => (
-              <button
-                key={d.iso}
-                onClick={() => setSelectedDay(d.iso)}
-                className={cn(
-                  "flex min-w-[3.5rem] flex-col items-center rounded-lg px-3 py-2 text-xs transition-colors",
-                  selectedDay === d.iso
-                    ? "bg-primary text-primary-foreground"
-                    : d.isToday
-                      ? "bg-primary/10 text-primary"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                )}
-              >
-                <span className="font-medium">{d.label}</span>
-                <span className="text-lg font-bold">{d.short}</span>
-              </button>
-            ))}
-          </div>
 
           {/* Day schedule */}
           {dayItems.length === 0 ? (
@@ -602,7 +588,7 @@ export function ScheduleModule() {
                           const startMinutes = dateToMinutes(item.startISO)
                           const rawEndMinutes = dateToMinutes(item.endISO)
                           const durationMinutes = Math.max(15, rawEndMinutes - startMinutes)
-                          const isExecutionBlock = durationMinutes >= EXECUTION_BLOCK_MINUTES
+                          const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
                           if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
                           const top = (startMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
                           const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
@@ -636,10 +622,10 @@ export function ScheduleModule() {
                                       variant="outline"
                                       className={cn(
                                         "h-5 border-border/70 px-1.5 text-[9px] uppercase tracking-wide",
-                                        isExecutionBlock ? "text-emerald-300" : "text-amber-200"
+                                        assignedBlock ? "text-emerald-300" : "text-amber-200"
                                       )}
                                     >
-                                      {isExecutionBlock ? "Execution block" : "Microtask"}
+                                      {assignedBlock ? assignedBlock.title : "Microtask"}
                                     </Badge>
                                     <span className="text-[9px] text-muted-foreground">{durationMinutes} min</span>
                                   </div>
@@ -660,9 +646,9 @@ export function ScheduleModule() {
               </Card>
             </div>
           )}
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="week" className="mt-4">
+            <TabsContent value="week" className="mt-0">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {weekDays.map((day) => {
               const items = weekItems.filter((item) => {
@@ -699,6 +685,7 @@ export function ScheduleModule() {
                         const linkedTask = item.linkedTaskId
                           ? tasks.find((entry) => entry.id === item.linkedTaskId)
                           : null
+                        const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
                         const isCompletedTask = Boolean(linkedTask?.completed)
                         return (
                           <div
@@ -724,6 +711,9 @@ export function ScheduleModule() {
                                   {format(start, "HH:mm")} - {format(end, "HH:mm")}
                                 </p>
                               ) : null}
+                              {assignedBlock ? (
+                                <p className="text-[10px] text-emerald-300">{assignedBlock.title}</p>
+                              ) : null}
                             </div>
                             {isCompletedTask ? (
                               <Badge className="h-5 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
@@ -744,12 +734,162 @@ export function ScheduleModule() {
               )
             })}
           </div>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="pomodoro" className="mt-4">
-          <PomodoroTimer />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="pomodoro" className="mt-0">
+              <PomodoroTimer />
+            </TabsContent>
+          </div>
+
+          <aside className={cn("flex flex-col gap-4 xl:sticky xl:top-4", isCalendarFullscreen && "hidden")}>
+            <Card className="border-border/60 bg-primary/5">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowRecommendedStructure((current) => !current)}
+                        className="flex items-center gap-2 text-left text-sm font-medium text-primary transition-opacity hover:opacity-80"
+                        aria-expanded={showRecommendedStructure}
+                      >
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", showRecommendedStructure ? "rotate-0" : "-rotate-90")} />
+                        <Target className="h-4 w-4" />
+                        Recommended Daily Structure
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Reference only. Use this when shaping a cleaner day.</p>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={openBlockEditor}>
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Customize
+                  </Button>
+                </div>
+
+                {showRecommendedStructure ? (
+                  <div className="space-y-3">
+                    {executionBlockTemplate.map((block, index) => {
+                      const style = EXECUTION_BLOCK_STYLES[index % EXECUTION_BLOCK_STYLES.length]
+                      const Icon = style.icon
+                      return (
+                        <div key={block.id} className="rounded-xl border border-border/70 bg-background/50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl border", style.tone)}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{block.title}</p>
+                                <p className="text-xs text-muted-foreground">{block.purpose}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="border-border/70 text-[10px]">
+                              {block.duration} min
+                            </Badge>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 bg-background/40">
+              <CardContent className="space-y-3 p-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Block-First Rule</p>
+                  <p className="text-sm font-medium text-foreground">Protect the large blocks. Push small tasks to the edges.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Assign scheduled work to one of your execution block types when it deserves real protected time. Leave quick items unassigned so they stay treated as microtasks.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+                    <p className="text-xs text-muted-foreground">Execution blocks</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{selectedDayExecutionItems.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+                    <p className="text-xs text-muted-foreground">Microtasks</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{selectedDayMicroItems.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+                    <p className="text-xs text-muted-foreground">Loose items</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{noTimeDayItems.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60 bg-secondary/10">
+              <CardContent className="space-y-4 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CalendarCheck2 className="h-4 w-4" />
+                      <p className="text-sm font-medium">Weekly Review Ritual</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Reference only. Keep the system clean before Monday.</p>
+                  </div>
+                  <Badge variant={sundayReview ? "secondary" : "outline"}>
+                    {sunday.label} {sunday.short}
+                  </Badge>
+                </div>
+
+                <div className="rounded-xl border border-border bg-background/40 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowWeeklyReviewChecklist((current) => !current)}
+                    className="flex w-full items-center gap-2 text-left text-sm font-medium transition-opacity hover:opacity-80"
+                    aria-expanded={showWeeklyReviewChecklist}
+                  >
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", showWeeklyReviewChecklist ? "rotate-0" : "-rotate-90")} />
+                    Review checklist
+                  </button>
+                  {showWeeklyReviewChecklist ? (
+                    <div className="mt-3 space-y-2">
+                      {[
+                        "Review weekly outcomes",
+                        "Archive completed tasks",
+                        "Pause unnecessary projects",
+                        "Define next week outcomes",
+                        "Choose Monday focus tasks",
+                      ].map((item) => (
+                        <div key={item} className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 p-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {sundayReview ? "Review scheduled" : "Not scheduled yet"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {sundayReview
+                        ? "Sunday 30-minute review is already on the calendar."
+                        : `Add it to ${sunday.label} in one click.`}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={sundayReview ? "outline" : "default"}
+                    size="sm"
+                    onClick={scheduleWeeklyReview}
+                    disabled={Boolean(sundayReview)}
+                  >
+                    {sundayReview ? "Scheduled" : "Schedule Review"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+      </div>
 
       <Dialog open={!!editingTaskId} onOpenChange={(open) => !open && setEditingTaskId(null)}>
         <DialogContent>
@@ -789,6 +929,20 @@ export function ScheduleModule() {
             <div>
               <Label htmlFor="schedule-task-estimate">Estimate (min)</Label>
               <Input id="schedule-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} />
+            </div>
+            <div>
+              <Label>Execution Block Type</Label>
+              <Select value={editBlockTypeId} onValueChange={setEditBlockTypeId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None / Microtask</SelectItem>
+                  {executionBlockTemplate.map((block) => (
+                    <SelectItem key={block.id} value={block.id}>
+                      {block.title} ({block.duration} min)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={saveTaskFromSchedule} className="w-full">Save Task</Button>
             <Button variant="outline" onClick={handleRemoveTimeAssignment} className="w-full">
@@ -857,7 +1011,7 @@ export function ScheduleModule() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </Tabs>
   )
 }
 

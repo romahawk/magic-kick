@@ -96,6 +96,7 @@ export interface ScheduleItem extends SyncFields {
   endISO: string
   hasExplicitTime?: boolean
   color?: string
+  blockTypeId?: string
   linkedTaskId?: string
 }
 
