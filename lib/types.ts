@@ -98,6 +98,8 @@ export interface ScheduleItem extends SyncFields {
   color?: string
   blockTypeId?: string
   linkedTaskId?: string
+  linkedProjectId?: string
+  linkedMilestoneId?: string
 }
 
 export interface Resource extends SyncFields {
