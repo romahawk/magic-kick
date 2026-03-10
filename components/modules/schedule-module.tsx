@@ -74,6 +74,7 @@ type DisplayScheduleItem = ScheduleItem & {
   sourceKind?: "schedule" | "project-milestone"
   milestoneCompleted?: boolean
   projectId?: Project["id"]
+  milestoneId?: string
 }
 
 export function ScheduleModule() {
@@ -89,15 +90,53 @@ export function ScheduleModule() {
   const addScheduleItem = useAppStore((s) => s.addScheduleItem)
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
+  const updateMilestone = useAppStore((s) => s.updateMilestone)
   const weekDays = getWeekDays()
   const projects = allProjects.filter((project) => !project.deleted)
+  const milestoneMeta = useMemo(() => {
+    const meta = new Map<string, { project: Project; milestone: Project["milestones"][number] }>()
+    for (const project of projects) {
+      for (const milestone of project.milestones) {
+        meta.set(`${project.id}:${milestone.id}`, { project, milestone })
+      }
+    }
+    return meta
+  }, [projects])
   const schedule = useMemo<DisplayScheduleItem[]>(() => {
-    const persistedItems = allSchedule
+    const persistedItems: DisplayScheduleItem[] = allSchedule
       .filter((item) => !item.deleted)
-      .map((item) => ({ ...item, sourceKind: "schedule" as const }))
+      .flatMap((item) => {
+        if (!item.linkedProjectId || !item.linkedMilestoneId) {
+          return [{ ...item, sourceKind: "schedule" as const }]
+        }
+
+        const meta = milestoneMeta.get(`${item.linkedProjectId}:${item.linkedMilestoneId}`)
+        if (!meta || meta.milestone.completed) return []
+
+        return [{
+          ...item,
+          title: `${meta.project.title}: ${meta.milestone.title}`,
+          type: "project-milestone",
+          color: meta.project.color,
+          sourceKind: "schedule" as const,
+          milestoneCompleted: false,
+          projectId: meta.project.id,
+          milestoneId: meta.milestone.id,
+        }]
+      })
+
+    const scheduledMilestoneKeys = new Set(
+      persistedItems
+        .filter((item) => item.projectId && item.milestoneId)
+        .map((item) => `${item.projectId}:${item.milestoneId}`)
+    )
 
     const milestoneItems = projects.flatMap((project) =>
-      project.milestones.map((milestone) => {
+      project.milestones
+        .filter((milestone) => !milestone.completed)
+        .map((milestone) => {
+        const milestoneKey = `${project.id}:${milestone.id}`
+        if (scheduledMilestoneKeys.has(milestoneKey)) return null
         const dayISO = weekDays[milestone.dayIndex]?.iso ?? weekDays[0]?.iso
         if (!dayISO) return null
         return {
@@ -111,12 +150,13 @@ export function ScheduleModule() {
           sourceKind: "project-milestone" as const,
           milestoneCompleted: milestone.completed,
           projectId: project.id,
+          milestoneId: milestone.id,
         }
-      })
+        })
     ).filter(Boolean) as DisplayScheduleItem[]
 
     return [...persistedItems, ...milestoneItems]
-  }, [allSchedule, projects, weekDays])
+  }, [allSchedule, milestoneMeta, projects, weekDays])
   const tasks = allTasks.filter((task) => !task.deleted)
   const [selectedDay, setSelectedDay] = useState(
     weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
@@ -221,6 +261,37 @@ export function ScheduleModule() {
 
   function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
+    if (item?.projectId && item.milestoneId) {
+      const startMinutes = clampToDayWindow(snapMinutes(minutesFromStartOfDay))
+      const endMinutes = clampToDayWindow(startMinutes + 30)
+      const dayIndex = Math.max(0, weekDays.findIndex((day) => day.iso === selectedDay))
+      const existingScheduleItem = allSchedule.find(
+        (entry) =>
+          !entry.deleted &&
+          entry.linkedProjectId === item.projectId &&
+          entry.linkedMilestoneId === item.milestoneId
+      )
+
+      updateMilestone(item.projectId, item.milestoneId, { dayIndex })
+
+      const schedulePayload = {
+        title: item.title,
+        type: "project-milestone",
+        startISO: `${selectedDay}T${minutesToHHmm(startMinutes)}`,
+        endISO: `${selectedDay}T${minutesToHHmm(endMinutes)}`,
+        hasExplicitTime: true,
+        color: item.color,
+        linkedProjectId: item.projectId,
+        linkedMilestoneId: item.milestoneId,
+      }
+
+      if (existingScheduleItem) {
+        updateScheduleItem(existingScheduleItem.id, schedulePayload)
+      } else {
+        addScheduleItem(schedulePayload)
+      }
+      return
+    }
     if (!item?.linkedTaskId) return
     const linkedTask = tasks.find((entry) => entry.id === item.linkedTaskId)
     const duration = getDurationMinutes(item, linkedTask?.estimateMin ?? 30)
@@ -269,6 +340,21 @@ export function ScheduleModule() {
   function moveItemToDay(scheduleItemId: string, targetDayISO: string) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
     if (!item) return
+    if (item.projectId && item.milestoneId) {
+      const dayIndex = weekDays.findIndex((day) => day.iso === targetDayISO)
+      if (dayIndex >= 0) {
+        updateMilestone(item.projectId, item.milestoneId, { dayIndex })
+        if (item.hasExplicitTime !== false && item.sourceKind === "schedule") {
+          const startHHmm = format(parseISO(item.startISO), "HH:mm")
+          const endHHmm = format(parseISO(item.endISO), "HH:mm")
+          updateScheduleItem(item.id, {
+            startISO: `${targetDayISO}T${startHHmm}`,
+            endISO: `${targetDayISO}T${endHHmm}`,
+          })
+        }
+      }
+      return
+    }
     if (!item.linkedTaskId) {
       const startHHmm = format(parseISO(item.startISO), "HH:mm")
       const endHHmm = format(parseISO(item.endISO), "HH:mm")
@@ -537,7 +623,7 @@ export function ScheduleModule() {
                     {noTimeDayItems.map((item) => (
                       <div
                         key={item.id}
-                        draggable={Boolean(item.linkedTaskId)}
+                        draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
                         onDragStart={(event) => {
                           setDraggedItemId(item.id)
                           event.dataTransfer.setData("text/plain", item.id)
@@ -548,7 +634,7 @@ export function ScheduleModule() {
                         }}
                         className={cn(
                           "flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2",
-                          item.linkedTaskId ? "cursor-grab active:cursor-grabbing" : ""
+                          (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : ""
                         )}
                       >
                         <div className={cn("h-8 w-1 rounded-full", item.color || "bg-primary")} />
@@ -633,10 +719,10 @@ export function ScheduleModule() {
                           return (
                             <div
                               key={item.id}
-                              draggable={Boolean(item.linkedTaskId)}
-                              onDragStart={(event) => {
-                                setDraggedItemId(item.id)
-                                event.dataTransfer.setData("text/plain", item.id)
+                            draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
+                            onDragStart={(event) => {
+                              setDraggedItemId(item.id)
+                              event.dataTransfer.setData("text/plain", item.id)
                               }}
                               onDragEnd={() => {
                                 setDraggedItemId(null)
@@ -644,7 +730,7 @@ export function ScheduleModule() {
                               }}
                               className={cn(
                                 "absolute left-2 right-2 overflow-hidden rounded-md border border-border bg-card px-3 py-2 shadow-sm",
-                                item.linkedTaskId ? "cursor-grab active:cursor-grabbing" : ""
+                                (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : ""
                               )}
                               style={{ top: `${top}px`, height: `${height}px` }}
                             >
@@ -733,7 +819,7 @@ export function ScheduleModule() {
                               item.linkedTaskId && "cursor-grab active:cursor-grabbing",
                               isCompletedTask && "border-emerald-500/50 bg-emerald-500/10"
                             )}
-                            draggable={Boolean(item.linkedTaskId)}
+                            draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
                             onDragStart={(event) => {
                               startWeekItemDrag(event, item.id)
                             }}

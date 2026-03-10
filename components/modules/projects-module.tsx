@@ -687,11 +687,13 @@ function WeeklyProjectGrid({
 
       {projects.map((project) => {
         const sortedMilestones = sortMilestonesByDay(project.milestones)
+        const openMilestones = sortedMilestones.filter((milestone) => !milestone.completed)
+        const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
         const completedTasks = projectTasks.filter((t) => t.completed).length
-        const completedMilestones = project.milestones.filter((m) => m.completed).length
+        const completedMilestoneCount = project.milestones.filter((m) => m.completed).length
         const totalMilestones = project.milestones.length
-        const progressPercent = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
+        const progressPercent = totalMilestones > 0 ? (completedMilestoneCount / totalMilestones) * 100 : 0
 
         return (
           <div key={project.id} className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
@@ -710,7 +712,7 @@ function WeeklyProjectGrid({
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
                 <span className="text-[10px] text-muted-foreground">
-                  {completedMilestones}/{totalMilestones}
+                  {completedMilestoneCount}/{totalMilestones}
                 </span>
                 <span className="text-[10px] text-muted-foreground">{completedTasks} done</span>
               </div>
@@ -794,6 +796,8 @@ function ProjectDetailsGrid({
     <div className="grid gap-4 sm:grid-cols-2">
       {projects.map((project) => {
         const sortedMilestones = sortMilestonesByDay(project.milestones)
+        const openMilestones = sortedMilestones.filter((milestone) => !milestone.completed)
+        const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
         const completedTasks = projectTasks.filter((t) => t.completed).length
 
@@ -841,7 +845,12 @@ function ProjectDetailsGrid({
                     ))}
                   </div>
                 )}
-                <p className="mb-1 text-xs font-medium">Milestones</p>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium">Milestones</p>
+                  <Badge variant="outline" className="text-[10px]">
+                    {openMilestones.length} open
+                  </Badge>
+                </div>
                 <div className="mb-2 flex gap-1.5">
                   <Input
                     value={getMilestoneDraft(project.id).title}
@@ -866,9 +875,18 @@ function ProjectDetailsGrid({
                   </Button>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  {sortedMilestones.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2">
-                      <Checkbox checked={m.completed} onCheckedChange={() => toggleMilestone(project.id, m.id)} aria-label={`Toggle milestone: ${m.title}`} />
+                  {openMilestones.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-2">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => toggleMilestone(project.id, m.id)}
+                        aria-label={`Complete milestone: ${m.title}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
                       {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
                         <>
                           <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
@@ -893,8 +911,15 @@ function ProjectDetailsGrid({
                         </>
                       ) : (
                         <>
-                          <span className={cn("text-sm", m.completed && "line-through text-muted-foreground")}>{m.title}</span>
-                          <span className="ml-auto text-[10px] text-muted-foreground">{DAY_LABELS[m.dayIndex]}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm">{m.title}</p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">
+                                {DAY_LABELS[m.dayIndex]}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground">Ready to complete</span>
+                            </div>
+                          </div>
                           <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -905,9 +930,77 @@ function ProjectDetailsGrid({
                       )}
                     </div>
                   ))}
-                  {project.milestones.length === 0 ? <p className="text-xs text-muted-foreground">No milestones yet.</p> : null}
+                  {openMilestones.length === 0 ? <p className="text-xs text-muted-foreground">No open milestones.</p> : null}
                 </div>
-              </div>
+                {completedMilestones.length > 0 ? (
+                  <div className="mt-3 rounded-md border border-border/60 bg-background/40 p-2">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed milestones</p>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {completedMilestones.length}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {completedMilestones.map((m) => (
+                        <div key={m.id} className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-2">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8 shrink-0 border-emerald-500/40"
+                            onClick={() => toggleMilestone(project.id, m.id)}
+                            aria-label={`Reopen milestone: ${m.title}`}
+                          >
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          </Button>
+                          {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
+                            <>
+                              <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
+                              <select
+                                value={editingMilestoneDayIndex}
+                                onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
+                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                aria-label="Edit milestone day"
+                              >
+                                {DAY_LABELS.map((day, index) => (
+                                  <option key={`${project.id}-${m.id}-completed-day-${day}`} value={index}>
+                                    {day}
+                                  </option>
+                                ))}
+                              </select>
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit} aria-label="Cancel milestone edit">
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm line-through text-muted-foreground">{m.title}</p>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {DAY_LABELS[m.dayIndex]}
+                                  </Badge>
+                                  <span className="text-[10px] text-emerald-300">Completed</span>
+                                </div>
+                              </div>
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {project.milestones.length === 0 ? <p className="text-xs text-muted-foreground">No milestones yet.</p> : null}
+                </div>
             </CardContent>
           </Card>
         )
