@@ -272,6 +272,7 @@ export interface AppState {
   deleteMilestone: (projectId: string, milestoneId: string) => void
   addAchievement: (a: Omit<Achievement, "id">) => void
   addResource: (r: Omit<Resource, "id">) => void
+  reorderResources: (draggedResourceId: string, targetResourceId: string) => void
   updateResource: (id: string, updates: Partial<Omit<Resource, "id" | "deleted" | "clientUpdatedAt">>) => void
   deleteResource: (id: string) => void
   addJournalEntry: (j: Omit<JournalEntry, "id">) => void
@@ -326,7 +327,7 @@ export const useAppStore = create<AppState>()(
           projects: seedProjects.map((p) => ({ ...p, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           achievements,
           schedule: seedSchedule.map((s) => ({ ...s, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
-          resources: seedResources.map((r) => ({ ...r, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          resources: seedResources.map((r, index) => ({ ...r, order: r.order ?? index + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           journal: seedJournal.map((j) => ({ ...j, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           activeModule: "command-center",
           sync: createInitialSyncState(),
@@ -1284,7 +1285,8 @@ export const useAppStore = create<AppState>()(
 
       addResource: (r) => {
         const id = generateId()
-        const item = touchEntity({ ...r, id, deleted: false })
+        const maxOrder = get().resources.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
+        const item = touchEntity({ ...r, id, order: maxOrder + 1, deleted: false })
         set((s) => ({
           resources: [...s.resources, item],
           sync: {
@@ -1295,6 +1297,53 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+      },
+
+      reorderResources: (draggedResourceId, targetResourceId) => {
+        if (draggedResourceId === targetResourceId) return
+        const ts = now()
+        set((s) => {
+          const active = s.resources.filter((resource) => !resource.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          const draggedIndex = active.findIndex((resource) => resource.id === draggedResourceId)
+          const targetIndex = active.findIndex((resource) => resource.id === targetResourceId)
+          if (draggedIndex < 0 || targetIndex < 0) return {}
+
+          const nextActive = [...active]
+          const [dragged] = nextActive.splice(draggedIndex, 1)
+          nextActive.splice(targetIndex, 0, dragged)
+
+          const orderById = new Map<string, number>()
+          nextActive.forEach((resource, index) => {
+            orderById.set(resource.id, index + 1)
+          })
+
+          const resources = s.resources.map((resource) => {
+            const nextOrder = orderById.get(resource.id)
+            if (!nextOrder) return resource
+            return {
+              ...resource,
+              order: nextOrder,
+              clientUpdatedAt: ts,
+              deleted: false,
+            }
+          })
+
+          const pendingResources = { ...s.sync.pending.resources }
+          for (const resource of nextActive) {
+            pendingResources[resource.id] = ts
+          }
+
+          return {
+            resources,
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                resources: pendingResources,
+              },
+            },
+          }
+        })
       },
 
       updateResource: (id, updates) => {
@@ -1588,7 +1637,10 @@ export const useAppStore = create<AppState>()(
           ...item,
           blockTypeId: inferScheduleBlockTypeId(item, scheduleBlockIds),
         }))
-        const resources = normalizeCollection(merged.resources)
+        const resources = normalizeCollection(merged.resources).map((resource, index) => ({
+          ...resource,
+          order: resource.order ?? index + 1,
+        }))
         const journal = normalizeCollection(merged.journal)
 
         const next = {

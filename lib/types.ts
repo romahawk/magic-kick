@@ -104,6 +104,7 @@ export interface Resource extends SyncFields {
   id: string
   category: string
   title: string
+  order?: number
   url?: string
   links?: Array<{
     label: string

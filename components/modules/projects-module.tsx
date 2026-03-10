@@ -117,8 +117,8 @@ export function ProjectsModule() {
   const [formError, setFormError] = useState<string | null>(null)
   const [openSections, setOpenSections] = useState<Record<ProjectStatus, boolean>>({
     active: true,
-    paused: true,
-    parked: true,
+    paused: false,
+    parked: false,
     completed: true,
   })
 

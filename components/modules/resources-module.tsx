@@ -10,18 +10,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, ExternalLink, Search, Plus, Tag, Trash2, Pencil } from "lucide-react"
+import { BookOpen, ExternalLink, GripVertical, Search, Plus, Tag, Trash2, Pencil } from "lucide-react"
 
 export function ResourcesModule() {
   const allResources = useAppStore((s) => s.resources)
   const addResource = useAppStore((s) => s.addResource)
+  const reorderResources = useAppStore((s) => s.reorderResources)
   const updateResource = useAppStore((s) => s.updateResource)
   const deleteResource = useAppStore((s) => s.deleteResource)
-  const resources = allResources.filter((r) => !r.deleted)
+  const resources = useMemo(
+    () => allResources.filter((r) => !r.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [allResources]
+  )
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterTag, setFilterTag] = useState<string>("all")
   const [open, setOpen] = useState(false)
+  const [draggedResourceId, setDraggedResourceId] = useState<string | null>(null)
 
   const [newTitle, setNewTitle] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
@@ -292,6 +297,7 @@ export function ResourcesModule() {
             </button>
           ))}
         </div>
+        {resources.length > 1 ? <p className="text-xs text-muted-foreground">Drag cards to reorder them.</p> : null}
       </div>
 
       {/* Tag filter */}
@@ -336,7 +342,24 @@ export function ResourcesModule() {
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">{category} ({items.length})</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((resource) => (
-                <Card key={resource.id} className="transition-colors hover:bg-secondary/30">
+                <Card
+                  key={resource.id}
+                  className={cn(
+                    "transition-colors hover:bg-secondary/30",
+                    "cursor-grab active:cursor-grabbing",
+                    draggedResourceId === resource.id && "opacity-60"
+                  )}
+                  draggable
+                  onDragStart={() => setDraggedResourceId(resource.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (!draggedResourceId || draggedResourceId === resource.id) return
+                    reorderResources(draggedResourceId, resource.id)
+                    setDraggedResourceId(null)
+                  }}
+                  onDragEnd={() => setDraggedResourceId(null)}
+                >
                   <CardContent className="p-4">
                     {(() => {
                       const links = getResourceLinks(resource)
@@ -344,7 +367,10 @@ export function ResourcesModule() {
                         <>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{resource.title}</p>
+                              <div className="flex items-center gap-2">
+                                <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <p className="min-w-0 truncate text-sm font-medium">{resource.title}</p>
+                              </div>
                               <p className="mt-0.5 text-xs text-muted-foreground">{resource.description}</p>
                             </div>
                             <div className="flex items-center gap-1">

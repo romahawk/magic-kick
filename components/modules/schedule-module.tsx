@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink, Briefcase, FolderKanban, Mail, Rocket, Target, AlertTriangle, ChevronDown, SlidersHorizontal, CalendarCheck2, CheckCircle2, Maximize2, Minimize2 } from "lucide-react"
-import type { ExecutionBlockTemplate, ScheduleItem, TaskCategory } from "@/lib/types"
+import type { ExecutionBlockTemplate, Project, ScheduleItem, TaskCategory } from "@/lib/types"
 import { DEFAULT_EXECUTION_BLOCKS } from "@/lib/execution-os"
 
 const POMODORO_WORK = 25 * 60
@@ -70,8 +70,15 @@ function getDurationMinutes(item: ScheduleItem, fallbackMinutes: number) {
   return Math.max(15, diff)
 }
 
+type DisplayScheduleItem = ScheduleItem & {
+  sourceKind?: "schedule" | "project-milestone"
+  milestoneCompleted?: boolean
+  projectId?: Project["id"]
+}
+
 export function ScheduleModule() {
   const allSchedule = useAppStore((s) => s.schedule)
+  const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const systemConfig = useAppStore((s) => s.profile.systemConfig)
@@ -83,7 +90,33 @@ export function ScheduleModule() {
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
   const weekDays = getWeekDays()
-  const schedule = allSchedule.filter((item) => !item.deleted)
+  const projects = allProjects.filter((project) => !project.deleted)
+  const schedule = useMemo<DisplayScheduleItem[]>(() => {
+    const persistedItems = allSchedule
+      .filter((item) => !item.deleted)
+      .map((item) => ({ ...item, sourceKind: "schedule" as const }))
+
+    const milestoneItems = projects.flatMap((project) =>
+      project.milestones.map((milestone) => {
+        const dayISO = weekDays[milestone.dayIndex]?.iso ?? weekDays[0]?.iso
+        if (!dayISO) return null
+        return {
+          id: `project-milestone-${project.id}-${milestone.id}`,
+          title: `${project.title}: ${milestone.title}`,
+          type: "project-milestone",
+          startISO: `${dayISO}T00:00`,
+          endISO: `${dayISO}T00:00`,
+          hasExplicitTime: false,
+          color: project.color,
+          sourceKind: "project-milestone" as const,
+          milestoneCompleted: milestone.completed,
+          projectId: project.id,
+        }
+      })
+    ).filter(Boolean) as DisplayScheduleItem[]
+
+    return [...persistedItems, ...milestoneItems]
+  }, [allSchedule, projects, weekDays])
   const tasks = allTasks.filter((task) => !task.deleted)
   const [selectedDay, setSelectedDay] = useState(
     weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
@@ -99,7 +132,6 @@ export function ScheduleModule() {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
   const [isGridDragOver, setIsGridDragOver] = useState(false)
   const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
-  const [showScheduleSurface, setShowScheduleSurface] = useState(true)
   const [showRecommendedStructure, setShowRecommendedStructure] = useState(false)
   const [showWeeklyReviewChecklist, setShowWeeklyReviewChecklist] = useState(false)
   const [isBlockEditorOpen, setIsBlockEditorOpen] = useState(false)
@@ -395,11 +427,12 @@ export function ScheduleModule() {
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 px-2 sm:px-3"
               onClick={() => setIsCalendarFullscreen((current) => !current)}
+              aria-label={isCalendarFullscreen ? "Exit calendar fullscreen" : "Expand calendar fullscreen"}
             >
               {isCalendarFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              {isCalendarFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              <span className="hidden sm:inline">{isCalendarFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
             </Button>
             <Button asChild variant="outline" size="sm" className="gap-1.5">
               <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
@@ -415,7 +448,7 @@ export function ScheduleModule() {
             className={cn(
               "flex min-w-0 flex-col gap-4",
               isCalendarFullscreen &&
-                "fixed inset-4 z-50 overflow-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+                "fixed inset-2 z-50 overflow-auto rounded-2xl border border-border bg-background p-3 shadow-2xl sm:inset-4 sm:p-4"
             )}
           >
             {isCalendarFullscreen ? (
@@ -439,9 +472,9 @@ export function ScheduleModule() {
 
             <TabsContent value="day" className="mt-0 flex flex-col gap-4">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-stretch">
-                <Card className="border-border/70 xl:min-w-[460px] xl:max-w-[620px]">
+                <Card className="border-border/70 xl:min-w-[420px] xl:max-w-[620px]">
                   <CardContent className="p-3">
-                    <div className="grid gap-2 sm:grid-cols-4">
+                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
                       <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
                         <p className="text-[11px] text-muted-foreground">Deep work</p>
                         <p className="text-lg font-semibold text-foreground">{selectedDayDeepWorkItems.length}</p>
@@ -464,7 +497,7 @@ export function ScheduleModule() {
 
                 <Card className="border-border/70 xl:flex-1">
                   <CardContent className="p-3">
-                    <div className="flex gap-1.5 overflow-x-auto">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
                       {weekDays.map((d) => (
                         <button
                           key={d.iso}
@@ -521,9 +554,14 @@ export function ScheduleModule() {
                         <div className={cn("h-8 w-1 rounded-full", item.color || "bg-primary")} />
                         <p className="flex-1 text-sm font-medium">{item.title}</p>
                         <Badge variant="outline" className="text-[10px]">
-                          Loose task
+                          {item.sourceKind === "project-milestone" ? "Project milestone" : "Loose task"}
                         </Badge>
                         <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
+                        {item.milestoneCompleted ? (
+                          <Badge className="h-5 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
+                            Completed
+                          </Badge>
+                        ) : null}
                         {item.linkedTaskId ? (
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTaskEditor(item.id)}>
                             <Pencil className="h-3.5 w-3.5" />
@@ -551,14 +589,14 @@ export function ScheduleModule() {
                     )}
                   >
                     <div
-                      className="grid grid-cols-[3.25rem_1fr]"
+                      className="grid grid-cols-[2.5rem_1fr] sm:grid-cols-[3.25rem_1fr]"
                       style={{ height: `${(DAY_END_HOUR - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
                     >
                       <div className="relative border-r border-border/70 bg-muted/20">
                         {hourMarkers.map((hour) => (
                           <div
                             key={`label-${hour}`}
-                            className="absolute left-1 top-0 -translate-y-1/2 text-[10px] text-muted-foreground"
+                            className="absolute left-0.5 top-0 -translate-y-1/2 text-[9px] text-muted-foreground sm:left-1 sm:text-[10px]"
                             style={{ top: `${(hour - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
                           >
                             {String(hour).padStart(2, "0")}:00
@@ -686,15 +724,16 @@ export function ScheduleModule() {
                           ? tasks.find((entry) => entry.id === item.linkedTaskId)
                           : null
                         const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
-                        const isCompletedTask = Boolean(linkedTask?.completed)
+                        const isCompletedTask = Boolean(linkedTask?.completed || item.milestoneCompleted)
                         return (
                           <div
                             key={item.id}
                             className={cn(
-                              "flex items-center gap-2 rounded-md border border-border p-2 cursor-grab active:cursor-grabbing",
+                              "flex items-center gap-2 rounded-md border border-border p-2",
+                              item.linkedTaskId && "cursor-grab active:cursor-grabbing",
                               isCompletedTask && "border-emerald-500/50 bg-emerald-500/10"
                             )}
-                            draggable
+                            draggable={Boolean(item.linkedTaskId)}
                             onDragStart={(event) => {
                               startWeekItemDrag(event, item.id)
                             }}
