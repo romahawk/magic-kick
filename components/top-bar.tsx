@@ -23,7 +23,7 @@ export function TopBar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
+    <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 md:flex-nowrap md:gap-3 md:px-6 md:py-0">
       {/* Mobile menu */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
@@ -45,12 +45,12 @@ export function TopBar() {
       </div>
 
       {/* Week range */}
-      <p className="hidden text-sm text-muted-foreground md:block">{weekRange.label}</p>
+      <p className="order-last basis-full text-xs text-muted-foreground md:order-none md:basis-auto md:text-sm">{weekRange.label}</p>
 
-      <div className="flex-1" />
+      <div className="hidden flex-1 md:block" />
 
       {user ? (
-        <div className="hidden max-w-40 truncate rounded-full border border-border px-3 py-1 text-xs text-muted-foreground sm:block">
+        <div className="hidden max-w-40 truncate rounded-full border border-border px-3 py-1 text-xs text-muted-foreground lg:block">
           {user.email}
         </div>
       ) : null}
@@ -82,14 +82,15 @@ export function TopBar() {
       <Button
         variant="outline"
         size="sm"
-        className="h-8 gap-1.5 text-xs"
+        className="h-8 gap-1.5 px-2 text-xs sm:px-3"
         onClick={() => {
           if (!user?.uid) return
           void syncNow(user.uid)
         }}
+        aria-label={`Sync status: ${syncStatus}`}
       >
         <RefreshCcw className={syncStatus === "syncing" ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-        {syncStatus}
+        <span className="hidden sm:inline">{syncStatus}</span>
       </Button>
 
       <Button

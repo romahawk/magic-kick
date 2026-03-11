@@ -162,6 +162,13 @@ export function ScheduleModule() {
     weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
   )
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editingMilestoneSchedule, setEditingMilestoneSchedule] = useState<{
+    scheduleItemId: string | null
+    projectId: string
+    milestoneId: string
+    title: string
+    color?: string
+  } | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editCategory, setEditCategory] = useState<TaskCategory>("Learning")
   const [editDate, setEditDate] = useState("")
@@ -314,6 +321,42 @@ export function ScheduleModule() {
     )
   }
 
+  function upsertMilestoneScheduleItem(input: {
+    scheduleItemId?: string | null
+    projectId: string
+    milestoneId: string
+    title: string
+    color?: string
+    dateISO: string
+    startHHmm: string
+    endHHmm: string
+    blockTypeId?: string
+  }) {
+    const dayIndex = weekDays.findIndex((day) => day.iso === input.dateISO)
+    if (dayIndex >= 0) {
+      updateMilestone(input.projectId, input.milestoneId, { dayIndex })
+    }
+
+    const schedulePayload = {
+      title: input.title,
+      type: "project-milestone",
+      startISO: `${input.dateISO}T${input.startHHmm}`,
+      endISO: `${input.dateISO}T${input.endHHmm}`,
+      hasExplicitTime: true,
+      color: input.color,
+      blockTypeId: input.blockTypeId,
+      linkedProjectId: input.projectId,
+      linkedMilestoneId: input.milestoneId,
+    }
+
+    if (input.scheduleItemId) {
+      updateScheduleItem(input.scheduleItemId, schedulePayload)
+      return
+    }
+
+    addScheduleItem(schedulePayload)
+  }
+
   function onGridDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     setIsGridDragOver(true)
@@ -401,7 +444,25 @@ export function ScheduleModule() {
 
   function openTaskEditor(scheduleItemId: string) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
-    if (!item?.linkedTaskId) return
+    if (!item) return
+    if (item.projectId && item.milestoneId) {
+      const hasExplicitTime = item.hasExplicitTime !== false
+      setEditingMilestoneSchedule({
+        scheduleItemId: item.sourceKind === "schedule" ? item.id : null,
+        projectId: item.projectId,
+        milestoneId: item.milestoneId,
+        title: item.title,
+        color: item.color,
+      })
+      setEditTitle(item.title)
+      setEditDate(format(parseISO(item.startISO), "yyyy-MM-dd"))
+      setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "09:00")
+      setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "09:30")
+      setEditEstimate("")
+      setEditBlockTypeId(item.blockTypeId ?? "none")
+      return
+    }
+    if (!item.linkedTaskId) return
     const task = tasks.find((entry) => entry.id === item.linkedTaskId)
     if (!task) return
     const hasExplicitTime = item.hasExplicitTime !== false
@@ -416,6 +477,21 @@ export function ScheduleModule() {
   }
 
   function saveTaskFromSchedule() {
+    if (editingMilestoneSchedule) {
+      upsertMilestoneScheduleItem({
+        scheduleItemId: editingMilestoneSchedule.scheduleItemId,
+        projectId: editingMilestoneSchedule.projectId,
+        milestoneId: editingMilestoneSchedule.milestoneId,
+        title: editTitle.trim() || editingMilestoneSchedule.title,
+        color: editingMilestoneSchedule.color,
+        dateISO: editDate,
+        startHHmm: editStartTime,
+        endHHmm: editEndTime,
+        blockTypeId: editBlockTypeId === "none" ? undefined : editBlockTypeId,
+      })
+      setEditingMilestoneSchedule(null)
+      return
+    }
     if (!editingTaskId) return
     updateTask(
       editingTaskId,
@@ -435,6 +511,13 @@ export function ScheduleModule() {
   }
 
   function handleRemoveTimeAssignment() {
+    if (editingMilestoneSchedule?.scheduleItemId) {
+      updateScheduleItem(editingMilestoneSchedule.scheduleItemId, {
+        deleted: true,
+      } as Partial<ScheduleItem>)
+      setEditingMilestoneSchedule(null)
+      return
+    }
     if (!editingTaskId) return
     unscheduleTask(editingTaskId)
     setEditingTaskId(null)
@@ -648,7 +731,7 @@ export function ScheduleModule() {
                             Completed
                           </Badge>
                         ) : null}
-                        {item.linkedTaskId ? (
+                        {(item.linkedTaskId || item.projectId) ? (
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTaskEditor(item.id)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -754,7 +837,7 @@ export function ScheduleModule() {
                                     <span className="text-[9px] text-muted-foreground">{durationMinutes} min</span>
                                   </div>
                                 </div>
-                                {item.linkedTaskId ? (
+                                {(item.linkedTaskId || item.projectId) ? (
                                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
@@ -816,7 +899,7 @@ export function ScheduleModule() {
                             key={item.id}
                             className={cn(
                               "flex items-center gap-2 rounded-md border border-border p-2",
-                              item.linkedTaskId && "cursor-grab active:cursor-grabbing",
+                              (item.linkedTaskId || item.projectId) && "cursor-grab active:cursor-grabbing",
                               isCompletedTask && "border-emerald-500/50 bg-emerald-500/10"
                             )}
                             draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
@@ -845,7 +928,7 @@ export function ScheduleModule() {
                                 Completed
                               </Badge>
                             ) : null}
-                            {item.linkedTaskId ? (
+                            {(item.linkedTaskId || item.projectId) ? (
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -1016,17 +1099,26 @@ export function ScheduleModule() {
         </div>
       </div>
 
-      <Dialog open={!!editingTaskId} onOpenChange={(open) => !open && setEditingTaskId(null)}>
+      <Dialog
+        open={Boolean(editingTaskId || editingMilestoneSchedule)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTaskId(null)
+            setEditingMilestoneSchedule(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Task From Schedule</DialogTitle>
+            <DialogTitle>{editingMilestoneSchedule ? "Edit Milestone From Schedule" : "Edit Task From Schedule"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label htmlFor="schedule-task-title">Title</Label>
               <Input id="schedule-task-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
             </div>
-            <div>
+            {!editingMilestoneSchedule ? (
+              <div>
               <Label>Category</Label>
               <Select value={activeEditCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1036,7 +1128,8 @@ export function ScheduleModule() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              </div>
+            ) : null}
             <div>
               <Label htmlFor="schedule-task-date">Date</Label>
               <Input id="schedule-task-date" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
@@ -1051,10 +1144,12 @@ export function ScheduleModule() {
                 <Input id="schedule-task-end" type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} />
               </div>
             </div>
-            <div>
+            {!editingMilestoneSchedule ? (
+              <div>
               <Label htmlFor="schedule-task-estimate">Estimate (min)</Label>
               <Input id="schedule-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} />
-            </div>
+              </div>
+            ) : null}
             <div>
               <Label>Execution Block Type</Label>
               <Select value={editBlockTypeId} onValueChange={setEditBlockTypeId}>
@@ -1069,13 +1164,15 @@ export function ScheduleModule() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={saveTaskFromSchedule} className="w-full">Save Task</Button>
+            <Button onClick={saveTaskFromSchedule} className="w-full">{editingMilestoneSchedule ? "Save Milestone" : "Save Task"}</Button>
             <Button variant="outline" onClick={handleRemoveTimeAssignment} className="w-full">
               Remove Assigned Time
             </Button>
-            <Button variant="secondary" onClick={handleMoveToTodo} className="w-full">
-              Move to ToDo List
-            </Button>
+            {!editingMilestoneSchedule ? (
+              <Button variant="secondary" onClick={handleMoveToTodo} className="w-full">
+                Move to ToDo List
+              </Button>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

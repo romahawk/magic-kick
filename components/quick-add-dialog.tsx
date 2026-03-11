@@ -98,7 +98,7 @@ export function QuickAddDialog() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <Label htmlFor="task-day">Day (optional)</Label>
                 <Input id="task-day" type="date" value={taskDay} onChange={(e) => setTaskDay(e.target.value)} />
