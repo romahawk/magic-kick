@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef, type DragEvent } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } from "react"
 import { useAppStore } from "@/lib/store"
 import { getWeekDays } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
@@ -8,6 +8,7 @@ import { format, parseISO, isSameDay } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,6 +28,14 @@ const GRID_SNAP_MINUTES = 30
 const HOUR_ROW_HEIGHT_PX = 64
 const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
 const DEEP_WORK_BLOCK_MINUTES = 90
+const DEFAULT_PROJECT_COLOR = "#3b82f6"
+const LEGACY_COLOR_MAP: Record<string, string> = {
+  "bg-chart-1": "#3b82f6",
+  "bg-chart-2": "#22c55e",
+  "bg-chart-3": "#06b6d4",
+  "bg-chart-4": "#f97316",
+  "bg-chart-5": "#a855f7",
+}
 
 const EXECUTION_BLOCK_STYLES = [
   { icon: Briefcase, tone: "text-sky-300 border-sky-500/30 bg-sky-500/10" },
@@ -34,6 +43,20 @@ const EXECUTION_BLOCK_STYLES = [
   { icon: Mail, tone: "text-amber-200 border-amber-500/30 bg-amber-500/10" },
   { icon: Rocket, tone: "text-violet-200 border-violet-500/30 bg-violet-500/10" },
 ] as const
+
+function normalizeAccentColor(color: string | undefined, fallback = DEFAULT_PROJECT_COLOR) {
+  const trimmed = color?.trim() ?? ""
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed
+  return LEGACY_COLOR_MAP[trimmed] ?? fallback
+}
+
+function gradientStyleFromColor(color: string | undefined) {
+  const safeColor = normalizeAccentColor(color)
+  return {
+    backgroundImage: `linear-gradient(135deg, ${safeColor}26 0%, ${safeColor}12 55%, transparent 100%)`,
+    borderColor: `${safeColor}40`,
+  }
+}
 
 function clampMinutes(minutes: number) {
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, minutes))
@@ -77,13 +100,26 @@ type DisplayScheduleItem = ScheduleItem & {
   milestoneId?: string
 }
 
+type ResizeState = {
+  itemId: string
+  edge: "start" | "end"
+  originY: number
+  initialStartMinutes: number
+  initialEndMinutes: number
+  nextStartMinutes: number
+  nextEndMinutes: number
+}
+
 export function ScheduleModule() {
   const allSchedule = useAppStore((s) => s.schedule)
   const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const systemConfig = useAppStore((s) => s.profile.systemConfig)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const categoryColors = taskCategoryColors ?? {}
+  const toggleTask = useAppStore((s) => s.toggleTask)
   const updateTask = useAppStore((s) => s.updateTask)
   const updateSystemConfig = useAppStore((s) => s.updateSystemConfig)
   const updateScheduleItem = useAppStore((s) => s.updateScheduleItem)
@@ -91,6 +127,7 @@ export function ScheduleModule() {
   const unscheduleTask = useAppStore((s) => s.unscheduleTask)
   const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
+  const toggleMilestone = useAppStore((s) => s.toggleMilestone)
   const weekDays = getWeekDays()
   const projects = allProjects.filter((project) => !project.deleted)
   const milestoneMeta = useMemo(() => {
@@ -158,6 +195,7 @@ export function ScheduleModule() {
     return [...persistedItems, ...milestoneItems]
   }, [allSchedule, milestoneMeta, projects, weekDays])
   const tasks = allTasks.filter((task) => !task.deleted)
+  const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const [selectedDay, setSelectedDay] = useState(
     weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
   )
@@ -184,6 +222,7 @@ export function ScheduleModule() {
   const [isBlockEditorOpen, setIsBlockEditorOpen] = useState(false)
   const [isCalendarFullscreen, setIsCalendarFullscreen] = useState(false)
   const [draftExecutionBlocks, setDraftExecutionBlocks] = useState<ExecutionBlockTemplate[]>([])
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null)
   const dayGridRef = useRef<HTMLDivElement | null>(null)
   const activeEditCategory = useMemo(
     () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
@@ -265,6 +304,128 @@ export function ScheduleModule() {
       tone: "border-amber-500/30 bg-amber-500/10 text-amber-100",
     }
   }, [selectedDayDeepWorkItems.length, selectedDayExecutionMinutes, selectedDayMicroItems.length])
+
+  function toggleScheduleCompletion(item: DisplayScheduleItem) {
+    if (item.linkedTaskId) {
+      toggleTask(item.linkedTaskId)
+      return
+    }
+    if (item.projectId && item.milestoneId) {
+      toggleMilestone(item.projectId, item.milestoneId)
+    }
+  }
+
+  function applyResizedTime(item: DisplayScheduleItem, startMinutes: number, endMinutes: number) {
+    const nextStartMinutes = clampToDayWindow(snapMinutes(startMinutes))
+    const nextEndMinutes = clampToDayWindow(snapMinutes(endMinutes))
+    if (nextEndMinutes <= nextStartMinutes) return
+
+    if (item.projectId && item.milestoneId) {
+      const existingScheduleItem = allSchedule.find(
+        (entry) =>
+          !entry.deleted &&
+          entry.linkedProjectId === item.projectId &&
+          entry.linkedMilestoneId === item.milestoneId
+      )
+
+      const schedulePayload = {
+        title: item.title,
+        type: "project-milestone",
+        startISO: `${selectedDay}T${minutesToHHmm(nextStartMinutes)}`,
+        endISO: `${selectedDay}T${minutesToHHmm(nextEndMinutes)}`,
+        hasExplicitTime: true,
+        color: item.color,
+        blockTypeId: item.blockTypeId,
+        linkedProjectId: item.projectId,
+        linkedMilestoneId: item.milestoneId,
+      }
+
+      if (existingScheduleItem) {
+        updateScheduleItem(existingScheduleItem.id, schedulePayload)
+      } else {
+        addScheduleItem(schedulePayload)
+      }
+      return
+    }
+
+    if (!item.linkedTaskId) return
+    updateTask(
+      item.linkedTaskId,
+      { dueDate: selectedDay },
+      {
+        startHHmm: minutesToHHmm(nextStartMinutes),
+        endHHmm: minutesToHHmm(nextEndMinutes),
+        blockTypeId: item.blockTypeId ?? "",
+      }
+    )
+  }
+
+  function startResize(event: ReactMouseEvent<HTMLButtonElement>, item: DisplayScheduleItem, edge: "start" | "end") {
+    event.preventDefault()
+    event.stopPropagation()
+    const initialStartMinutes = dateToMinutes(item.startISO)
+    const initialEndMinutes = dateToMinutes(item.endISO)
+    setResizeState({
+      itemId: item.id,
+      edge,
+      originY: event.clientY,
+      initialStartMinutes,
+      initialEndMinutes,
+      nextStartMinutes: initialStartMinutes,
+      nextEndMinutes: initialEndMinutes,
+    })
+  }
+
+  useEffect(() => {
+    if (!resizeState) return
+    const activeResize = resizeState
+
+    function handleMouseMove(event: MouseEvent) {
+      const deltaMinutes = snapMinutes((event.clientY - activeResize.originY) / PIXELS_PER_MINUTE)
+      if (activeResize.edge === "start") {
+        const nextStartMinutes = clampToDayWindow(
+          Math.min(activeResize.initialStartMinutes + deltaMinutes, activeResize.initialEndMinutes - GRID_SNAP_MINUTES)
+        )
+        setResizeState((current) =>
+          current
+            ? {
+                ...current,
+                nextStartMinutes,
+              }
+            : current
+        )
+        return
+      }
+
+      const nextEndMinutes = clampToDayWindow(
+        Math.max(activeResize.initialEndMinutes + deltaMinutes, activeResize.initialStartMinutes + GRID_SNAP_MINUTES)
+      )
+      setResizeState((current) =>
+        current
+          ? {
+              ...current,
+              nextEndMinutes,
+            }
+          : current
+      )
+    }
+
+    function handleMouseUp() {
+      const item = schedule.find((entry) => entry.id === activeResize.itemId)
+      if (item) {
+        applyResizedTime(item, activeResize.nextStartMinutes, activeResize.nextEndMinutes)
+      }
+      setResizeState(null)
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleMouseUp)
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [addScheduleItem, allSchedule, resizeState, schedule, selectedDay, updateScheduleItem, updateTask])
 
   function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
@@ -720,8 +881,16 @@ export function ScheduleModule() {
                           (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : ""
                         )}
                       >
-                        <div className={cn("h-8 w-1 rounded-full", item.color || "bg-primary")} />
-                        <p className="flex-1 text-sm font-medium">{item.title}</p>
+                        {(item.linkedTaskId || item.projectId) ? (
+                          <Checkbox
+                            checked={Boolean(taskMap.get(item.linkedTaskId ?? "")?.completed || item.milestoneCompleted)}
+                            onCheckedChange={() => toggleScheduleCompletion(item)}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Complete ${item.title}`}
+                          />
+                        ) : null}
+                        <div className="h-8 w-1 rounded-full" style={{ backgroundColor: normalizeAccentColor(item.color, "#64748b") }} />
+                        <p className={cn("flex-1 text-sm font-medium", (taskMap.get(item.linkedTaskId ?? "")?.completed || item.milestoneCompleted) && "line-through text-muted-foreground")}>{item.title}</p>
                         <Badge variant="outline" className="text-[10px]">
                           {item.sourceKind === "project-milestone" ? "Project milestone" : "Loose task"}
                         </Badge>
@@ -794,35 +963,54 @@ export function ScheduleModule() {
                           const end = parseISO(item.endISO)
                           const startMinutes = dateToMinutes(item.startISO)
                           const rawEndMinutes = dateToMinutes(item.endISO)
-                          const durationMinutes = Math.max(15, rawEndMinutes - startMinutes)
+                          const isResizing = resizeState?.itemId === item.id
+                          const visualStartMinutes = isResizing ? resizeState.nextStartMinutes : startMinutes
+                          const visualEndMinutes = isResizing ? resizeState.nextEndMinutes : rawEndMinutes
+                          const durationMinutes = Math.max(15, visualEndMinutes - visualStartMinutes)
                           const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
+                          const linkedTask = item.linkedTaskId ? taskMap.get(item.linkedTaskId) : undefined
+                          const isCompleted = Boolean(linkedTask?.completed || item.milestoneCompleted)
+                          const categoryColor = linkedTask ? categoryColors[linkedTask.category] : undefined
+                          const cardStyle = linkedTask && categoryColor
+                            ? gradientStyleFromColor(categoryColor)
+                            : { borderColor: `${normalizeAccentColor(item.color, "#64748b")}40` }
                           if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
-                          const top = (startMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
+                          const top = (visualStartMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
                           const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
                           return (
                             <div
                               key={item.id}
-                            draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
-                            onDragStart={(event) => {
-                              setDraggedItemId(item.id)
-                              event.dataTransfer.setData("text/plain", item.id)
+                              draggable={!isResizing && Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
+                              onDragStart={(event) => {
+                                setDraggedItemId(item.id)
+                                event.dataTransfer.setData("text/plain", item.id)
                               }}
                               onDragEnd={() => {
                                 setDraggedItemId(null)
                                 setIsGridDragOver(false)
                               }}
                               className={cn(
-                                "absolute left-2 right-2 overflow-hidden rounded-md border border-border bg-card px-3 py-2 shadow-sm",
-                                (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : ""
+                                "absolute left-2 right-2 overflow-hidden rounded-md border bg-card/95 px-3 py-2 shadow-sm backdrop-blur-[1px]",
+                                (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : "",
+                                isCompleted && "opacity-65"
                               )}
-                              style={{ top: `${top}px`, height: `${height}px` }}
+                              style={{ ...cardStyle, top: `${top}px`, height: `${height}px` }}
                             >
                               <div className="flex h-full items-start gap-2">
-                                <div className={cn("mt-0.5 h-full w-1 rounded-full", item.color || "bg-primary")} />
+                                {(item.linkedTaskId || item.projectId) ? (
+                                  <Checkbox
+                                    checked={isCompleted}
+                                    onCheckedChange={() => toggleScheduleCompletion(item)}
+                                    onClick={(event) => event.stopPropagation()}
+                                    aria-label={`Complete ${item.title}`}
+                                    className="mt-0.5"
+                                  />
+                                ) : null}
+                                <div className="mt-0.5 h-full w-1 rounded-full" style={{ backgroundColor: normalizeAccentColor(categoryColor ?? item.color, "#64748b") }} />
                                 <div className="flex min-w-0 flex-1 flex-col justify-between">
-                                  <p className="truncate text-xs font-medium leading-tight">{item.title}</p>
+                                  <p className={cn("truncate text-xs font-medium leading-tight", isCompleted && "line-through text-muted-foreground")}>{item.title}</p>
                                   <p className="text-[10px] leading-tight text-muted-foreground">
-                                    {format(start, "HH:mm")} - {format(end, "HH:mm")}
+                                    {minutesToHHmm(visualStartMinutes)} - {minutesToHHmm(visualEndMinutes)}
                                   </p>
                                   <div className="mt-1 flex items-center gap-1.5">
                                     <Badge
@@ -843,6 +1031,18 @@ export function ScheduleModule() {
                                   </Button>
                                 ) : null}
                               </div>
+                              <button
+                                type="button"
+                                className="absolute inset-x-2 top-0 h-2 cursor-ns-resize rounded-t-md"
+                                onMouseDown={(event) => startResize(event, item, "start")}
+                                aria-label={`Adjust start time for ${item.title}`}
+                              />
+                              <button
+                                type="button"
+                                className="absolute inset-x-2 bottom-0 h-2 cursor-ns-resize rounded-b-md"
+                                onMouseDown={(event) => startResize(event, item, "end")}
+                                aria-label={`Adjust end time for ${item.title}`}
+                              />
                             </div>
                           )
                         })}
@@ -889,9 +1089,7 @@ export function ScheduleModule() {
                         const start = parseISO(item.startISO)
                         const end = parseISO(item.endISO)
                         const hasExplicitTime = item.hasExplicitTime !== false
-                        const linkedTask = item.linkedTaskId
-                          ? tasks.find((entry) => entry.id === item.linkedTaskId)
-                          : null
+                        const linkedTask = item.linkedTaskId ? taskMap.get(item.linkedTaskId) : null
                         const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
                         const isCompletedTask = Boolean(linkedTask?.completed || item.milestoneCompleted)
                         return (
@@ -911,7 +1109,15 @@ export function ScheduleModule() {
                               setWeekDragOverDay(null)
                             }}
                           >
-                            <div className={cn("h-6 w-0.5 rounded-full", item.color || "bg-primary")} />
+                            {(item.linkedTaskId || item.projectId) ? (
+                              <Checkbox
+                                checked={isCompletedTask}
+                                onCheckedChange={() => toggleScheduleCompletion(item)}
+                                onClick={(event) => event.stopPropagation()}
+                                aria-label={`Complete ${item.title}`}
+                              />
+                            ) : null}
+                            <div className="h-6 w-0.5 rounded-full" style={{ backgroundColor: normalizeAccentColor(linkedTask ? categoryColors[linkedTask.category] : item.color, "#64748b") }} />
                             <div className="flex-1 min-w-0">
                               <p className={cn("text-xs font-medium truncate", isCompletedTask && "line-through text-muted-foreground")}>{item.title}</p>
                               {hasExplicitTime ? (
