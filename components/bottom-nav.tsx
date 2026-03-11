@@ -29,13 +29,13 @@ export function BottomNav() {
       role="navigation"
       aria-label="Bottom navigation"
     >
-      <ul className="flex items-center justify-around py-1.5">
+      <ul className="flex items-center justify-around px-1 py-1.5 [padding-bottom:calc(env(safe-area-inset-bottom)+0.375rem)]">
         {BOTTOM_ITEMS.map((item) => (
           <li key={item.id}>
             <button
               onClick={() => setActiveModule(item.id)}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                "flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[11px] transition-colors sm:px-3 sm:text-xs",
                 activeModule === item.id
                   ? "text-primary"
                   : "text-muted-foreground"

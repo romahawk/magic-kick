@@ -42,9 +42,9 @@ export function CommandCenter() {
         <p className="text-sm text-muted-foreground">Welcome back, {profile.name}. Keep the day small, visible, and executable.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card className="border-none bg-primary/10">
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-center gap-3 p-3 sm:p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
               <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
@@ -56,7 +56,7 @@ export function CommandCenter() {
         </Card>
 
         <Card className="border-none bg-streak/10">
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-center gap-3 p-3 sm:p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-streak">
               <Flame className="h-5 w-5 text-foreground" />
             </div>
@@ -68,7 +68,7 @@ export function CommandCenter() {
         </Card>
 
         <Card>
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-center gap-3 p-3 sm:p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
               <ListTodo className="h-5 w-5 text-secondary-foreground" />
             </div>
@@ -80,7 +80,7 @@ export function CommandCenter() {
         </Card>
 
         <Card>
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-center gap-3 p-3 sm:p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
               <Trophy className="h-5 w-5 text-secondary-foreground" />
             </div>
@@ -92,7 +92,7 @@ export function CommandCenter() {
         </Card>
 
         <Card className={cn(load.overCapacity && "border-amber-500/40 bg-amber-500/5")}>
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-center gap-3 p-3 sm:p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
               <BrainCircuit className="h-5 w-5 text-secondary-foreground" />
             </div>
