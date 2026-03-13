@@ -123,7 +123,12 @@ export function selectWeeklyOutcomes(projects: Project[], config?: Partial<Syste
     .slice(0, rules.weeklyOutcomeLimit)
 }
 
-export function selectDailyFocus(tasks: Task[], projects: Project[], config?: Partial<SystemConfig>) {
+export function selectDailyFocus(
+  tasks: Task[],
+  projects: Project[],
+  config?: Partial<SystemConfig>,
+  options?: { focusedProjectId?: string }
+) {
   const rules = normalizeSystemConfig(config)
   const projectById = new Map(projects.filter((project) => !project.deleted).map((project) => [project.id, project]))
   const explicitFocus = tasks
@@ -147,6 +152,7 @@ export function selectDailyFocus(tasks: Task[], projects: Project[], config?: Pa
       const score =
         (isDueToday(task.dueDate) ? 100 : 0) +
         (isDueThisWeek(task.dueDate) ? 40 : 0) +
+        (task.linkedProjectId && task.linkedProjectId === options?.focusedProjectId ? 80 : 0) +
         (linkedStatus === "active" ? 35 : 0) +
         (linkedProject && hasDefinedWeeklyOutcome(linkedProject) ? 20 : 0) +
         Math.min(task.xpValue, 30)

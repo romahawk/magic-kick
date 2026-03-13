@@ -240,6 +240,7 @@ export interface AppState {
   setActiveModule: (m: ModuleId) => void
   completeOnboarding: (name: string) => void
   updateSystemConfig: (updates: Partial<NonNullable<Profile["systemConfig"]>>) => void
+  setFocusedProject: (projectId?: string) => void
   addCategory: (name: string) => void
   renameCategory: (from: string, to: string) => void
   deleteCategory: (name: string) => void
@@ -977,6 +978,25 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
+      setFocusedProject: (projectId) => {
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            focusedProjectId: projectId || undefined,
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
       updateGoal: (id, updates) => {
         const ts = now()
         set((s) => ({
@@ -1168,10 +1188,17 @@ export const useAppStore = create<AppState>()(
         const ts = now()
         set((s) => ({
           projects: s.projects.map((p) => (p.id === projectId ? { ...p, deleted: true, clientUpdatedAt: ts } : p)),
+          profile: {
+            ...s.profile,
+            focusedProjectId: s.profile.focusedProjectId === projectId ? undefined : s.profile.focusedProjectId,
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
           sync: {
             ...s.sync,
             pending: {
               ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
               projects: { ...s.sync.pending.projects, [projectId]: ts },
             },
           },
@@ -1596,6 +1623,7 @@ export const useAppStore = create<AppState>()(
                 : DEFAULT_TASK_CATEGORIES
             return buildCategoryColors(categories, merged.profile?.taskCategoryColors)
           })(),
+          focusedProjectId: merged.profile?.focusedProjectId || undefined,
           systemConfig: normalizedConfig,
           deleted: false,
           clientUpdatedAt: merged.profile?.clientUpdatedAt ?? now(),
@@ -1631,6 +1659,10 @@ export const useAppStore = create<AppState>()(
             }))
           ),
         }))
+        const validFocusedProjectId =
+          profile.focusedProjectId && projects.some((project) => !project.deleted && project.id === profile.focusedProjectId)
+            ? profile.focusedProjectId
+            : undefined
         const achievements = buildAchievementCatalog(normalizeCollection(merged.achievements))
         const scheduleBlockIds = normalizedConfig.executionBlocks.map((block) => block.id)
         const schedule = normalizeCollection(merged.schedule).map((item) => ({
@@ -1645,7 +1677,10 @@ export const useAppStore = create<AppState>()(
 
         const next = {
           ...merged,
-          profile,
+          profile: {
+            ...profile,
+            focusedProjectId: validFocusedProjectId,
+          },
           tasks,
           goals,
           projects,
