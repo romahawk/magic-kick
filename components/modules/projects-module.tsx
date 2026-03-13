@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight } from "lucide-react"
+import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -88,6 +88,8 @@ export function ProjectsModule() {
   const updateMilestone = useAppStore((s) => s.updateMilestone)
   const deleteMilestone = useAppStore((s) => s.deleteMilestone)
   const systemConfig = useAppStore((s) => s.profile.systemConfig)
+  const focusedProjectId = useAppStore((s) => s.profile.focusedProjectId)
+  const setFocusedProject = useAppStore((s) => s.setFocusedProject)
   const weekDays = getWeekDays()
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
@@ -131,8 +133,11 @@ export function ProjectsModule() {
     }
   }, [])
 
+  const focusedProject = focusedProjectId ? projects.find((project) => project.id === focusedProjectId) : undefined
+
   const displayProjects = (() => {
     if (!focusMode) return projects
+    if (focusedProject) return [focusedProject]
     const today = new Date()
     const current = [...projects].sort((a, b) => {
       const aStart = parseISO(a.weekStartISO)
@@ -469,11 +474,17 @@ export function ProjectsModule() {
         })}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" size="icon" variant={focusMode ? "default" : "outline"} onClick={() => setFocusMode((value) => !value)} aria-label={focusMode ? "Focus mode on" : "Focus mode off"}>
+            <Button
+              type="button"
+              size="icon"
+              variant={focusMode ? "default" : "outline"}
+              onClick={() => setFocusMode((value) => !value)}
+              aria-label={focusMode ? "Focused-only view on" : "Show focused only"}
+            >
               <Focus className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent sideOffset={8}>{focusMode ? "Focus Mode On" : "Focus Mode"}</TooltipContent>
+          <TooltipContent sideOffset={8}>{focusMode ? "Focused-Only View On" : "Show Focused Only"}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -524,8 +535,26 @@ export function ProjectsModule() {
           </CardContent>
         </Card>
       ) : null}
+      {focusedProject ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+            <div>
+              <p className="font-medium">Focused project selected</p>
+              <p className="text-muted-foreground">
+                {focusedProject.title} is pinned and gets priority in daily focus task scoring.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setFocusedProject(undefined)}>
+              <PinOff className="mr-1.5 h-4 w-4" />
+              Clear Focus
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
       {focusMode && hiddenProjectsCount > 0 ? (
-        <p className="text-xs text-muted-foreground">Focus mode shows 3 current projects. Hidden: {hiddenProjectsCount}.</p>
+        <p className="text-xs text-muted-foreground">
+          {focusedProject ? "Focused-only view shows your selected project." : `Focused-only view shows 3 current projects. Hidden: ${hiddenProjectsCount}.`}
+        </p>
       ) : null}
 
       {/* Weekly timeline header */}
@@ -556,6 +585,8 @@ export function ProjectsModule() {
                         tasks={tasks}
                         weekDays={weekDays}
                         onEdit={openEditDialog}
+                        focusedProjectId={focusedProjectId}
+                        onSetFocusedProject={setFocusedProject}
                         onDelete={deleteProject}
                         onToggleMilestone={toggleMilestone}
                       />
@@ -573,6 +604,8 @@ export function ProjectsModule() {
                 tasks={tasks}
                 weekDays={weekDays}
                 onEdit={openEditDialog}
+                focusedProjectId={focusedProjectId}
+                onSetFocusedProject={setFocusedProject}
                 onDelete={deleteProject}
                 onToggleMilestone={toggleMilestone}
               />
@@ -604,6 +637,8 @@ export function ProjectsModule() {
                       projects={section.projects}
                       tasks={tasks}
                       onEdit={openEditDialog}
+                      focusedProjectId={focusedProjectId}
+                      onSetFocusedProject={setFocusedProject}
                       editingMilestone={editingMilestone}
                       editingMilestoneTitle={editingMilestoneTitle}
                       editingMilestoneDayIndex={editingMilestoneDayIndex}
@@ -628,6 +663,8 @@ export function ProjectsModule() {
             projects={displayProjects}
             tasks={tasks}
             onEdit={openEditDialog}
+            focusedProjectId={focusedProjectId}
+            onSetFocusedProject={setFocusedProject}
             editingMilestone={editingMilestone}
             editingMilestoneTitle={editingMilestoneTitle}
             editingMilestoneDayIndex={editingMilestoneDayIndex}
@@ -653,6 +690,8 @@ function WeeklyProjectGrid({
   tasks,
   weekDays,
   onEdit,
+  focusedProjectId,
+  onSetFocusedProject,
   onDelete,
   onToggleMilestone,
 }: {
@@ -660,6 +699,8 @@ function WeeklyProjectGrid({
   tasks: Task[]
   weekDays: ReturnType<typeof getWeekDays>
   onEdit: (project: Project) => void
+  focusedProjectId?: string
+  onSetFocusedProject: (projectId?: string) => void
   onDelete: (projectId: string) => void
   onToggleMilestone: (projectId: string, milestoneId: string) => void
 }) {
@@ -700,6 +741,16 @@ function WeeklyProjectGrid({
             <div className="flex flex-col justify-center">
               <div className="flex items-center gap-1">
                 <p className="text-sm font-medium truncate">{project.title}</p>
+                <Button
+                  type="button"
+                  variant={focusedProjectId === project.id ? "default" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => onSetFocusedProject(focusedProjectId === project.id ? undefined : project.id)}
+                  aria-label={focusedProjectId === project.id ? `Clear focus from ${project.title}` : `Focus ${project.title}`}
+                >
+                  <Crosshair className="h-3.5 w-3.5" />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(project)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -710,6 +761,7 @@ function WeeklyProjectGrid({
               <p className="text-[10px] text-muted-foreground truncate">{project.objective}</p>
               <div className="mt-1 flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
+                {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
                 <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
                 <span className="text-[10px] text-muted-foreground">
                   {completedMilestoneCount}/{totalMilestones}
@@ -761,6 +813,8 @@ function ProjectDetailsGrid({
   projects,
   tasks,
   onEdit,
+  focusedProjectId,
+  onSetFocusedProject,
   editingMilestone,
   editingMilestoneTitle,
   editingMilestoneDayIndex,
@@ -778,6 +832,8 @@ function ProjectDetailsGrid({
   projects: Project[]
   tasks: Task[]
   onEdit: (project: Project) => void
+  focusedProjectId?: string
+  onSetFocusedProject: (projectId?: string) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
   editingMilestoneTitle: string
   editingMilestoneDayIndex: number
@@ -809,15 +865,28 @@ function ProjectDetailsGrid({
                   <FolderKanban className="h-4 w-4" style={{ color: normalizeProjectColor(project.color) }} />
                   {project.title}
                 </CardTitle>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(project)} aria-label={`Edit ${project.title}`}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant={focusedProjectId === project.id ? "default" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onSetFocusedProject(focusedProjectId === project.id ? undefined : project.id)}
+                    aria-label={focusedProjectId === project.id ? `Clear focus from ${project.title}` : `Focus ${project.title}`}
+                  >
+                    <Crosshair className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(project)} aria-label={`Edit ${project.title}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">{project.objective}</p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
+                {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
                 <Badge variant="secondary" className="text-[10px]">
                   {projectTasks.length} tasks ({completedTasks} done)
                 </Badge>

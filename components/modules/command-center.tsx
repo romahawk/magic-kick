@@ -24,7 +24,7 @@ export function CommandCenter() {
   const xpInfo = levelFromXP(profile.xpTotal)
   const weekDays = getWeekDays()
 
-  const dailyFocus = selectDailyFocus(tasks, projects, systemConfig)
+  const dailyFocus = selectDailyFocus(tasks, projects, systemConfig, { focusedProjectId: profile.focusedProjectId })
   const weeklyOutcomes = selectWeeklyOutcomes(projects, systemConfig)
   const activeProjects = selectActiveProjects(projects)
   const load = calculateCognitiveLoad({ projects, tasks, config: systemConfig })

@@ -132,6 +132,7 @@ export interface Profile extends SyncFields {
   onboardingCompleted: boolean
   taskCategories?: string[]
   taskCategoryColors?: Record<string, string>
+  focusedProjectId?: string
   systemConfig?: SystemConfig
   level: number
   xpTotal: number
