@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
@@ -57,6 +58,10 @@ function gradientStyleFromColor(color: string | undefined) {
     backgroundImage: `linear-gradient(135deg, ${safeColor}1f 0%, ${safeColor}08 100%)`,
     borderColor: `${safeColor}33`,
   }
+}
+
+function isProjectVisibleOnTimeline(project: Project) {
+  return project.showOnTimeline !== false
 }
 
 function sortMilestonesByDay(milestones: ProjectMilestone[]) {
@@ -134,12 +139,14 @@ export function ProjectsModule() {
   }, [])
 
   const focusedProject = focusedProjectId ? projects.find((project) => project.id === focusedProjectId) : undefined
+  const isFocusedOnlyView = focusMode
+  const focusEligibleProjects = timelineView === "yearly" ? activeProjects : projects
 
   const displayProjects = (() => {
-    if (!focusMode) return projects
-    if (focusedProject) return [focusedProject]
+    if (!isFocusedOnlyView) return projects
+    if (focusedProject && focusEligibleProjects.some((project) => project.id === focusedProject.id)) return [focusedProject]
     const today = new Date()
-    const current = [...projects].sort((a, b) => {
+    const current = [...focusEligibleProjects].sort((a, b) => {
       const aStart = parseISO(a.weekStartISO)
       const aEnd = parseISO(a.weekEndISO)
       const bStart = parseISO(b.weekStartISO)
@@ -237,6 +244,7 @@ export function ProjectsModule() {
       addProject({
         title: title.trim(),
         objective: objective.trim() || "Project objective",
+        showOnTimeline: true,
         weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
         weekStartISO: defaultWeekRange.start,
@@ -477,14 +485,17 @@ export function ProjectsModule() {
             <Button
               type="button"
               size="icon"
-              variant={focusMode ? "default" : "outline"}
-              onClick={() => setFocusMode((value) => !value)}
-              aria-label={focusMode ? "Focused-only view on" : "Show focused only"}
+              variant={isFocusedOnlyView ? "default" : "outline"}
+              onClick={() => focusedProject && setFocusMode((value) => !value)}
+              aria-label={isFocusedOnlyView ? "Focused-only view on" : "Show focused only"}
+              disabled={!focusedProject}
             >
               <Focus className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent sideOffset={8}>{focusMode ? "Focused-Only View On" : "Show Focused Only"}</TooltipContent>
+          <TooltipContent sideOffset={8}>
+            {focusedProject ? (isFocusedOnlyView ? "Focused-Only View On" : "Show Focused Only") : "Select a focused project first"}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -551,7 +562,7 @@ export function ProjectsModule() {
           </CardContent>
         </Card>
       ) : null}
-      {focusMode && hiddenProjectsCount > 0 ? (
+      {isFocusedOnlyView && hiddenProjectsCount > 0 ? (
         <p className="text-xs text-muted-foreground">
           {focusedProject ? "Focused-only view shows your selected project." : `Focused-only view shows 3 current projects. Hidden: ${hiddenProjectsCount}.`}
         </p>
@@ -587,6 +598,7 @@ export function ProjectsModule() {
                         onEdit={openEditDialog}
                         focusedProjectId={focusedProjectId}
                         onSetFocusedProject={setFocusedProject}
+                        onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                         onDelete={deleteProject}
                         onToggleMilestone={toggleMilestone}
                       />
@@ -606,6 +618,7 @@ export function ProjectsModule() {
                 onEdit={openEditDialog}
                 focusedProjectId={focusedProjectId}
                 onSetFocusedProject={setFocusedProject}
+                onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                 onDelete={deleteProject}
                 onToggleMilestone={toggleMilestone}
               />
@@ -639,6 +652,7 @@ export function ProjectsModule() {
                       onEdit={openEditDialog}
                       focusedProjectId={focusedProjectId}
                       onSetFocusedProject={setFocusedProject}
+                      onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                       editingMilestone={editingMilestone}
                       editingMilestoneTitle={editingMilestoneTitle}
                       editingMilestoneDayIndex={editingMilestoneDayIndex}
@@ -665,6 +679,7 @@ export function ProjectsModule() {
             onEdit={openEditDialog}
             focusedProjectId={focusedProjectId}
             onSetFocusedProject={setFocusedProject}
+            onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
             editingMilestone={editingMilestone}
             editingMilestoneTitle={editingMilestoneTitle}
             editingMilestoneDayIndex={editingMilestoneDayIndex}
@@ -692,6 +707,7 @@ function WeeklyProjectGrid({
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
+  onToggleTimelineVisibility,
   onDelete,
   onToggleMilestone,
 }: {
@@ -701,6 +717,7 @@ function WeeklyProjectGrid({
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void
+  onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   onDelete: (projectId: string) => void
   onToggleMilestone: (projectId: string, milestoneId: string) => void
 }) {
@@ -762,6 +779,16 @@ function WeeklyProjectGrid({
               <div className="mt-1 flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
+                <div className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span>Timeline</span>
+                  <Switch
+                    checked={isProjectVisibleOnTimeline(project)}
+                    onCheckedChange={(checked) => onToggleTimelineVisibility(project.id, checked)}
+                    aria-label={`${isProjectVisibleOnTimeline(project) ? "Hide" : "Show"} ${project.title} on yearly timeline`}
+                  />
+                </div>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
                 <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
                 <span className="text-[10px] text-muted-foreground">
                   {completedMilestoneCount}/{totalMilestones}
@@ -815,6 +842,7 @@ function ProjectDetailsGrid({
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
+  onToggleTimelineVisibility,
   editingMilestone,
   editingMilestoneTitle,
   editingMilestoneDayIndex,
@@ -834,6 +862,7 @@ function ProjectDetailsGrid({
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void
+  onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
   editingMilestoneTitle: string
   editingMilestoneDayIndex: number
@@ -866,6 +895,14 @@ function ProjectDetailsGrid({
                   {project.title}
                 </CardTitle>
                 <div className="flex items-center gap-1">
+                  <div className="mr-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Timeline</span>
+                    <Switch
+                      checked={isProjectVisibleOnTimeline(project)}
+                      onCheckedChange={(checked) => onToggleTimelineVisibility(project.id, checked)}
+                      aria-label={`${isProjectVisibleOnTimeline(project) ? "Hide" : "Show"} ${project.title} on yearly timeline`}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant={focusedProjectId === project.id ? "default" : "ghost"}

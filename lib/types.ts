@@ -65,6 +65,7 @@ export interface Project extends SyncFields {
   title: string
   objective: string
   status?: ProjectStatus
+  showOnTimeline?: boolean
   weeklyOutcome?: string
   weekStartISO: string
   weekEndISO: string
