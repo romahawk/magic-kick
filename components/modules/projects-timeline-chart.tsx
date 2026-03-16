@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { getProjectStatus } from "@/lib/execution-os"
 import { ArrowDownAZ, ArrowUpDown, AlertTriangle, CalendarDays, Info, Sparkles } from "lucide-react"
 import type { Project } from "@/lib/types"
 
@@ -70,8 +71,7 @@ function statusFromProject(project: Project): { status: TimelineStatus; statusRe
   const start = parseISO(project.weekStartISO)
   const end = parseISO(project.weekEndISO)
   const completedCount = project.milestones.filter((m) => m.completed).length
-  const allCompleted = project.milestones.length > 0 && completedCount === project.milestones.length
-  if (allCompleted) return { status: "completed", statusReason: "All milestones completed" }
+  if (getProjectStatus(project) === "completed") return { status: "completed", statusReason: "Project marked completed" }
   if (isBefore(end, today)) return { status: "overdue", statusReason: "Timeline end date is in the past" }
   if (isAfter(start, today) && completedCount === 0) return { status: "not-started", statusReason: "Project starts in the future" }
   return { status: "in-progress", statusReason: "Active timeline with incomplete milestones" }
@@ -375,7 +375,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
                 </button>
               </TooltipTrigger>
               <TooltipContent sideOffset={8} className="max-w-sm leading-relaxed">
-                Completed: all milestones done. Overdue: end date is in the past and not completed. Not started: starts in the future with no completed milestones. In progress: everything else. Alerts cover overdue, late completion, and due soon within {DUE_SOON_DAYS} days.
+                Completed: project is manually marked completed. Overdue: end date is in the past and project is not completed. Not started: starts in the future with no completed milestones. In progress: everything else. Alerts cover overdue, late completion, and due soon within {DUE_SOON_DAYS} days.
               </TooltipContent>
             </Tooltip>
           </div>

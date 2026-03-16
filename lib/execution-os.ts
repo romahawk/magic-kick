@@ -81,10 +81,7 @@ export function normalizeSystemConfig(config?: Partial<SystemConfig>): SystemCon
 }
 
 export function getProjectStatus(project: Project): ProjectStatus {
-  if (project.status) return project.status
-  const hasMilestones = project.milestones.length > 0
-  if (hasMilestones && project.milestones.every((milestone) => milestone.completed)) return "completed"
-  return "active"
+  return project.status ?? "active"
 }
 
 export function selectActiveProjects(projects: Project[]) {
