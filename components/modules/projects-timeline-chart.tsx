@@ -38,6 +38,10 @@ const TOTAL_WEEKS = 52
 const DAY_MS = 24 * 60 * 60 * 1000
 const DUE_SOON_DAYS = 14
 
+function isProjectVisibleOnTimeline(project: Project) {
+  return project.showOnTimeline !== false
+}
+
 function clampWeek(value: number) {
   return Math.max(1, Math.min(TOTAL_WEEKS, value))
 }
@@ -90,21 +94,23 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
     origin: DraftWeeks
   } | null>(null)
 
+  const visibleProjects = useMemo(() => projects.filter((project) => isProjectVisibleOnTimeline(project)), [projects])
+
   const availableYears = useMemo(() => {
     const years = new Set<number>()
     years.add(new Date().getFullYear())
-    for (const project of projects) {
+    for (const project of visibleProjects) {
       years.add(parseISO(project.weekStartISO).getFullYear())
       years.add(parseISO(project.weekEndISO).getFullYear())
     }
     return [...years].sort((a, b) => a - b)
-  }, [projects])
+  }, [visibleProjects])
 
   const rows = useMemo<TimelineRow[]>(() => {
     const rangeStart = startOfYear(new Date(selectedYear, 0, 1))
     const rangeEnd = endOfYear(rangeStart)
 
-    const mapped = projects
+    const mapped = visibleProjects
       .map((project) => {
         const start = parseISO(project.weekStartISO)
         const end = parseISO(project.weekEndISO)
@@ -136,7 +142,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
       return a.start.getTime() - b.start.getTime()
     })
     return sortDirection === "asc" ? sorted : sorted.reverse()
-  }, [projects, selectedYear, alertOnly, sortKey, sortDirection])
+  }, [visibleProjects, selectedYear, alertOnly, sortKey, sortDirection])
 
   const pageCount = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE))
   const activePage = Math.min(currentPage, pageCount)
