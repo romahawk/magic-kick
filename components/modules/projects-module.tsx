@@ -730,7 +730,7 @@ function WeeklyProjectGrid({
 }) {
   return (
     <>
-      <div className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
+      <div className="mb-4 grid grid-cols-[220px_1fr] gap-3 xl:grid-cols-[260px_1fr]">
         <div className="text-xs font-medium text-muted-foreground">Project</div>
         <div className="grid grid-cols-7 gap-1 text-center">
           {weekDays.map((d) => (
@@ -762,10 +762,10 @@ function WeeklyProjectGrid({
         const projectCompleted = getProjectStatus(project) === "completed"
 
         return (
-          <div key={project.id} className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
-            <div className="flex flex-col justify-center">
-              <div className="flex items-center gap-1">
-                <p className="text-sm font-medium truncate">{project.title}</p>
+          <div key={project.id} className="mb-4 grid grid-cols-[220px_1fr] gap-3 xl:grid-cols-[260px_1fr]">
+            <div className="flex min-w-0 flex-col justify-center rounded-md border border-border/50 bg-background/30 p-2">
+              <div className="flex items-start gap-1">
+                <p className="min-w-0 flex-1 text-sm font-medium truncate">{project.title}</p>
                 <Button
                   type="button"
                   variant={focusedProjectId === project.id ? "default" : "ghost"}
@@ -783,11 +783,11 @@ function WeeklyProjectGrid({
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground truncate">{project.objective}</p>
-              <div className="mt-1 flex items-center gap-2">
+              <p className="mt-1 text-[10px] text-muted-foreground line-clamp-2">{project.objective}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
-                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <div className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">
                   <span>Complete</span>
                   <Switch
                     checked={projectCompleted}
@@ -795,7 +795,7 @@ function WeeklyProjectGrid({
                     aria-label={`${projectCompleted ? "Reopen" : "Complete"} ${project.title}`}
                   />
                 </div>
-                <div className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+                <div className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">
                   <span>Timeline</span>
                   <Switch
                     checked={isProjectVisibleOnTimeline(project)}
@@ -804,7 +804,7 @@ function WeeklyProjectGrid({
                   />
                 </div>
               </div>
-              <div className="mt-1 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2">
                 <Progress value={progressPercent} className="h-1.5 flex-1 [&>div]:bg-primary" />
                 <span className="text-[10px] text-muted-foreground">
                   {completedMilestoneCount}/{totalMilestones}
