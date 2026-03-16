@@ -75,6 +75,7 @@ const STATUS_SECTIONS: Array<{ id: ProjectStatus; label: string; description: st
   { id: "active", label: "Active", description: "Counts toward capacity and cognitive load." },
   { id: "paused", label: "Paused", description: "Temporarily inactive but still visible." },
   { id: "parked", label: "Parked", description: "Idea vault items that should not tax focus." },
+  { id: "completed", label: "Completed", description: "Finished projects tracked separately from this week's milestones." },
 ]
 
 const VIEW_CONTROLS = [
@@ -151,8 +152,8 @@ export function ProjectsModule() {
       const aEnd = parseISO(a.weekEndISO)
       const bStart = parseISO(b.weekStartISO)
       const bEnd = parseISO(b.weekEndISO)
-      const aCompleted = a.milestones.length > 0 && a.milestones.every((m) => m.completed)
-      const bCompleted = b.milestones.length > 0 && b.milestones.every((m) => m.completed)
+      const aCompleted = getProjectStatus(a) === "completed"
+      const bCompleted = getProjectStatus(b) === "completed"
 
       const aPriority = aCompleted ? 3 : isBefore(aEnd, today) ? 0 : isAfter(aStart, today) ? 2 : 1
       const bPriority = bCompleted ? 3 : isBefore(bEnd, today) ? 0 : isAfter(bStart, today) ? 2 : 1
@@ -598,6 +599,7 @@ export function ProjectsModule() {
                         onEdit={openEditDialog}
                         focusedProjectId={focusedProjectId}
                         onSetFocusedProject={setFocusedProject}
+                        onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                         onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                         onDelete={deleteProject}
                         onToggleMilestone={toggleMilestone}
@@ -618,6 +620,7 @@ export function ProjectsModule() {
                 onEdit={openEditDialog}
                 focusedProjectId={focusedProjectId}
                 onSetFocusedProject={setFocusedProject}
+                onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                 onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                 onDelete={deleteProject}
                 onToggleMilestone={toggleMilestone}
@@ -652,6 +655,7 @@ export function ProjectsModule() {
                       onEdit={openEditDialog}
                       focusedProjectId={focusedProjectId}
                       onSetFocusedProject={setFocusedProject}
+                      onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                       onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                       editingMilestone={editingMilestone}
                       editingMilestoneTitle={editingMilestoneTitle}
@@ -679,6 +683,7 @@ export function ProjectsModule() {
             onEdit={openEditDialog}
             focusedProjectId={focusedProjectId}
             onSetFocusedProject={setFocusedProject}
+            onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
             onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
             editingMilestone={editingMilestone}
             editingMilestoneTitle={editingMilestoneTitle}
@@ -707,6 +712,7 @@ function WeeklyProjectGrid({
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
+  onToggleProjectCompleted,
   onToggleTimelineVisibility,
   onDelete,
   onToggleMilestone,
@@ -717,6 +723,7 @@ function WeeklyProjectGrid({
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void
+  onToggleProjectCompleted: (projectId: string, completed: boolean) => void
   onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   onDelete: (projectId: string) => void
   onToggleMilestone: (projectId: string, milestoneId: string) => void
@@ -749,9 +756,10 @@ function WeeklyProjectGrid({
         const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
         const completedTasks = projectTasks.filter((t) => t.completed).length
-        const completedMilestoneCount = project.milestones.filter((m) => m.completed).length
+        const completedMilestoneCount = completedMilestones.length
         const totalMilestones = project.milestones.length
         const progressPercent = totalMilestones > 0 ? (completedMilestoneCount / totalMilestones) * 100 : 0
+        const projectCompleted = getProjectStatus(project) === "completed"
 
         return (
           <div key={project.id} className="mb-4 grid grid-cols-[140px_1fr] gap-3 sm:grid-cols-[180px_1fr]">
@@ -779,6 +787,14 @@ function WeeklyProjectGrid({
               <div className="mt-1 flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span>Complete</span>
+                  <Switch
+                    checked={projectCompleted}
+                    onCheckedChange={(checked) => onToggleProjectCompleted(project.id, checked)}
+                    aria-label={`${projectCompleted ? "Reopen" : "Complete"} ${project.title}`}
+                  />
+                </div>
                 <div className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
                   <span>Timeline</span>
                   <Switch
@@ -842,6 +858,7 @@ function ProjectDetailsGrid({
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
+  onToggleProjectCompleted,
   onToggleTimelineVisibility,
   editingMilestone,
   editingMilestoneTitle,
@@ -862,6 +879,7 @@ function ProjectDetailsGrid({
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void
+  onToggleProjectCompleted: (projectId: string, completed: boolean) => void
   onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
   editingMilestoneTitle: string
@@ -885,6 +903,7 @@ function ProjectDetailsGrid({
         const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
         const completedTasks = projectTasks.filter((t) => t.completed).length
+        const projectCompleted = getProjectStatus(project) === "completed"
 
         return (
           <Card key={project.id} style={gradientStyleFromColor(project.color)}>
@@ -895,6 +914,14 @@ function ProjectDetailsGrid({
                   {project.title}
                 </CardTitle>
                 <div className="flex items-center gap-1">
+                  <div className="mr-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Complete</span>
+                    <Switch
+                      checked={projectCompleted}
+                      onCheckedChange={(checked) => onToggleProjectCompleted(project.id, checked)}
+                      aria-label={`${projectCompleted ? "Reopen" : "Complete"} ${project.title}`}
+                    />
+                  </div>
                   <div className="mr-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>Timeline</span>
                     <Switch
