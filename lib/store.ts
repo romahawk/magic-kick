@@ -14,6 +14,7 @@ import type {
   SyncCollection,
   SyncState,
   Task,
+  TaskLane,
 } from "./types"
 import { generateId } from "./game-utils"
 import { normalizeSystemConfig } from "./execution-os"
@@ -257,6 +258,7 @@ export interface AppState {
   toggleTask: (id: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
   reorderTasks: (draggedTaskId: string, targetTaskId: string) => void
+  moveTaskToLane: (taskId: string, lane: TaskLane, targetTaskId?: string) => void
   updateTask: (
     id: string,
     updates: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>,
@@ -703,6 +705,81 @@ export const useAppStore = create<AppState>()(
           const tasks = s.tasks.map((task) => {
             const nextOrder = orderById.get(task.id)
             if (!nextOrder) return task
+            return {
+              ...task,
+              order: nextOrder,
+              clientUpdatedAt: ts,
+              deleted: false,
+            }
+          })
+
+          const pendingTasks = { ...s.sync.pending.tasks }
+          for (const task of nextActive) {
+            pendingTasks[task.id] = ts
+          }
+
+          return {
+            tasks,
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                tasks: pendingTasks,
+              },
+            },
+          }
+        })
+      },
+
+      moveTaskToLane: (taskId, lane, targetTaskId) => {
+        const ts = now()
+        set((s) => {
+          const active = s.tasks.filter((task) => !task.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          const dragged = active.find((task) => task.id === taskId)
+          if (!dragged) return {}
+
+          const remaining = active.filter((task) => task.id !== taskId)
+          const targetIndex =
+            targetTaskId ? remaining.findIndex((task) => task.id === targetTaskId) : -1
+
+          const updatedDragged: Task = {
+            ...dragged,
+            lane,
+            clientUpdatedAt: ts,
+            deleted: false,
+          }
+
+          const insertAt =
+            targetIndex >= 0
+              ? targetIndex
+              : (() => {
+                  const laneTasks = remaining.filter((task) => !task.completed && (task.lane ?? "backlog") === lane)
+                  if (laneTasks.length === 0) return remaining.length
+                  const lastLaneTask = laneTasks[laneTasks.length - 1]
+                  const lastLaneIndex = remaining.findIndex((task) => task.id === lastLaneTask.id)
+                  return lastLaneIndex + 1
+                })()
+
+          const nextActive = [...remaining]
+          nextActive.splice(insertAt, 0, updatedDragged)
+
+          const orderById = new Map<string, number>()
+          nextActive.forEach((task, index) => {
+            orderById.set(task.id, index + 1)
+          })
+
+          const tasks = s.tasks.map((task) => {
+            const nextOrder = orderById.get(task.id)
+            if (!nextOrder) return task
+            if (task.id === taskId) {
+              return {
+                ...task,
+                lane,
+                order: nextOrder,
+                clientUpdatedAt: ts,
+                deleted: false,
+              }
+            }
             return {
               ...task,
               order: nextOrder,

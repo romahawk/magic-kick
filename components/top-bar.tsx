@@ -2,6 +2,7 @@
 
 import { useTheme } from "next-themes"
 import { signOut } from "firebase/auth"
+import { useEffect, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { auth } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
@@ -12,7 +13,6 @@ import { QuickAddDialog } from "./quick-add-dialog"
 import { Zap, Flame, Moon, Sun, Menu, RefreshCcw, LogOut } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { MobileNav } from "./mobile-nav"
-import { useState } from "react"
 
 export function TopBar() {
   const { theme, setTheme } = useTheme()
@@ -21,6 +21,29 @@ export function TopBar() {
   const profile = useAppStore((s) => s.profile)
   const weekRange = getCurrentWeekRange()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [currentTime, setCurrentTime] = useState(() =>
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date())
+  )
+
+  useEffect(() => {
+    const formatter = new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+
+    const updateClock = () => setCurrentTime(formatter.format(new Date()))
+    const timer = window.setInterval(updateClock, 1000)
+    updateClock()
+
+    return () => window.clearInterval(timer)
+  }, [])
 
   return (
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 md:flex-nowrap md:gap-3 md:px-6 md:py-0">
@@ -54,6 +77,10 @@ export function TopBar() {
           {user.email}
         </div>
       ) : null}
+
+      <div className="hidden rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground sm:block">
+        {currentTime}
+      </div>
 
       {/* XP badge */}
       <div className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
