@@ -1,4 +1,4 @@
-import { addMinutes, format, parseISO } from "date-fns"
+import { addDays, addMinutes, format, parseISO } from "date-fns"
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type {
@@ -123,6 +123,15 @@ function sortProjectMilestones<T extends Pick<ProjectMilestone, "dayIndex" | "ti
     if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
     return a.title.localeCompare(b.title)
   })
+}
+
+function inferLegacyMilestoneCompletionDate(weekStartISO: string | undefined, dayIndex: number) {
+  if (!weekStartISO) return undefined
+  try {
+    return format(addDays(parseISO(weekStartISO), Math.max(0, Math.min(6, dayIndex))), "yyyy-MM-dd")
+  } catch {
+    return undefined
+  }
 }
 
 function createInitialData() {
@@ -1114,6 +1123,7 @@ export const useAppStore = create<AppState>()(
             title: milestone.title,
             dayIndex: milestone.dayIndex,
             completed: false,
+            completedAt: undefined,
           }))
         )
         const item = touchEntity({
@@ -1212,6 +1222,7 @@ export const useAppStore = create<AppState>()(
           title: milestone.title.trim() || "Milestone",
           dayIndex: Math.max(0, Math.min(6, milestone.dayIndex)),
           completed: false,
+          completedAt: undefined,
         }
         set((s) => ({
           projects: s.projects.map((project) =>
@@ -1254,7 +1265,14 @@ export const useAppStore = create<AppState>()(
                             ...(typeof updates.dayIndex === "number"
                               ? { dayIndex: Math.max(0, Math.min(6, updates.dayIndex)) }
                               : {}),
-                            ...(typeof updates.completed === "boolean" ? { completed: updates.completed } : {}),
+                            ...(typeof updates.completed === "boolean"
+                              ? {
+                                  completed: updates.completed,
+                                  completedAt: updates.completed
+                                    ? milestone.completedAt ?? format(new Date(), "yyyy-MM-dd")
+                                    : undefined,
+                                }
+                              : {}),
                           }
                         : milestone
                     )
@@ -1481,7 +1499,13 @@ export const useAppStore = create<AppState>()(
                   clientUpdatedAt: ts,
                   deleted: false,
                   milestones: p.milestones.map((m) =>
-                    m.id === milestoneId ? { ...m, completed: !m.completed } : m
+                    m.id === milestoneId
+                      ? {
+                          ...m,
+                          completed: !m.completed,
+                          completedAt: !m.completed ? format(new Date(), "yyyy-MM-dd") : undefined,
+                        }
+                      : m
                   ),
                 }
               : p
@@ -1570,7 +1594,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 5,
+      version: 7,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -1656,6 +1680,12 @@ export const useAppStore = create<AppState>()(
               title: milestone.title ?? "Milestone",
               dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
               completed: Boolean(milestone.completed),
+              completedAt:
+                milestone.completed && typeof milestone.completedAt === "string" && milestone.completedAt.trim()
+                  ? milestone.completedAt
+                  : milestone.completed
+                    ? inferLegacyMilestoneCompletionDate(project.weekStartISO, milestone.dayIndex ?? 0)
+                    : undefined,
             }))
           ),
         }))
