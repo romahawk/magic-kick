@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff } from "lucide-react"
+import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -119,6 +119,7 @@ export function ProjectsModule() {
   const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
   const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
   const [timelineView, setTimelineView] = useState<"weekly" | "yearly">("weekly")
+  const [selectedStatus, setSelectedStatus] = useState<ProjectStatus>("active")
   const [focusMode, setFocusMode] = useState(false)
   const [showDetails, setShowDetails] = useState(true)
   const [projectView, setProjectView] = useState<"all" | "split">("split")
@@ -168,6 +169,7 @@ export function ProjectsModule() {
     ...section,
     projects: displayProjects.filter((project) => getProjectStatus(project) === section.id),
   }))
+  const selectedBucket = statusBuckets.find((section) => section.id === selectedStatus) ?? statusBuckets[0]
 
   function openCreateDialog() {
     setEditingId(null)
@@ -460,73 +462,140 @@ export function ProjectsModule() {
         </Dialog>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {VIEW_CONTROLS.map((control) => {
-          const isActive = timelineView === control.id
-          const Icon = control.icon
-          return (
-            <Tooltip key={control.id}>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant={isActive ? "default" : "outline"}
-                  onClick={() => setTimelineView(control.id)}
-                  aria-label={control.label}
-                >
-                  <Icon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={8}>{control.label}</TooltipContent>
-            </Tooltip>
-          )
-        })}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              size="icon"
-              variant={isFocusedOnlyView ? "default" : "outline"}
-              onClick={() => focusedProject && setFocusMode((value) => !value)}
-              aria-label={isFocusedOnlyView ? "Focused-only view on" : "Show focused only"}
-              disabled={!focusedProject}
-            >
-              <Focus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent sideOffset={8}>
-            {focusedProject ? (isFocusedOnlyView ? "Focused-Only View On" : "Show Focused Only") : "Select a focused project first"}
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button type="button" size="icon" variant={projectView === "split" ? "default" : "outline"} onClick={() => setProjectView((value) => value === "split" ? "all" : "split")} aria-label={projectView === "split" ? "Split view on" : "Split by status"}>
-              <Rows3 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent sideOffset={8}>{projectView === "split" ? "Split by Status On" : "Split by Status"}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button type="button" size="icon" variant="outline" onClick={() => setShowDetails((value) => !value)} aria-label={showDetails ? "Hide details" : "Show details"}>
-              {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent sideOffset={8}>{showDetails ? "Hide Details" : "Show Details"}</TooltipContent>
-        </Tooltip>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {VIEW_CONTROLS.map((control) => {
+            const isActive = timelineView === control.id
+            const Icon = control.icon
+            return (
+              <Tooltip key={control.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={isActive ? "default" : "outline"}
+                    onClick={() => setTimelineView(control.id)}
+                    aria-label={control.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>{control.label}</TooltipContent>
+              </Tooltip>
+            )
+          })}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant={isFocusedOnlyView ? "default" : "outline"}
+                onClick={() => focusedProject && setFocusMode((value) => !value)}
+                aria-label={isFocusedOnlyView ? "Focused-only view on" : "Show focused only"}
+                disabled={!focusedProject}
+              >
+                <Focus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={8}>
+              {focusedProject ? (isFocusedOnlyView ? "Focused-Only View On" : "Show Focused Only") : "Select a focused project first"}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" size="icon" variant={projectView === "split" ? "default" : "outline"} onClick={() => setProjectView((value) => value === "split" ? "all" : "split")} aria-label={projectView === "split" ? "Split view on" : "Split by status"}>
+                <Rows3 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={8}>{projectView === "split" ? "Split by Status On" : "Split by Status"}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" size="icon" variant="outline" onClick={() => setShowDetails((value) => !value)} aria-label={showDetails ? "Hide details" : "Show details"}>
+                {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={8}>{showDetails ? "Hide Details" : "Show Details"}</TooltipContent>
+          </Tooltip>
+        </div>
+        {projectView === "split" ? (
+          <div className="flex flex-wrap items-center gap-6">
+            {statusBuckets.map((section) => {
+              const isOpen = openSections[section.id]
+              return (
+                <Tooltip key={`nav-${section.id}`}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStatus(section.id)
+                        setOpenSections((prev) => ({ ...prev, [section.id]: true }))
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors",
+                        selectedStatus === section.id
+                          ? "border-primary bg-background/70 text-foreground"
+                          : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-background/40 hover:text-foreground"
+                      )}
+                      aria-label={`Show ${section.label} projects`}
+                    >
+                      {selectedStatus === section.id && isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      <span className="text-sm font-semibold">{section.label}</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {section.projects.length}
+                      </Badge>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={8}>{section.description}</TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
+        ) : null}
       </div>
-      {load.overCapacity ? (
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-            <div>
-              <p className="font-medium">Cognitive overload warning</p>
-              <p className="text-muted-foreground">
+      {load.overCapacity || focusedProject ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {load.overCapacity ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-amber-400" />
+                  <span className="font-medium text-foreground">Cognitive overload</span>
+                  <Badge className="bg-amber-500 text-black">Over capacity</Badge>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>
                 {activeProjects.length} active projects exceeds the limit of {systemConfig?.maxActiveProjects ?? 3}. Focus score reduced to {load.focusScore}.
-              </p>
-            </div>
-            <Badge className="bg-amber-500 text-black">Over capacity</Badge>
-          </CardContent>
-        </Card>
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+          {focusedProject ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                    <Crosshair className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-foreground">Focused project</span>
+                    <Badge variant="outline" className="max-w-40 truncate text-[10px]">
+                      {focusedProject.title}
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>
+                  {focusedProject.title} is pinned and gets priority in daily focus task scoring.
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setFocusedProject(undefined)} aria-label="Clear focus">
+                    <PinOff className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>Clear Focus</TooltipContent>
+              </Tooltip>
+            </>
+          ) : null}
+        </div>
       ) : null}
       {activeProjectsMissingWeeklyOutcome.length > 0 ? (
         <Card className="border-sky-500/30 bg-sky-500/10">
@@ -547,22 +616,6 @@ export function ProjectsModule() {
           </CardContent>
         </Card>
       ) : null}
-      {focusedProject ? (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-            <div>
-              <p className="font-medium">Focused project selected</p>
-              <p className="text-muted-foreground">
-                {focusedProject.title} is pinned and gets priority in daily focus task scoring.
-              </p>
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => setFocusedProject(undefined)}>
-              <PinOff className="mr-1.5 h-4 w-4" />
-              Clear Focus
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
       {isFocusedOnlyView && hiddenProjectsCount > 0 ? (
         <p className="text-xs text-muted-foreground">
           {focusedProject ? "Focused-only view shows your selected project." : `Focused-only view shows 3 current projects. Hidden: ${hiddenProjectsCount}.`}
@@ -573,7 +626,7 @@ export function ProjectsModule() {
       {timelineView === "weekly" ? (
         projectView === "split" ? (
           <div className="flex flex-col gap-4">
-            {statusBuckets.map((section) => (
+            {[selectedBucket].map((section) => (
               <Collapsible key={section.id} open={openSections[section.id]} onOpenChange={() => toggleSection(section.id)}>
                 <Card>
                   <CardHeader className="pb-3">
@@ -636,7 +689,7 @@ export function ProjectsModule() {
       {showDetails ? (
         projectView === "split" ? (
           <div className="flex flex-col gap-6">
-            {statusBuckets.map((section) => (
+            {[selectedBucket].map((section) => (
               <Collapsible key={`${section.id}-details`} open={openSections[section.id]} onOpenChange={() => toggleSection(section.id)}>
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
