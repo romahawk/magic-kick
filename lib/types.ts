@@ -40,6 +40,7 @@ export interface ProjectMilestone {
   title: string
   dayIndex: number
   completed: boolean
+  completedAt?: string
 }
 
 export type ProjectStatus = "active" | "paused" | "parked" | "completed"

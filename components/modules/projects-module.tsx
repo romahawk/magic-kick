@@ -814,7 +814,7 @@ function WeeklyProjectGrid({
             </div>
             <div className="grid grid-cols-7 gap-1">
               {weekDays.map((_, i) => {
-                const dayMilestones = sortedMilestones.filter((m) => m.dayIndex === i)
+                const dayMilestones = openMilestones.filter((m) => m.dayIndex === i)
                 return (
                   <div
                     key={i}
@@ -1066,71 +1066,85 @@ function ProjectDetailsGrid({
                   {openMilestones.length === 0 ? <p className="text-xs text-muted-foreground">No open milestones.</p> : null}
                 </div>
                 {completedMilestones.length > 0 ? (
-                  <div className="mt-3 rounded-md border border-border/60 bg-background/40 p-2">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed milestones</p>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {completedMilestones.length}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      {completedMilestones.map((m) => (
-                        <div key={m.id} className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-2">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            className="h-8 w-8 shrink-0 border-emerald-500/40"
-                            onClick={() => toggleMilestone(project.id, m.id)}
-                            aria-label={`Reopen milestone: ${m.title}`}
-                          >
-                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                          </Button>
-                          {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
-                            <>
-                              <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
-                              <select
-                                value={editingMilestoneDayIndex}
-                                onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
-                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                                aria-label="Edit milestone day"
+                  <Collapsible>
+                    <div className="mt-3 rounded-md border border-border/60 bg-background/40 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <CollapsibleTrigger asChild>
+                          <button className="group flex items-center gap-2 text-left">
+                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed milestones</p>
+                          </button>
+                        </CollapsibleTrigger>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {completedMilestones.length}
+                        </Badge>
+                      </div>
+                      <CollapsibleContent className="mt-2">
+                        <div className="flex flex-col gap-1.5">
+                          {completedMilestones.map((m) => (
+                            <div key={m.id} className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-2">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8 shrink-0 border-emerald-500/40"
+                                onClick={() => toggleMilestone(project.id, m.id)}
+                                aria-label={`Reopen milestone: ${m.title}`}
                               >
-                                {DAY_LABELS.map((day, index) => (
-                                  <option key={`${project.id}-${m.id}-completed-day-${day}`} value={index}>
-                                    {day}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
-                                <Check className="h-3.5 w-3.5" />
+                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                               </Button>
-                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit} aria-label="Cancel milestone edit">
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm line-through text-muted-foreground">{m.title}</p>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <Badge variant="outline" className="text-[10px]">
-                                    {DAY_LABELS[m.dayIndex]}
-                                  </Badge>
-                                  <span className="text-[10px] text-emerald-300">Completed</span>
-                                </div>
-                              </div>
-                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
+                              {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
+                                <>
+                                  <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
+                                  <select
+                                    value={editingMilestoneDayIndex}
+                                    onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
+                                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                    aria-label="Edit milestone day"
+                                  >
+                                    {DAY_LABELS.map((day, index) => (
+                                      <option key={`${project.id}-${m.id}-completed-day-${day}`} value={index}>
+                                        {day}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit} aria-label="Cancel milestone edit">
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm line-through text-muted-foreground">{m.title}</p>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {DAY_LABELS[m.dayIndex]}
+                                      </Badge>
+                                      <span className="text-[10px] text-emerald-300">Completed</span>
+                                      {m.completedAt ? (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {format(parseISO(m.completedAt), "MMM d, yyyy")}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </CollapsibleContent>
                     </div>
-                  </div>
+                  </Collapsible>
                 ) : null}
                 {project.milestones.length === 0 ? <p className="text-xs text-muted-foreground">No milestones yet.</p> : null}
                 </div>
