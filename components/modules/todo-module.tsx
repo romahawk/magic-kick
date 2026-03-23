@@ -34,6 +34,7 @@ export function TodoModule() {
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
   const toggleTask = useAppStore((s) => s.toggleTask)
   const reorderTasks = useAppStore((s) => s.reorderTasks)
+  const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
   const updateTask = useAppStore((s) => s.updateTask)
   const deleteTask = useAppStore((s) => s.deleteTask)
   const addCategory = useAppStore((s) => s.addCategory)
@@ -135,6 +136,11 @@ export function TodoModule() {
 
   function canUseDailyFocusLane(taskId?: string) {
     return tasks.filter((task) => !task.deleted && !task.completed && (task.lane ?? "backlog") === "daily-focus" && task.id !== taskId).length < dailyFocusLimit
+  }
+
+  function handleMoveTask(taskId: string, lane: TaskLane, targetTaskId?: string) {
+    if (lane === "daily-focus" && !canUseDailyFocusLane(taskId)) return
+    moveTaskToLane(taskId, lane, targetTaskId)
   }
 
   function saveTaskEdits() {
@@ -270,21 +276,45 @@ export function TodoModule() {
         <div className="flex flex-col gap-4">
           {filterStatus !== "completed" ? (
             <>
-              <TaskLaneSection lane="daily-focus" open={openLanes["daily-focus"]} onToggleOpen={() => toggleLane("daily-focus")} tasks={dailyFocusTasks} limit={dailyFocusLimit} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTaskId) => {
-                if (sortBy !== "manual" || !draggedTaskId || draggedTaskId === targetTaskId) return
-                reorderTasks(draggedTaskId, targetTaskId)
+              <TaskLaneSection lane="daily-focus" open={openLanes["daily-focus"]} onToggleOpen={() => toggleLane("daily-focus")} tasks={dailyFocusTasks} limit={dailyFocusLimit} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
+                if (!draggedTaskId || draggedTaskId === targetTask.id) return
+                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
+                  if (sortBy !== "manual") return
+                  reorderTasks(draggedTaskId, targetTask.id)
+                }
+                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
                 setDraggedTaskId(null)
-              }} draggable={sortBy === "manual"} onDragEnd={() => setDraggedTaskId(null)} />
-              <TaskLaneSection lane="backlog" open={openLanes.backlog} onToggleOpen={() => toggleLane("backlog")} tasks={backlogTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTaskId) => {
-                if (sortBy !== "manual" || !draggedTaskId || draggedTaskId === targetTaskId) return
-                reorderTasks(draggedTaskId, targetTaskId)
+              }} onDropOnLane={() => {
+                if (!draggedTaskId) return
+                handleMoveTask(draggedTaskId, "daily-focus")
                 setDraggedTaskId(null)
-              }} draggable={sortBy === "manual"} onDragEnd={() => setDraggedTaskId(null)} />
-              <TaskLaneSection lane="parking-lot" open={openLanes["parking-lot"]} onToggleOpen={() => toggleLane("parking-lot")} tasks={parkingLotTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTaskId) => {
-                if (sortBy !== "manual" || !draggedTaskId || draggedTaskId === targetTaskId) return
-                reorderTasks(draggedTaskId, targetTaskId)
+              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
+              <TaskLaneSection lane="backlog" open={openLanes.backlog} onToggleOpen={() => toggleLane("backlog")} tasks={backlogTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
+                if (!draggedTaskId || draggedTaskId === targetTask.id) return
+                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
+                  if (sortBy !== "manual") return
+                  reorderTasks(draggedTaskId, targetTask.id)
+                }
+                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
                 setDraggedTaskId(null)
-              }} draggable={sortBy === "manual"} onDragEnd={() => setDraggedTaskId(null)} />
+              }} onDropOnLane={() => {
+                if (!draggedTaskId) return
+                handleMoveTask(draggedTaskId, "backlog")
+                setDraggedTaskId(null)
+              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
+              <TaskLaneSection lane="parking-lot" open={openLanes["parking-lot"]} onToggleOpen={() => toggleLane("parking-lot")} tasks={parkingLotTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
+                if (!draggedTaskId || draggedTaskId === targetTask.id) return
+                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
+                  if (sortBy !== "manual") return
+                  reorderTasks(draggedTaskId, targetTask.id)
+                }
+                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
+                setDraggedTaskId(null)
+              }} onDropOnLane={() => {
+                if (!draggedTaskId) return
+                handleMoveTask(draggedTaskId, "parking-lot")
+                setDraggedTaskId(null)
+              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
             </>
           ) : null}
           {(filterStatus === "all" || filterStatus === "completed") && archivedTasks.length > 0 ? (
@@ -437,6 +467,7 @@ function TaskLaneSection({
   onSelect,
   onDragStart,
   onDropOnTask,
+  onDropOnLane,
   draggable,
   onDragEnd,
   limit,
@@ -449,7 +480,8 @@ function TaskLaneSection({
   onToggle: (id: string) => void
   onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void
-  onDropOnTask: (taskId: string) => void
+  onDropOnTask: (task: Task) => void
+  onDropOnLane: () => void
   draggable: boolean
   onDragEnd: () => void
   limit?: number
@@ -476,7 +508,18 @@ function TaskLaneSection({
           </div>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="flex flex-col gap-2">
+          <CardContent
+            className="flex flex-col gap-2"
+            onDragOver={(e) => {
+              if (!draggable) return
+              e.preventDefault()
+            }}
+            onDrop={(e) => {
+              if (!draggable) return
+              e.preventDefault()
+              onDropOnLane()
+            }}
+          >
             {tasks.length === 0 ? <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">No tasks in this lane.</p> : null}
             {tasks.map((task) => (
               <TaskRow key={task.id} task={task} categoryColor={categoryColors[task.category]} onToggle={onToggle} onSelect={onSelect} onDragStart={onDragStart} onDropOnTask={onDropOnTask} draggable={draggable && !task.completed} onDragEnd={onDragEnd} />
@@ -488,7 +531,7 @@ function TaskLaneSection({
   )
 }
 
-function TaskRow({ task, categoryColor, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd }: { task: Task; categoryColor?: string; onToggle: (id: string) => void; onSelect: (task: Task) => void; onDragStart: (taskId: string) => void; onDropOnTask: (taskId: string) => void; draggable?: boolean; onDragEnd: () => void }) {
+function TaskRow({ task, categoryColor, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd }: { task: Task; categoryColor?: string; onToggle: (id: string) => void; onSelect: (task: Task) => void; onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void; draggable?: boolean; onDragEnd: () => void }) {
   return (
     <div
       className={cn("flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30", draggable ? "cursor-grab active:cursor-grabbing" : "", task.completed && "opacity-50")}
@@ -498,7 +541,7 @@ function TaskRow({ task, categoryColor, onToggle, onSelect, onDragStart, onDropO
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
-        onDropOnTask(task.id)
+        onDropOnTask(task)
       }}
       onDragEnd={onDragEnd}
       role="button"

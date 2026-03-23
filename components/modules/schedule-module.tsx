@@ -255,6 +255,15 @@ export function ScheduleModule() {
     () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, idx) => DAY_START_HOUR + idx),
     []
   )
+  const [currentTimeMarker, setCurrentTimeMarker] = useState(() => new Date())
+  const isSelectedDayToday = useMemo(
+    () => format(new Date(), "yyyy-MM-dd") === selectedDay,
+    [selectedDay]
+  )
+  const currentTimeMinutes = useMemo(
+    () => currentTimeMarker.getHours() * 60 + currentTimeMarker.getMinutes() + currentTimeMarker.getSeconds() / 60,
+    [currentTimeMarker]
+  )
   const selectedDayExecutionItems = useMemo(
     () => timedDayItems.filter((item) => item.blockTypeId && executionBlockById.has(item.blockTypeId)),
     [executionBlockById, timedDayItems]
@@ -426,6 +435,12 @@ export function ScheduleModule() {
       window.removeEventListener("mouseup", handleMouseUp)
     }
   }, [addScheduleItem, allSchedule, resizeState, schedule, selectedDay, updateScheduleItem, updateTask])
+
+  useEffect(() => {
+    if (!isSelectedDayToday) return
+    const timer = window.setInterval(() => setCurrentTimeMarker(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [isSelectedDayToday])
 
   function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
     const item = schedule.find((entry) => entry.id === scheduleItemId)
@@ -957,6 +972,15 @@ export function ScheduleModule() {
                             style={{ top: `${((hour - DAY_START_HOUR) * 60 + 30) * PIXELS_PER_MINUTE}px` }}
                           />
                         ))}
+                        {isSelectedDayToday && currentTimeMinutes >= DAY_START_HOUR * 60 && currentTimeMinutes <= DAY_END_HOUR * 60 ? (
+                          <div
+                            className="absolute left-0 right-0 z-20"
+                            style={{ top: `${(currentTimeMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE}px` }}
+                          >
+                            <div className="absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full bg-primary shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
+                            <div className="border-t border-primary" />
+                          </div>
+                        ) : null}
 
                         {timedDayItems.map((item) => {
                           const start = parseISO(item.startISO)
