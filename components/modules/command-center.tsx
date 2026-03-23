@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { levelFromXP, getWeekDays, isDueToday } from "@/lib/game-utils"
 import { calculateCognitiveLoad, selectActiveProjects, selectDailyFocus, selectWeeklyOutcomes } from "@/lib/execution-os"
@@ -16,6 +17,7 @@ export function CommandCenter() {
   const allProjects = useAppStore((s) => s.projects)
   const allAchievements = useAppStore((s) => s.achievements)
   const toggleTask = useAppStore((s) => s.toggleTask)
+  const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
 
   const tasks = allTasks.filter((task) => !task.deleted)
   const projects = allProjects.filter((project) => !project.deleted)
@@ -34,6 +36,7 @@ export function CommandCenter() {
   const unlockedBadges = achievements.filter((achievement) => achievement.unlocked).length
   const dailyFocusLimit = systemConfig?.dailyFocusLimit ?? 3
   const maxActiveProjects = systemConfig?.maxActiveProjects ?? 3
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
 
   return (
     <div className="flex flex-col gap-6">
@@ -134,7 +137,20 @@ export function CommandCenter() {
               </p>
             ) : (
               dailyFocus.map(({ task, linkedProject }, index) => (
-                <div key={task.id} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/20 p-3">
+                <div
+                  key={task.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-secondary/20 p-3 transition-colors hover:bg-secondary/30"
+                  draggable={!task.completed}
+                  onDragStart={() => setDraggedTaskId(task.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (!draggedTaskId || draggedTaskId === task.id) return
+                    moveTaskToLane(draggedTaskId, "daily-focus", task.id)
+                    setDraggedTaskId(null)
+                  }}
+                  onDragEnd={() => setDraggedTaskId(null)}
+                >
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                     {index + 1}
                   </div>
