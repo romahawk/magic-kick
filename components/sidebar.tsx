@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress"
 import type { ModuleId } from "@/lib/types"
 import {
   LayoutDashboard,
-  CalendarRange,
   Target,
   CheckSquare,
   FolderKanban,
@@ -21,7 +20,6 @@ import {
 
 const NAV_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
   { id: "command-center", label: "Command Center", icon: LayoutDashboard },
-  { id: "weekly-plan", label: "Weekly Plan", icon: CalendarRange },
   { id: "goals", label: "Goals", icon: Target },
   { id: "todo", label: "ToDo", icon: CheckSquare },
   { id: "projects", label: "Projects", icon: FolderKanban },

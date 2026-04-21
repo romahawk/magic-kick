@@ -231,7 +231,6 @@ export interface SyncState {
 
 export type ModuleId =
   | "command-center"
-  | "weekly-plan"
   | "goals"
   | "todo"
   | "projects"

@@ -294,7 +294,7 @@ export function ScheduleModule() {
               <Button variant="ghost" size="icon" onClick={() => setDayIndex((i) => Math.max(0, i - 1))} disabled={dayIndex === 0}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="min-w-[90px] text-center text-sm font-medium">
+              <span className="min-w-22.5 text-center text-sm font-medium">
                 {weekDays[dayIndex]?.label} {weekDays[dayIndex]?.dayNumber}
               </span>
               <Button variant="ghost" size="icon" onClick={() => setDayIndex((i) => Math.min(6, i + 1))} disabled={dayIndex === 6}>
@@ -316,7 +316,7 @@ export function ScheduleModule() {
               Day
             </button>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setActiveModule("weekly-plan")}>
+          <Button variant="outline" size="sm" onClick={() => setActiveModule("command-center")}>
             {activePlan ? "Edit plan" : "Create plan"}
           </Button>
         </div>
@@ -329,7 +329,7 @@ export function ScheduleModule() {
             <p className="font-medium">No active weekly plan</p>
             <p className="text-sm text-muted-foreground">Allocate the week first, then schedule blocks.</p>
           </div>
-          <Button onClick={() => setActiveModule("weekly-plan")}>Set weekly plan</Button>
+          <Button onClick={() => setActiveModule("command-center")}>Set weekly plan</Button>
         </div>
       ) : (
         <div className="flex flex-1 gap-4 overflow-hidden">
