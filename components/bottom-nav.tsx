@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { ModuleId } from "@/lib/types"
 import {
   LayoutDashboard,
+  CalendarRange,
   CheckSquare,
   FolderKanban,
   CalendarDays,
@@ -13,6 +14,7 @@ import {
 
 const BOTTOM_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
   { id: "command-center", label: "Home", icon: LayoutDashboard },
+  { id: "weekly-plan", label: "Weekly", icon: CalendarRange },
   { id: "todo", label: "ToDo", icon: CheckSquare },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "schedule", label: "Schedule", icon: CalendarDays },

@@ -1,5 +1,6 @@
 import type {
   Achievement,
+  ExecutionLog,
   Goal,
   JournalEntry,
   Profile,
@@ -8,6 +9,9 @@ import type {
   ScheduleItem,
   Task,
   SyncCollection,
+  TimeBlock,
+  WeeklyPlan,
+  WeeklyReview,
 } from "@/lib/types"
 
 export interface CollectionEntityMap {
@@ -16,6 +20,10 @@ export interface CollectionEntityMap {
   projects: Project
   achievements: Achievement
   schedule: ScheduleItem
+  weeklyPlans: WeeklyPlan
+  timeBlocks: TimeBlock
+  executionLogs: ExecutionLog
+  weeklyReviews: WeeklyReview
   resources: Resource
   journal: JournalEntry
 }
@@ -26,6 +34,10 @@ export const ENTITY_COLLECTIONS: Array<Exclude<SyncCollection, "profile">> = [
   "projects",
   "achievements",
   "schedule",
+  "weeklyPlans",
+  "timeBlocks",
+  "executionLogs",
+  "weeklyReviews",
   "resources",
   "journal",
 ]

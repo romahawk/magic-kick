@@ -9,6 +9,10 @@ const ENTITY_COLLECTIONS: EntityCollection[] = [
   "projects",
   "achievements",
   "schedule",
+  "weeklyPlans",
+  "timeBlocks",
+  "executionLogs",
+  "weeklyReviews",
   "resources",
   "journal",
 ]

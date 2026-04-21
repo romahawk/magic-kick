@@ -63,6 +63,10 @@ export function applyRemoteSnapshot(snapshot: RemoteSnapshot) {
   const projects = mergeCollection(state.projects, snapshot.entities.projects)
   const achievements = mergeCollection(state.achievements, snapshot.entities.achievements)
   const schedule = mergeCollection(state.schedule, snapshot.entities.schedule)
+  const weeklyPlans = mergeCollection(state.weeklyPlans, snapshot.entities.weeklyPlans)
+  const timeBlocks = mergeCollection(state.timeBlocks, snapshot.entities.timeBlocks)
+  const executionLogs = mergeCollection(state.executionLogs, snapshot.entities.executionLogs)
+  const weeklyReviews = mergeCollection(state.weeklyReviews, snapshot.entities.weeklyReviews)
   const resources = mergeCollection(state.resources, snapshot.entities.resources)
   const journal = mergeCollection(state.journal, snapshot.entities.journal)
 
@@ -75,6 +79,10 @@ export function applyRemoteSnapshot(snapshot: RemoteSnapshot) {
       projects: { ...current.sync.pending.projects },
       achievements: { ...current.sync.pending.achievements },
       schedule: { ...current.sync.pending.schedule },
+      weeklyPlans: { ...current.sync.pending.weeklyPlans },
+      timeBlocks: { ...current.sync.pending.timeBlocks },
+      executionLogs: { ...current.sync.pending.executionLogs },
+      weeklyReviews: { ...current.sync.pending.weeklyReviews },
       resources: { ...current.sync.pending.resources },
       journal: { ...current.sync.pending.journal },
     }
@@ -87,6 +95,10 @@ export function applyRemoteSnapshot(snapshot: RemoteSnapshot) {
     for (const id of projects.overriddenIds) delete nextPending.projects[id]
     for (const id of achievements.overriddenIds) delete nextPending.achievements[id]
     for (const id of schedule.overriddenIds) delete nextPending.schedule[id]
+    for (const id of weeklyPlans.overriddenIds) delete nextPending.weeklyPlans[id]
+    for (const id of timeBlocks.overriddenIds) delete nextPending.timeBlocks[id]
+    for (const id of executionLogs.overriddenIds) delete nextPending.executionLogs[id]
+    for (const id of weeklyReviews.overriddenIds) delete nextPending.weeklyReviews[id]
     for (const id of resources.overriddenIds) delete nextPending.resources[id]
     for (const id of journal.overriddenIds) delete nextPending.journal[id]
 
@@ -97,6 +109,10 @@ export function applyRemoteSnapshot(snapshot: RemoteSnapshot) {
       projects: projects.items,
       achievements: achievements.items,
       schedule: schedule.items,
+      weeklyPlans: weeklyPlans.items,
+      timeBlocks: timeBlocks.items,
+      executionLogs: executionLogs.items,
+      weeklyReviews: weeklyReviews.items,
       resources: resources.items,
       journal: journal.items.sort((a, b) => b.dateISO.localeCompare(a.dateISO)),
       sync: {

@@ -1,108 +1,164 @@
-# Roadmap — Magic Kick
+# Roadmap - Magic Kick
 
-**Last updated:** 2026-03-02
-**Model:** Outcome-based, weekly shipping increments
-
----
-
-## Freeze List (Do NOT touch until Month 3)
-
-- Schedule module — calendar UI is low-leverage until core loop is proven
-- Resources module — reference library is V2 scope
-- Social/sharing features — out of scope
-- AI task suggestions — post-MVP
-- Native mobile app — web-first
+**Last updated:** 2026-03-31
+**Product direction:** Weekly Execution OS
+**Model:** Constraint-driven weekly shipping increments
 
 ---
 
-## Week 1–2: Stabilize + Ship One Visible Improvement
+## Product Focus
 
-**Outcome:** The repo is portfolio-credible and a stranger can set it up in under 10 minutes.
+Magic Kick is no longer just a project tracker.
 
-### Issues
-1. Fix `package.json` name from `"my-project"` to `"magic-kick"`
-2. Update README to product-pitch format (30-second pitch, stack, screenshot, deploy link, setup steps)
-3. Create `/docs` folder with PRD, ARCHITECTURE, ROADMAP, DECISIONS_LOG
-4. Add GitHub issue and PR templates
-5. Add `CHANGELOG.md` with v0.1.1 entry
-6. Fix: XP category base values don't cover user-created categories (fallback to 15 XP)
+The next product phase is:
 
-**Definition of Done:**
-- [ ] `npm run build` passes with zero type errors
-- [ ] README has a screenshot or GIF of the Command Center
-- [ ] A new developer can clone, copy `.env.example`, and run locally with emulators in under 10 minutes
-- [ ] All 6 issues above are merged as individual PRs
+> A Weekly Execution OS that allocates time across projects and enforces delivery.
 
-**Demo artifact:** Screenshot of Command Center (desktop + mobile) added to README
+Core operating rule:
+- time is the primary constraint
+- weekly allocation decides what gets worked on
+- no more than 3 active projects per week
+- total allocated time must stay within weekly capacity
 
 ---
 
-## Week 3–4: Add One "Signal" Feature (UX / Quality)
+## Freeze List
 
-**Outcome:** The app is noticeably more polished and there is one shareable proof-of-work moment.
+Do not prioritize these until the Weekly Execution OS loop is shipped end-to-end:
 
-### Issues
-1. Add UI error boundaries around each module (prevent full-app crash on module error)
-2. Add empty-state illustrations/messages to all 5 MVP modules
-3. Improve onboarding — pre-create a sample goal and task so Command Center isn't blank on first login
-4. Add `middleware.ts` for server-side route protection (redirect unauthenticated requests from `/` to `/login`)
-5. Move `firebase-admin` to `devDependencies` or add server route that justifies it
-6. Add sync error toast with "Retry" action when sync status is `"error"`
-
-**Definition of Done:**
-- [ ] No full-page crashes when a single module throws (error boundary test)
-- [ ] Onboarding creates at least 1 goal and 1 task automatically
-- [ ] Unauthenticated GET to `/` returns redirect to `/login` (server-side verified in logs)
-- [ ] Sync error is visible and actionable in UI
-
-**Demo artifact:** Loom or GIF showing onboarding → Command Center → task completion → XP animation
+- Resource-library expansion
+- Social or sharing features
+- AI task suggestions
+- Native mobile app
+- New gamification layers beyond current XP and achievements
+- Task recurrence
+- General calendar polish not tied to weekly allocation or execution
 
 ---
 
-## Month 2: Expand Core Loop Quality
+## Current Build Gap
 
-**Outcome:** The three core modules (Todo, Goals, Projects) are tight, tested, and production-hardened.
+Current strengths:
+- project creation exists
+- weekly outcomes exist at the project layer
+- schedule and execution-block UI already exist
+- command center already frames daily execution
 
-### Milestones
-- Add unit tests for `xp-engine.ts` and `achievement-engine.ts` (pure functions, easy wins)
-- Add integration smoke test for sync engine using Firebase emulators
-- Add Firestore security rules unit tests (`firebase-admin` test runner)
-- Implement task recurrence (daily/weekly) — most-requested personal-productivity feature
-- Improve Command Center: show "overdue tasks" section (tasks with past `dueDate` not completed)
-- Add `streak at risk` warning if no task completed today and it's after 6pm
-
-**Definition of Done:**
-- [ ] Test coverage ≥ 70% on `lib/` (xp-engine, achievement-engine, sync/diff)
-- [ ] CI runs on every PR (`npm run build` + `npm run lint` + tests)
-- [ ] Task recurrence working end-to-end with sync
+Current missing system layer:
+- no weekly capacity model
+- no hard allocation across projects
+- no direct link from allocation -> blocks -> actual hours -> review decisions
+- no forced trade-off when weekly demand exceeds capacity
 
 ---
 
-## Month 3: Ship and Signal
+## Phase 1: Weekly Allocation Architecture
 
-**Outcome:** The app is publicly deployed, demo-ready, and has at least 5 real sessions logged.
+**Outcome:** The app has a new source of truth for weekly execution commitment.
 
-### Milestones
-- Production Firebase project configured and deployed (Vercel + Firebase)
-- Deploy link in README
-- CHANGELOG updated with v0.2.0 release notes
-- Lighthouse score ≥ 90 for Performance and Accessibility
-- Journal module activated (daily/weekly reflections)
-- XP category values made user-configurable in profile settings
-- Analytics review: identify which modules users actually use
+### Scope
+- Add `WeeklyPlan`, `WeeklyAllocation`, `TimeBlock`, `ExecutionLog`, and `WeeklyReview` models
+- Extend Zustand store and sync collections
+- Add selector and validation layer for capacity, allocation totals, active-project limit, and review summaries
+- Keep Firestore on the current `users/{uid}` model for this phase
 
-**Definition of Done:**
-- [ ] Live deploy URL accessible without login gate on landing page
-- [ ] Vercel Analytics shows at least 5 unique sessions
-- [ ] Lighthouse CI passes in PR pipeline
+### GitHub Issues
+1. `#36` Weekly Execution OS: add weekly execution domain models and store slice
+2. `#37` Weekly Execution OS: extend Firestore sync schema for new execution entities
+3. `#35` Weekly Execution OS: build weekly planning constraints and selectors
+
+### Definition of Done
+- [ ] One weekly plan can be created for a given week
+- [ ] Capacity and allocation totals are validated in code
+- [ ] More than 3 active projects is blocked
+- [ ] New entities sync with the existing offline-first store
 
 ---
 
-## Versioning
+## Phase 2: Weekly Allocation UI
+
+**Outcome:** The user can explicitly choose what gets time this week and how much.
+
+### Scope
+- Add a dedicated Weekly Plan screen
+- Show capacity, allocated hours, remaining hours, and overload state
+- Allow selecting up to 3 active projects
+- Require each allocated project to have hours and one weekly outcome
+- Connect project workflow to weekly allocation instead of treating project status as the execution decision
+
+### GitHub Issues
+1. `#33` Weekly Execution OS: build Weekly Plan screen with hard capacity guardrails
+2. `#38` Weekly Execution OS: refactor Command Center and Schedule around weekly allocation
+
+### Definition of Done
+- [ ] The user can create and edit a weekly plan in under 3 minutes
+- [ ] Over-capacity allocation is blocked in UI and logic
+- [ ] Every allocated project shows priority, hours, and weekly outcome
+- [ ] Command Center reflects the current weekly plan instead of generic project state
+
+---
+
+## Phase 3: Execution Layer
+
+**Outcome:** Allocated hours turn into daily blocks and measurable execution.
+
+### Scope
+- Add lightweight time-block UI linked to the weekly plan
+- Track planned vs actual hours by block and aggregate by project/day
+- Keep the interaction fast: quick-create, drag-adjust, low-friction completion
+- Show per-project `allocated / planned / actual` progress
+
+### GitHub Issues
+1. `#38` Weekly Execution OS: refactor Command Center and Schedule around weekly allocation
+
+### Definition of Done
+- [ ] Blocks can only be created against allocated projects
+- [ ] Planned hours cannot silently exceed project allocation
+- [ ] Actual hours are captured from execution flow, not invented in review
+- [ ] Daily execution can be run without opening a heavy planning surface
+
+---
+
+## Phase 4: Weekly Review System
+
+**Outcome:** Every week ends with a decision, not drift.
+
+### Scope
+- Add weekly review UI for each allocated project
+- Show outcome achieved yes/no, planned vs actual hours, and decision
+- Require one of: continue, adjust allocation, remove
+- Feed review output into next week's planning flow
+
+### GitHub Issues
+1. `#34` Weekly Execution OS: build weekly review loop
+
+### Definition of Done
+- [ ] Each allocated project gets a review decision
+- [ ] Planned vs actual is visible per project
+- [ ] Outcome completion is explicit and reviewable
+- [ ] Next week planning can reuse reviewed project context without copying noise
+
+---
+
+## Release Path
 
 | Version | Description |
 |---|---|
-| v0.1.1 | Current — auth, sync engine, all modules wired |
-| v0.2.0 | Stabilized — docs, error boundaries, onboarding polish, middleware |
-| v0.3.0 | Tested — unit tests, CI, task recurrence |
-| v1.0.0 | Shipped — public deploy, Lighthouse ≥ 90, Journal active |
+| v0.2.0 | Weekly allocation architecture and data model shipped |
+| v0.3.0 | Weekly planning UI and Command Center integration shipped |
+| v0.4.0 | Execution tracking and lightweight time blocking shipped |
+| v0.5.0 | Weekly review loop shipped end-to-end |
+
+---
+
+## What Success Looks Like
+
+The product is successful in this phase when a user can:
+
+1. Set weekly capacity once
+2. Allocate that capacity across no more than 3 projects
+3. Turn allocation into daily time blocks
+4. Compare planned vs actual hours
+5. End the week with explicit continue / adjust / remove decisions
+
+If a feature does not strengthen that loop, it is not on the critical path.

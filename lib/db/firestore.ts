@@ -73,6 +73,10 @@ export async function pullUserSnapshot(uid: string, since: number | null): Promi
     projects: [] as CollectionEntityMap["projects"][],
     achievements: [] as CollectionEntityMap["achievements"][],
     schedule: [] as CollectionEntityMap["schedule"][],
+    weeklyPlans: [] as CollectionEntityMap["weeklyPlans"][],
+    timeBlocks: [] as CollectionEntityMap["timeBlocks"][],
+    executionLogs: [] as CollectionEntityMap["executionLogs"][],
+    weeklyReviews: [] as CollectionEntityMap["weeklyReviews"][],
     resources: [] as CollectionEntityMap["resources"][],
     journal: [] as CollectionEntityMap["journal"][],
   }
@@ -90,6 +94,10 @@ export async function pullUserSnapshot(uid: string, since: number | null): Promi
       if (name === "projects") entities.projects.push(data as CollectionEntityMap["projects"])
       if (name === "achievements") entities.achievements.push(data as CollectionEntityMap["achievements"])
       if (name === "schedule") entities.schedule.push(data as CollectionEntityMap["schedule"])
+      if (name === "weeklyPlans") entities.weeklyPlans.push(data as CollectionEntityMap["weeklyPlans"])
+      if (name === "timeBlocks") entities.timeBlocks.push(data as CollectionEntityMap["timeBlocks"])
+      if (name === "executionLogs") entities.executionLogs.push(data as CollectionEntityMap["executionLogs"])
+      if (name === "weeklyReviews") entities.weeklyReviews.push(data as CollectionEntityMap["weeklyReviews"])
       if (name === "resources") entities.resources.push(data as CollectionEntityMap["resources"])
       if (name === "journal") entities.journal.push(data as CollectionEntityMap["journal"])
       if (typeof data.updatedAt === "number" && data.updatedAt > cursor) {

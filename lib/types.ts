@@ -44,6 +44,10 @@ export interface ProjectMilestone {
 }
 
 export type ProjectStatus = "active" | "paused" | "parked" | "completed"
+export type ProjectPriority = "P1" | "P2" | "P3"
+export type WeeklyPlanStatus = "draft" | "active" | "reviewed"
+export type TimeBlockStatus = "planned" | "done" | "missed"
+export type ReviewDecision = "continue" | "adjust" | "remove"
 
 export interface ExecutionBlockTemplate {
   id: string
@@ -77,6 +81,63 @@ export interface Project extends SyncFields {
     label: string
     url: string
   }>
+}
+
+export interface WeeklyAllocation {
+  projectId: string
+  hoursAllocated: number
+  priority: ProjectPriority
+  weeklyOutcome: string
+}
+
+export interface WeeklyPlan extends SyncFields {
+  id: string
+  weekStartISO: string
+  totalCapacityHours: number
+  allocations: WeeklyAllocation[]
+  status: WeeklyPlanStatus
+  reviewedAt?: string
+}
+
+export interface TimeBlock extends SyncFields {
+  id: string
+  weekPlanId: string
+  projectId: string
+  dateISO: string
+  startTime: string
+  endTime: string
+  taskDescription: string
+  plannedHours: number
+  actualHours?: number
+  status: TimeBlockStatus
+}
+
+export interface ExecutionLog extends SyncFields {
+  id: string
+  weekPlanId: string
+  projectId: string
+  dateISO: string
+  plannedHours: number
+  actualHours: number
+}
+
+export interface ProjectWeeklyReview {
+  projectId: string
+  outcomePlanned: string
+  outcomeAchieved: boolean
+  plannedHours: number
+  actualHours: number
+  decision: ReviewDecision
+  notes?: string
+}
+
+export interface WeeklyReview extends SyncFields {
+  id: string
+  weekPlanId: string
+  weekStartISO: string
+  summary: ProjectWeeklyReview[]
+  nextWeekCapacityHours?: number
+  completed: boolean
 }
 
 export interface Achievement extends SyncFields {
@@ -150,6 +211,10 @@ export type SyncCollection =
   | "projects"
   | "achievements"
   | "schedule"
+  | "weeklyPlans"
+  | "timeBlocks"
+  | "executionLogs"
+  | "weeklyReviews"
   | "resources"
   | "journal"
   | "profile"
@@ -166,6 +231,7 @@ export interface SyncState {
 
 export type ModuleId =
   | "command-center"
+  | "weekly-plan"
   | "goals"
   | "todo"
   | "projects"

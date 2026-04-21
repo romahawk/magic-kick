@@ -3,21 +3,27 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type {
   Achievement,
+  ExecutionLog,
   Goal,
   JournalEntry,
   ModuleId,
   Profile,
   Project,
   ProjectMilestone,
+  ReviewDecision,
   Resource,
   ScheduleItem,
   SyncCollection,
   SyncState,
   Task,
   TaskLane,
+  TimeBlock,
+  WeeklyPlan,
+  WeeklyReview,
 } from "./types"
 import { generateId } from "./game-utils"
 import { normalizeSystemConfig } from "./execution-os"
+import { buildExecutionLogFromBlocks, calculateTimeBlockHours, emptyWeeklyPlan, getCurrentWeekStartISO } from "@/lib/weekly-plan"
 import { getOrCreateDeviceId } from "@/lib/sync/deviceId"
 import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollbackTaskXP } from "@/lib/xp-engine"
 import { levelFromXP } from "@/lib/game-utils"
@@ -81,12 +87,27 @@ const ENTITY_COLLECTIONS: Exclude<SyncCollection, "profile">[] = [
   "projects",
   "achievements",
   "schedule",
+  "weeklyPlans",
+  "timeBlocks",
+  "executionLogs",
+  "weeklyReviews",
   "resources",
   "journal",
 ]
 
 type PendingRecord = Record<SyncCollection, Record<string, number>>
-type LocalEntity = Task | Goal | Project | Achievement | ScheduleItem | Resource | JournalEntry
+type LocalEntity =
+  | Task
+  | Goal
+  | Project
+  | Achievement
+  | ScheduleItem
+  | WeeklyPlan
+  | TimeBlock
+  | ExecutionLog
+  | WeeklyReview
+  | Resource
+  | JournalEntry
 
 function now() {
   return Date.now()
@@ -106,6 +127,10 @@ function createEmptyPending(): PendingRecord {
     projects: {},
     achievements: {},
     schedule: {},
+    weeklyPlans: {},
+    timeBlocks: {},
+    executionLogs: {},
+    weeklyReviews: {},
     resources: {},
     journal: {},
   }
@@ -157,12 +182,32 @@ function createInitialData() {
     projects: [] as Project[],
     achievements: [] as Achievement[],
     schedule: [] as ScheduleItem[],
+    weeklyPlans: [] as WeeklyPlan[],
+    timeBlocks: [] as TimeBlock[],
+    executionLogs: [] as ExecutionLog[],
+    weeklyReviews: [] as WeeklyReview[],
     resources: [] as Resource[],
     journal: [] as JournalEntry[],
   }
 }
 
-function buildPendingFromState(state: Pick<AppState, "profile" | "tasks" | "goals" | "projects" | "achievements" | "schedule" | "resources" | "journal">): PendingRecord {
+function buildPendingFromState(
+  state: Pick<
+    AppState,
+    | "profile"
+    | "tasks"
+    | "goals"
+    | "projects"
+    | "achievements"
+    | "schedule"
+    | "weeklyPlans"
+    | "timeBlocks"
+    | "executionLogs"
+    | "weeklyReviews"
+    | "resources"
+    | "journal"
+  >
+): PendingRecord {
   const pending = createEmptyPending()
   if (state.profile.clientUpdatedAt) {
     pending.profile.profile = state.profile.clientUpdatedAt
@@ -242,6 +287,10 @@ export interface AppState {
   projects: Project[]
   achievements: Achievement[]
   schedule: ScheduleItem[]
+  weeklyPlans: WeeklyPlan[]
+  timeBlocks: TimeBlock[]
+  executionLogs: ExecutionLog[]
+  weeklyReviews: WeeklyReview[]
   resources: Resource[]
   journal: JournalEntry[]
   activeModule: ModuleId
@@ -290,6 +339,14 @@ export interface AppState {
   addJournalEntry: (j: Omit<JournalEntry, "id">) => void
   addScheduleItem: (s: Omit<ScheduleItem, "id">) => void
   updateScheduleItem: (id: string, updates: Partial<Omit<ScheduleItem, "id" | "deleted" | "clientUpdatedAt">>) => void
+  ensureWeeklyPlan: (weekStartISO?: string) => string
+  saveWeeklyPlan: (plan: Omit<WeeklyPlan, "id"> & { id?: string }) => void
+  deleteWeeklyPlan: (id: string) => void
+  saveTimeBlock: (block: Omit<TimeBlock, "id" | "plannedHours"> & { id?: string; plannedHours?: number }) => void
+  updateTimeBlock: (id: string, updates: Partial<Omit<TimeBlock, "id" | "deleted" | "clientUpdatedAt">>) => void
+  deleteTimeBlock: (id: string) => void
+  saveExecutionLog: (log: Omit<ExecutionLog, "id"> & { id?: string }) => void
+  saveWeeklyReview: (review: Omit<WeeklyReview, "id"> & { id?: string }) => void
   toggleMilestone: (projectId: string, milestoneId: string) => void
 
   setSyncStatus: (status: SyncState["status"], error?: string | null) => void
@@ -339,6 +396,10 @@ export const useAppStore = create<AppState>()(
           projects: seedProjects.map((p) => ({ ...p, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           achievements,
           schedule: seedSchedule.map((s) => ({ ...s, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
+          weeklyPlans: [],
+          timeBlocks: [],
+          executionLogs: [],
+          weeklyReviews: [],
           resources: seedResources.map((r, index) => ({ ...r, order: r.order ?? index + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           journal: seedJournal.map((j) => ({ ...j, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           activeModule: "command-center",
@@ -1566,6 +1627,191 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
+      ensureWeeklyPlan: (weekStartISO = getCurrentWeekStartISO()) => {
+        const existing = get().weeklyPlans.find((plan) => !plan.deleted && plan.weekStartISO === weekStartISO)
+        if (existing) return existing.id
+        const item = touchEntity(emptyWeeklyPlan(weekStartISO))
+        set((s) => ({
+          weeklyPlans: [...s.weeklyPlans, item],
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              weeklyPlans: { ...s.sync.pending.weeklyPlans, [item.id]: item.clientUpdatedAt ?? now() },
+            },
+          },
+        }))
+        return item.id
+      },
+
+      saveWeeklyPlan: (plan) => {
+        const ts = now()
+        const id = plan.id ?? plan.weekStartISO
+        const item = touchEntity({
+          ...plan,
+          id,
+          allocations: plan.allocations.map((allocation) => ({
+            ...allocation,
+            weeklyOutcome: allocation.weeklyOutcome.trim(),
+          })),
+          deleted: false,
+        })
+        set((s) => ({
+          weeklyPlans: s.weeklyPlans.some((entry) => entry.id === id)
+            ? s.weeklyPlans.map((entry) => (entry.id === id ? item : entry))
+            : [...s.weeklyPlans, item],
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              weeklyPlans: { ...s.sync.pending.weeklyPlans, [id]: item.clientUpdatedAt ?? ts },
+            },
+          },
+        }))
+      },
+
+      deleteWeeklyPlan: (id) => {
+        const ts = now()
+        set((s) => ({
+          weeklyPlans: s.weeklyPlans.map((plan) => (plan.id === id ? { ...plan, deleted: true, clientUpdatedAt: ts } : plan)),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              weeklyPlans: { ...s.sync.pending.weeklyPlans, [id]: ts },
+            },
+          },
+        }))
+      },
+
+      saveTimeBlock: (block) => {
+        const ts = now()
+        const id = block.id ?? generateId()
+        const plannedHours = block.plannedHours ?? calculateTimeBlockHours(block.startTime, block.endTime)
+        const item = touchEntity({
+          ...block,
+          id,
+          plannedHours,
+          deleted: false,
+        })
+        set((s) => {
+          const nextTimeBlocks = s.timeBlocks.some((entry) => entry.id === id)
+            ? s.timeBlocks.map((entry) => (entry.id === id ? item : entry))
+            : [...s.timeBlocks, item]
+          const nextLog = touchEntity(
+            buildExecutionLogFromBlocks(item.weekPlanId, item.projectId, item.dateISO, nextTimeBlocks)
+          )
+          const executionLogs = s.executionLogs.some((entry) => entry.id === nextLog.id)
+            ? s.executionLogs.map((entry) => (entry.id === nextLog.id ? nextLog : entry))
+            : [...s.executionLogs, nextLog]
+          return {
+            timeBlocks: nextTimeBlocks,
+            executionLogs,
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                timeBlocks: { ...s.sync.pending.timeBlocks, [id]: item.clientUpdatedAt ?? ts },
+                executionLogs: { ...s.sync.pending.executionLogs, [nextLog.id]: nextLog.clientUpdatedAt ?? ts },
+              },
+            },
+          }
+        })
+      },
+
+      updateTimeBlock: (id, updates) => {
+        const existing = get().timeBlocks.find((block) => block.id === id)
+        if (!existing) return
+        get().saveTimeBlock({
+          ...existing,
+          ...updates,
+          id,
+          plannedHours:
+            typeof updates.plannedHours === "number"
+              ? updates.plannedHours
+              : calculateTimeBlockHours(updates.startTime ?? existing.startTime, updates.endTime ?? existing.endTime),
+        })
+      },
+
+      deleteTimeBlock: (id) => {
+        const ts = now()
+        set((s) => {
+          const target = s.timeBlocks.find((block) => block.id === id)
+          if (!target) return {}
+          const nextTimeBlocks = s.timeBlocks.map((block) => (block.id === id ? { ...block, deleted: true, clientUpdatedAt: ts } : block))
+          const nextLog = touchEntity(
+            buildExecutionLogFromBlocks(target.weekPlanId, target.projectId, target.dateISO, nextTimeBlocks)
+          )
+          const executionLogs = s.executionLogs.some((entry) => entry.id === nextLog.id)
+            ? s.executionLogs.map((entry) => (entry.id === nextLog.id ? nextLog : entry))
+            : [...s.executionLogs, nextLog]
+          return {
+            timeBlocks: nextTimeBlocks,
+            executionLogs,
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                timeBlocks: { ...s.sync.pending.timeBlocks, [id]: ts },
+                executionLogs: { ...s.sync.pending.executionLogs, [nextLog.id]: nextLog.clientUpdatedAt ?? ts },
+              },
+            },
+          }
+        })
+      },
+
+      saveExecutionLog: (log) => {
+        const ts = now()
+        const id = log.id ?? `${log.weekPlanId}:${log.projectId}:${log.dateISO}`
+        const item = touchEntity({ ...log, id, deleted: false })
+        set((s) => ({
+          executionLogs: s.executionLogs.some((entry) => entry.id === id)
+            ? s.executionLogs.map((entry) => (entry.id === id ? item : entry))
+            : [...s.executionLogs, item],
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              executionLogs: { ...s.sync.pending.executionLogs, [id]: item.clientUpdatedAt ?? ts },
+            },
+          },
+        }))
+      },
+
+      saveWeeklyReview: (review) => {
+        const ts = now()
+        const id = review.id ?? review.weekStartISO
+        const item = touchEntity({
+          ...review,
+          id,
+          deleted: false,
+        })
+        set((s) => ({
+          weeklyReviews: s.weeklyReviews.some((entry) => entry.id === id)
+            ? s.weeklyReviews.map((entry) => (entry.id === id ? item : entry))
+            : [...s.weeklyReviews, item],
+          weeklyPlans: s.weeklyPlans.map((plan) =>
+            plan.id === review.weekPlanId
+              ? {
+                  ...plan,
+                  status: review.completed ? "reviewed" : plan.status,
+                  reviewedAt: review.completed ? format(new Date(), "yyyy-MM-dd") : plan.reviewedAt,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                }
+              : plan
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              weeklyReviews: { ...s.sync.pending.weeklyReviews, [id]: item.clientUpdatedAt ?? ts },
+              weeklyPlans: { ...s.sync.pending.weeklyPlans, [review.weekPlanId]: ts },
+            },
+          },
+        }))
+      },
+
       toggleMilestone: (projectId, milestoneId) => {
         const ts = now()
         set((s) => ({
@@ -1630,6 +1876,10 @@ export const useAppStore = create<AppState>()(
             projects: { ...s.sync.pending.projects },
             achievements: { ...s.sync.pending.achievements },
             schedule: { ...s.sync.pending.schedule },
+            weeklyPlans: { ...s.sync.pending.weeklyPlans },
+            timeBlocks: { ...s.sync.pending.timeBlocks },
+            executionLogs: { ...s.sync.pending.executionLogs },
+            weeklyReviews: { ...s.sync.pending.weeklyReviews },
             resources: { ...s.sync.pending.resources },
             journal: { ...s.sync.pending.journal },
           }
@@ -1671,7 +1921,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 7,
+      version: 8,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -1776,6 +2026,43 @@ export const useAppStore = create<AppState>()(
           ...item,
           blockTypeId: inferScheduleBlockTypeId(item, scheduleBlockIds),
         }))
+        const weeklyPlans = normalizeCollection(merged.weeklyPlans).map((plan) => ({
+          ...emptyWeeklyPlan(plan.weekStartISO ?? getCurrentWeekStartISO()),
+          ...plan,
+          allocations: (plan.allocations ?? []).map((allocation) => ({
+            projectId: allocation.projectId ?? "",
+            hoursAllocated: Math.max(0, Number(allocation.hoursAllocated) || 0),
+            priority: allocation.priority ?? "P2",
+            weeklyOutcome: allocation.weeklyOutcome?.trim() ?? "",
+          })),
+          status: plan.status ?? "draft",
+        }))
+        const timeBlocks = normalizeCollection(merged.timeBlocks).map((block) => ({
+          ...block,
+          plannedHours:
+            typeof block.plannedHours === "number"
+              ? block.plannedHours
+              : calculateTimeBlockHours(block.startTime, block.endTime),
+          status: block.status ?? "planned",
+        }))
+        const executionLogs = normalizeCollection(merged.executionLogs).map((log) => ({
+          ...log,
+          plannedHours: Number(log.plannedHours) || 0,
+          actualHours: Number(log.actualHours) || 0,
+        }))
+        const weeklyReviews = normalizeCollection(merged.weeklyReviews).map((review) => ({
+          ...review,
+          summary: (review.summary ?? []).map((item) => ({
+            projectId: item.projectId ?? "",
+            outcomePlanned: item.outcomePlanned ?? "",
+            outcomeAchieved: Boolean(item.outcomeAchieved),
+            plannedHours: Number(item.plannedHours) || 0,
+            actualHours: Number(item.actualHours) || 0,
+            decision: (item.decision ?? "continue") as ReviewDecision,
+            notes: item.notes?.trim() || undefined,
+          })),
+          completed: Boolean(review.completed),
+        }))
         const resources = normalizeCollection(merged.resources).map((resource, index) => ({
           ...resource,
           order: resource.order ?? index + 1,
@@ -1793,6 +2080,10 @@ export const useAppStore = create<AppState>()(
           projects,
           achievements,
           schedule,
+          weeklyPlans,
+          timeBlocks,
+          executionLogs,
+          weeklyReviews,
           resources,
           journal,
         }
