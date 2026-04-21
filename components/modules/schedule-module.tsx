@@ -1,291 +1,678 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import {
-  calculateTimeBlockHours,
   getActiveWeeklyPlan,
   getCurrentWeekStartISO,
   getWeekDates,
   selectProjectHours,
-  selectTimeBlocksForDay,
+  selectTimeBlocksForWeek,
 } from "@/lib/weekly-plan"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, CheckCircle2, Clock3, Plus } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { CalendarDays, ChevronLeft, ChevronRight, X, CheckCircle2, Trash2 } from "lucide-react"
+import type { TimeBlock } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+// ── Grid constants ──────────────────────────────────────────────────────────
+const HOUR_PX = 64          // pixels per hour
+const DAY_START = 6         // first visible hour (6 AM)
+const DAY_END = 23          // last visible hour (11 PM)
+const SNAP_MIN = 15         // snap interval in minutes
+const TOTAL_HOURS = DAY_END - DAY_START
+const GRID_HEIGHT = TOTAL_HOURS * HOUR_PX
+
+// ── Time math ───────────────────────────────────────────────────────────────
+function toMin(time: string) {
+  const [h, m] = time.split(":").map(Number)
+  return h * 60 + m
+}
+
+function toTime(minutes: number) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
+function snap(minutes: number) {
+  return Math.round(minutes / SNAP_MIN) * SNAP_MIN
+}
+
+function toY(time: string) {
+  return ((toMin(time) - DAY_START * 60) / 60) * HOUR_PX
+}
+
+function yToMin(y: number) {
+  return snap(DAY_START * 60 + (y / HOUR_PX) * 60)
+}
+
+function blockH(start: string, end: string) {
+  return Math.max(HOUR_PX / 4, ((toMin(end) - toMin(start)) / 60) * HOUR_PX)
+}
+
+function clampMin(m: number) {
+  return Math.max(DAY_START * 60, Math.min(DAY_END * 60, m))
+}
+
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+// ── Hour label list ──────────────────────────────────────────────────────────
+const HOUR_LABELS = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => {
+  const h = DAY_START + i
+  return { h, label: h === 12 ? "12 PM" : h < 12 ? `${h} AM` : `${h - 12} PM` }
+})
+
+// ── Project color helpers ────────────────────────────────────────────────────
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "")
+  const n = parseInt(clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function blockStyle(color: string) {
+  const [r, g, b] = hexToRgb(color || "#6366f1")
+  return {
+    backgroundColor: `rgba(${r},${g},${b},0.18)`,
+    borderColor: `rgba(${r},${g},${b},0.7)`,
+    color: `rgb(${r},${g},${b})`,
+  }
+}
+
+// ── Drag state (ref-based to avoid stale closures) ───────────────────────────
+interface DragState {
+  blockId: string
+  mode: "move" | "resize"
+  origStart: string
+  origEnd: string
+  origDay: string
+  mouseStartY: number
+  blockOffsetY: number // cursor Y within the block top at drag start
+}
+
+// ── Preview (local during drag, committed on mouseup) ────────────────────────
+interface Preview {
+  blockId: string
+  startTime: string
+  endTime: string
+  dateISO: string
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ScheduleModule() {
-  const projects = useAppStore((s) => s.projects).filter((project) => !project.deleted)
+  const projects = useAppStore((s) => s.projects).filter((p) => !p.deleted)
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const timeBlocks = useAppStore((s) => s.timeBlocks)
   const executionLogs = useAppStore((s) => s.executionLogs)
   const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
   const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
+  const deleteTimeBlock = useAppStore((s) => s.deleteTimeBlock)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
   const weekStartISO = getCurrentWeekStartISO()
   const activePlan = getActiveWeeklyPlan(weeklyPlans, weekStartISO)
   const weekDays = getWeekDates(weekStartISO)
-  const [selectedDay, setSelectedDay] = useState(weekDays[0]?.iso ?? weekStartISO)
-  const [projectId, setProjectId] = useState("")
-  const [startTime, setStartTime] = useState("09:00")
-  const [endTime, setEndTime] = useState("10:30")
-  const [taskDescription, setTaskDescription] = useState("")
-  const [error, setError] = useState<string | null>(null)
 
+  const [view, setView] = useState<"week" | "day">("week")
+  const [dayIndex, setDayIndex] = useState(() => {
+    const today = todayISO()
+    const idx = weekDays.findIndex((d) => d.iso === today)
+    return idx >= 0 ? idx : 0
+  })
+
+  // Current time bar
+  const [nowY, setNowY] = useState<number | null>(null)
+  const [nowDayISO, setNowDayISO] = useState(todayISO())
+  useEffect(() => {
+    function tick() {
+      const d = new Date()
+      const m = d.getHours() * 60 + d.getMinutes()
+      setNowDayISO(todayISO())
+      setNowY(m >= DAY_START * 60 && m <= DAY_END * 60 ? ((m - DAY_START * 60) / 60) * HOUR_PX : null)
+    }
+    tick()
+    const id = setInterval(tick, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const allowedProjects = useMemo(
+    () =>
+      activePlan
+        ? activePlan.allocations
+            .map((a) => projects.find((p) => p.id === a.projectId))
+            .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        : [],
+    [activePlan, projects]
+  )
   const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
-  const allowedProjects = activePlan
-    ? activePlan.allocations
-        .map((allocation) => projects.find((project) => project.id === allocation.projectId))
-        .filter((project): project is NonNullable<typeof project> => Boolean(project))
-    : []
-  const dayBlocks = selectTimeBlocksForDay(timeBlocks, selectedDay, activePlan?.id)
+  const weekBlocks = selectTimeBlocksForWeek(timeBlocks, activePlan?.id)
 
-  function handleAddTimeBlock() {
-    if (!activePlan) {
-      setError("Create a weekly plan before scheduling time blocks.")
-      return
-    }
-    if (!projectId) {
-      setError("Choose an allocated project.")
-      return
-    }
-    if (!taskDescription.trim()) {
-      setError("Add a task description for the block.")
-      return
-    }
+  // Create panel
+  const [creating, setCreating] = useState<{ dayISO: string; startTime: string; endTime: string } | null>(null)
+  const [newDesc, setNewDesc] = useState("")
+  const [newProjectId, setNewProjectId] = useState("")
 
-    const durationHours = calculateTimeBlockHours(startTime, endTime)
-    const metric = projectHours.find((item) => item.projectId === projectId)
-    if (!metric) {
-      setError("This project is not allocated in the active weekly plan.")
-      return
-    }
-    if (metric.plannedHours + durationHours > metric.allocatedHours) {
-      setError("This block would exceed the project's weekly allocation.")
-      return
-    }
+  // Edit panel
+  const [editId, setEditId] = useState<string | null>(null)
+  const editBlock = weekBlocks.find((b) => b.id === editId) ?? null
 
+  // Drag preview (optimistic local state during drag)
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const dragRef = useRef<DragState | null>(null)
+
+  // Mouse down on grid background → record position for click-to-create detection
+  function gridMouseDown(e: React.MouseEvent<HTMLDivElement>, dayISO: string) {
+    if (e.button !== 0) return
+    if (!activePlan) return
+    ;(e.currentTarget as HTMLElement).dataset.mousedownY = String(e.clientY)
+  }
+
+  function gridMouseUp(e: React.MouseEvent<HTMLDivElement>, dayISO: string) {
+    if (dragRef.current) return
+    const startY = Number((e.currentTarget as HTMLElement).dataset.mousedownY ?? 0)
+    if (Math.abs(e.clientY - startY) > 8) return
+    if (!activePlan) return
+    const y = Math.max(0, e.clientY - e.currentTarget.getBoundingClientRect().top)
+    const startMin = clampMin(yToMin(y))
+    const endMin = clampMin(startMin + 60)
+    setCreating({ dayISO, startTime: toTime(startMin), endTime: toTime(endMin) })
+    setNewDesc("")
+    setNewProjectId(allowedProjects[0]?.id ?? "")
+    setEditId(null)
+  }
+
+  function handleCreate() {
+    if (!creating || !activePlan || !newProjectId || !newDesc.trim()) return
     saveTimeBlock({
       weekPlanId: activePlan.id,
-      projectId,
-      dateISO: selectedDay,
-      startTime,
-      endTime,
-      taskDescription: taskDescription.trim(),
-      actualHours: undefined,
+      projectId: newProjectId,
+      dateISO: creating.dayISO,
+      startTime: creating.startTime,
+      endTime: creating.endTime,
+      taskDescription: newDesc.trim(),
       status: "planned",
       deleted: false,
     })
-    setTaskDescription("")
-    setError(null)
+    setCreating(null)
+    setNewDesc("")
   }
 
+  // Block drag start
+  function blockMouseDown(e: React.MouseEvent, block: TimeBlock, mode: "move" | "resize") {
+    e.stopPropagation()
+    e.preventDefault()
+    const colEl = document.querySelector(`[data-day="${block.dateISO}"]`) as HTMLElement | null
+    const colTop = colEl?.getBoundingClientRect().top ?? 0
+    dragRef.current = {
+      blockId: block.id,
+      mode,
+      origStart: block.startTime,
+      origEnd: block.endTime,
+      origDay: block.dateISO,
+      mouseStartY: e.clientY,
+      blockOffsetY: e.clientY - colTop - toY(block.startTime),
+    }
+    setPreview({ blockId: block.id, startTime: block.startTime, endTime: block.endTime, dateISO: block.dateISO })
+  }
+
+  // Global mousemove/mouseup for drag
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      const drag = dragRef.current
+      if (!drag) return
+
+      // Find which day column the cursor is over
+      let targetDay = drag.origDay
+      const cols = document.querySelectorAll("[data-day]")
+      for (const col of cols) {
+        const r = col.getBoundingClientRect()
+        if (e.clientX >= r.left && e.clientX <= r.right) {
+          targetDay = (col as HTMLElement).dataset.day ?? drag.origDay
+          break
+        }
+      }
+      const colEl = document.querySelector(`[data-day="${targetDay}"]`) as HTMLElement | null
+      if (!colEl) return
+      const colTop = colEl.getBoundingClientRect().top
+
+      if (drag.mode === "move") {
+        const blockTop = e.clientY - colTop - drag.blockOffsetY
+        const startMin = clampMin(yToMin(Math.max(0, blockTop)))
+        const durMin = toMin(drag.origEnd) - toMin(drag.origStart)
+        const endMin = clampMin(startMin + durMin)
+        setPreview({ blockId: drag.blockId, startTime: toTime(startMin), endTime: toTime(endMin), dateISO: targetDay })
+      } else {
+        const y = e.clientY - colTop
+        const newEnd = clampMin(Math.max(toMin(drag.origStart) + SNAP_MIN, yToMin(y)))
+        setPreview({ blockId: drag.blockId, startTime: drag.origStart, endTime: toTime(newEnd), dateISO: drag.origDay })
+      }
+    }
+
+    function onUp() {
+      const drag = dragRef.current
+      if (drag && preview) {
+        updateTimeBlock(drag.blockId, {
+          startTime: preview.startTime,
+          endTime: preview.endTime,
+          dateISO: preview.dateISO,
+        })
+      }
+      dragRef.current = null
+      setPreview(null)
+    }
+
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+    return () => {
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+  }, [preview, updateTimeBlock])
+
+  const visibleDays = view === "week" ? weekDays : [weekDays[dayIndex]]
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex h-full flex-col gap-0">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div>
           <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
           <p className="text-sm text-muted-foreground">
-            Turn weekly allocation into concrete blocks. Blocks can only be created against projects that already have time.
+            {activePlan ? "Click a slot to add · drag to move · drag edge to resize" : "Create a weekly plan first to schedule blocks"}
           </p>
         </div>
-        <Button variant="outline" onClick={() => setActiveModule("weekly-plan")}>
-          {activePlan ? "Edit weekly plan" : "Create weekly plan"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {view === "day" && (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => setDayIndex((i) => Math.max(0, i - 1))} disabled={dayIndex === 0}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[90px] text-center text-sm font-medium">
+                {weekDays[dayIndex]?.label} {weekDays[dayIndex]?.dayNumber}
+              </span>
+              <Button variant="ghost" size="icon" onClick={() => setDayIndex((i) => Math.min(6, i + 1))} disabled={dayIndex === 6}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          <div className="flex rounded-md border text-sm">
+            <button
+              className={cn("px-3 py-1.5 transition-colors", view === "week" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+              onClick={() => setView("week")}
+            >
+              Week
+            </button>
+            <button
+              className={cn("px-3 py-1.5 transition-colors", view === "day" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+              onClick={() => setView("day")}
+            >
+              Day
+            </button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setActiveModule("weekly-plan")}>
+            {activePlan ? "Edit plan" : "Create plan"}
+          </Button>
+        </div>
       </div>
 
       {!activePlan ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <CalendarDays className="h-8 w-8 text-muted-foreground" />
-            <div>
-              <p className="font-medium">No active weekly plan</p>
-              <p className="text-sm text-muted-foreground">Allocate the week first, then shape daily execution blocks.</p>
-            </div>
-            <Button onClick={() => setActiveModule("weekly-plan")}>Set weekly plan</Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-20 text-center">
+          <CalendarDays className="h-8 w-8 text-muted-foreground" />
+          <div>
+            <p className="font-medium">No active weekly plan</p>
+            <p className="text-sm text-muted-foreground">Allocate the week first, then schedule blocks.</p>
+          </div>
+          <Button onClick={() => setActiveModule("weekly-plan")}>Set weekly plan</Button>
+        </div>
       ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock3 className="h-4 w-4" />
-                Add Time Block
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr_120px_120px_auto]">
-                <div className="space-y-2">
-                  <Label>Project</Label>
-                  <Select value={projectId || "none"} onValueChange={(value) => setProjectId(value === "none" ? "" : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select allocated project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Select allocated project</SelectItem>
-                      {allowedProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.title}
-                        </SelectItem>
+        <div className="flex flex-1 gap-4 overflow-hidden">
+          {/* Calendar grid */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
+            {/* Day header row */}
+            <div className="flex border-b bg-muted/30">
+              <div className="w-14 shrink-0 border-r" />
+              {visibleDays.map((day) => {
+                const isToday = day.iso === nowDayISO
+                return (
+                  <div
+                    key={day.iso}
+                    className={cn(
+                      "flex flex-1 flex-col items-center py-2 text-center",
+                      view === "week" && "border-r last:border-r-0"
+                    )}
+                  >
+                    <span className="text-xs text-muted-foreground">{day.label}</span>
+                    <span
+                      className={cn(
+                        "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                        isToday && "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      {day.dayNumber}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Scrollable grid body */}
+            <div className="flex flex-1 overflow-y-auto">
+              {/* Time labels */}
+              <div className="relative w-14 shrink-0 border-r">
+                <div style={{ height: GRID_HEIGHT }}>
+                  {HOUR_LABELS.map(({ h, label }) => (
+                    <div
+                      key={h}
+                      className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground"
+                      style={{ top: (h - DAY_START) * HOUR_PX }}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Day columns */}
+              <div className={cn("flex flex-1", view === "week" && "")}>
+                {visibleDays.map((day) => {
+                  const dayBlocks = weekBlocks
+                    .filter((b) => b.dateISO === day.iso)
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                  const isToday = day.iso === nowDayISO
+
+                  return (
+                    <div
+                      key={day.iso}
+                      data-day={day.iso}
+                      className={cn(
+                        "relative flex-1 cursor-crosshair select-none",
+                        view === "week" && "border-r last:border-r-0"
+                      )}
+                      style={{ height: GRID_HEIGHT }}
+                      onMouseDown={(e) => gridMouseDown(e, day.iso)}
+                      onMouseUp={(e) => gridMouseUp(e, day.iso)}
+                    >
+                      {/* Hour grid lines */}
+                      {HOUR_LABELS.map(({ h }) => (
+                        <div key={h} className="absolute inset-x-0 border-t border-border/40" style={{ top: (h - DAY_START) * HOUR_PX }} />
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Day</Label>
-                  <Select value={selectedDay} onValueChange={setSelectedDay}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {weekDays.map((day) => (
-                        <SelectItem key={day.iso} value={day.iso}>
-                          {day.label} {day.dayNumber}
-                        </SelectItem>
+                      {/* Half-hour lines */}
+                      {Array.from({ length: TOTAL_HOURS }, (_, i) => (
+                        <div
+                          key={i}
+                          className="absolute inset-x-0 border-t border-border/20 border-dashed"
+                          style={{ top: (i + 0.5) * HOUR_PX }}
+                        />
                       ))}
-                    </SelectContent>
-                  </Select>
+
+                      {/* Current time bar */}
+                      {isToday && nowY !== null && (
+                        <div className="pointer-events-none absolute inset-x-0 z-10" style={{ top: nowY }}>
+                          <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-red-500" />
+                          <div className="h-px bg-red-500" />
+                        </div>
+                      )}
+
+                      {/* Time blocks */}
+                      {dayBlocks.map((block) => {
+                        const isPreview = preview?.blockId === block.id
+                        const displayStart = isPreview ? preview.startTime : block.startTime
+                        const displayEnd = isPreview ? preview.endTime : block.endTime
+                        const displayDay = isPreview ? preview.dateISO : block.dateISO
+                        if (displayDay !== day.iso) return null
+
+                        const project = projects.find((p) => p.id === block.projectId)
+                        const style = blockStyle(project?.color ?? "#6366f1")
+                        const isEditing = editId === block.id
+
+                        return (
+                          <div
+                            key={block.id}
+                            className={cn(
+                              "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs",
+                              isEditing && "ring-2 ring-primary ring-offset-1",
+                              isPreview && "opacity-90"
+                            )}
+                            style={{
+                              top: toY(displayStart),
+                              height: blockH(displayStart, displayEnd),
+                              ...style,
+                              cursor: "grab",
+                            }}
+                            onMouseDown={(e) => blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "move")}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditId(editId === block.id ? null : block.id)
+                              setCreating(null)
+                            }}
+                          >
+                            <p className="truncate font-medium leading-tight">{block.taskDescription}</p>
+                            <p className="truncate opacity-75">{displayStart}–{displayEnd}</p>
+                            {block.status === "done" && (
+                              <CheckCircle2 className="absolute right-1 top-1 h-3 w-3" />
+                            )}
+                            {/* Resize handle */}
+                            <div
+                              className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
+                              onMouseDown={(e) => {
+                                e.stopPropagation()
+                                blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "resize")
+                              }}
+                            />
+                          </div>
+                        )
+                      })}
+
+                      {/* Preview ghost for blocks being dragged to this day */}
+                      {preview && preview.dateISO === day.iso && !dayBlocks.find((b) => b.id === preview.blockId) && (() => {
+                        const block = weekBlocks.find((b) => b.id === preview.blockId)
+                        if (!block) return null
+                        const project = projects.find((p) => p.id === block.projectId)
+                        const style = blockStyle(project?.color ?? "#6366f1")
+                        return (
+                          <div
+                            className="pointer-events-none absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs opacity-80"
+                            style={{
+                              top: toY(preview.startTime),
+                              height: blockH(preview.startTime, preview.endTime),
+                              ...style,
+                            }}
+                          >
+                            <p className="truncate font-medium leading-tight">{block.taskDescription}</p>
+                            <p className="truncate opacity-75">{preview.startTime}–{preview.endTime}</p>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right sidebar: create panel / edit panel / allocation status */}
+          <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto">
+            {/* Create panel */}
+            {creating && (
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-semibold">New block</p>
+                  <button onClick={() => setCreating(null)} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Start</Label>
-                  <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>End</Label>
-                  <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleAddTimeBlock}>
-                    <Plus className="mr-2 h-4 w-4" />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Description</Label>
+                    <Input
+                      autoFocus
+                      value={newDesc}
+                      onChange={(e) => setNewDesc(e.target.value)}
+                      placeholder="What gets done?"
+                      onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Project</Label>
+                    <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedProjects.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Start</Label>
+                      <Input type="time" value={creating.startTime} onChange={(e) => setCreating((c) => c && ({ ...c, startTime: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">End</Label>
+                      <Input type="time" value={creating.endTime} onChange={(e) => setCreating((c) => c && ({ ...c, endTime: e.target.value }))} />
+                    </div>
+                  </div>
+                  <Button className="w-full" onClick={handleCreate} disabled={!newDesc.trim() || !newProjectId}>
                     Add block
                   </Button>
                 </div>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <Label htmlFor="block-description">Block description</Label>
-                <Input
-                  id="block-description"
-                  value={taskDescription}
-                  onChange={(event) => setTaskDescription(event.target.value)}
-                  placeholder="What exactly gets done in this block?"
-                />
-              </div>
+            {/* Edit panel */}
+            {editBlock && (
+              <EditPanel
+                block={editBlock}
+                project={projects.find((p) => p.id === editBlock.projectId)}
+                onUpdate={(updates) => updateTimeBlock(editBlock.id, updates)}
+                onDelete={() => { deleteTimeBlock(editBlock.id); setEditId(null) }}
+                onClose={() => setEditId(null)}
+              />
+            )}
 
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">This Day&apos;s Blocks</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {dayBlocks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No blocks scheduled for this day yet.</p>
-                ) : (
-                  dayBlocks.map((block) => {
-                    const project = projects.find((item) => item.id === block.projectId)
-                    return (
-                      <div key={block.id} className="space-y-3 rounded-xl border border-border/70 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium">{block.taskDescription}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {project?.title ?? "Unknown project"} · {block.startTime} - {block.endTime}
-                            </p>
-                          </div>
-                          <Badge variant={block.status === "done" ? "default" : "outline"}>{block.status}</Badge>
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-[140px_140px_auto]">
-                          <div className="space-y-2">
-                            <Label>Actual hours</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              step={0.25}
-                              value={block.actualHours ?? block.plannedHours}
-                              onChange={(event) => updateTimeBlock(block.id, { actualHours: Number(event.target.value) || 0 })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Status</Label>
-                            <Select value={block.status} onValueChange={(value) => updateTimeBlock(block.id, { status: value as "planned" | "done" | "missed" })}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="planned">Planned</SelectItem>
-                                <SelectItem value="done">Done</SelectItem>
-                                <SelectItem value="missed">Missed</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-end">
-                            <Button
-                              variant="outline"
-                              onClick={() =>
-                                updateTimeBlock(block.id, {
-                                  status: "done",
-                                  actualHours: block.actualHours ?? block.plannedHours,
-                                })
-                              }
-                            >
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Mark done
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Project Hour Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            {/* Allocation status */}
+            <div className="rounded-xl border bg-card p-4">
+              <p className="mb-3 text-sm font-semibold">Week allocation</p>
+              <div className="space-y-3">
                 {projectHours.map((item) => {
-                  const project = projects.find((projectEntry) => projectEntry.id === item.projectId)
+                  const project = projects.find((p) => p.id === item.projectId)
+                  const pct = Math.min(100, (item.plannedHours / item.allocatedHours) * 100)
                   return (
-                    <div key={item.projectId} className="rounded-xl border border-border/70 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium">{project?.title ?? "Unknown project"}</p>
-                        <Badge variant="outline">{item.priority}</Badge>
+                    <div key={item.projectId} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="truncate font-medium">{project?.title ?? "Unknown"}</span>
+                        <span className="ml-2 shrink-0 text-muted-foreground">{item.plannedHours}h / {item.allocatedHours}h</span>
                       </div>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                        <HourMetric label="Allocated" value={`${item.allocatedHours}h`} />
-                        <HourMetric label="Planned" value={`${item.plannedHours}h`} />
-                        <HourMetric label="Actual" value={`${item.actualHours}h`} />
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: project?.color ?? "#6366f1",
+                          }}
+                        />
                       </div>
                     </div>
                   )
                 })}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
 }
 
-function HourMetric({ label, value }: { label: string; value: string }) {
+// ── Edit panel ────────────────────────────────────────────────────────────────
+interface EditPanelProps {
+  block: TimeBlock
+  project: { title: string; color: string } | undefined
+  onUpdate: (updates: Partial<TimeBlock>) => void
+  onDelete: () => void
+  onClose: () => void
+}
+
+function EditPanel({ block, project, onUpdate, onDelete, onClose }: EditPanelProps) {
+  const style = blockStyle(project?.color ?? "#6366f1")
   return (
-    <div className="rounded-xl border border-border/70 bg-background/40 p-3">
-      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-base font-semibold">{value}</p>
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#6366f1" }} />
+          <p className="text-sm font-semibold truncate">{project?.title ?? "Unknown"}</p>
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Description</Label>
+          <Input
+            value={block.taskDescription}
+            onChange={(e) => onUpdate({ taskDescription: e.target.value })}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Start</Label>
+            <Input type="time" value={block.startTime} onChange={(e) => onUpdate({ startTime: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">End</Label>
+            <Input type="time" value={block.endTime} onChange={(e) => onUpdate({ endTime: e.target.value })} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Actual hours</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.25}
+              value={block.actualHours ?? block.plannedHours}
+              onChange={(e) => onUpdate({ actualHours: Number(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Status</Label>
+            <Select value={block.status} onValueChange={(v) => onUpdate({ status: v as TimeBlock["status"] })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planned">Planned</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+                <SelectItem value="missed">Missed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            className="flex-1"
+            variant="outline"
+            onClick={() => onUpdate({ status: "done", actualHours: block.actualHours ?? block.plannedHours })}
+          >
+            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+            Done
+          </Button>
+          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
