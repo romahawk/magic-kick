@@ -112,6 +112,11 @@ export function selectTimeBlocksForWeek(timeBlocks: TimeBlock[], weekPlanId?: st
   return timeBlocks.filter((block) => !block.deleted && block.weekPlanId === weekPlanId)
 }
 
+export function selectTimeBlocksForDates(timeBlocks: TimeBlock[], dayISOList: string[]) {
+  const dates = new Set(dayISOList)
+  return timeBlocks.filter((block) => !block.deleted && dates.has(block.dateISO))
+}
+
 export function selectTimeBlocksForDay(timeBlocks: TimeBlock[], dateISO: string, weekPlanId?: string) {
   return selectTimeBlocksForWeek(timeBlocks, weekPlanId)
     .filter((block) => block.dateISO === dateISO)

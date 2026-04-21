@@ -7,14 +7,14 @@ import {
   getCurrentWeekStartISO,
   getWeekDates,
   selectProjectHours,
-  selectTimeBlocksForWeek,
+  selectTimeBlocksForDates,
 } from "@/lib/weekly-plan"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { CalendarDays, ChevronLeft, ChevronRight, X, CheckCircle2, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2 } from "lucide-react"
 import type { TimeBlock } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -142,17 +142,9 @@ export function ScheduleModule() {
     return () => clearInterval(id)
   }, [])
 
-  const allowedProjects = useMemo(
-    () =>
-      activePlan
-        ? activePlan.allocations
-            .map((a) => projects.find((p) => p.id === a.projectId))
-            .filter((p): p is NonNullable<typeof p> => Boolean(p))
-        : [],
-    [activePlan, projects]
-  )
+  const activeProjects = projects.filter((p) => (p.status ?? "active") === "active")
   const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
-  const weekBlocks = selectTimeBlocksForWeek(timeBlocks, activePlan?.id)
+  const weekBlocks = selectTimeBlocksForDates(timeBlocks, weekDays.map((d) => d.iso))
 
   // Create panel
   const [creating, setCreating] = useState<{ dayISO: string; startTime: string; endTime: string } | null>(null)
@@ -170,7 +162,6 @@ export function ScheduleModule() {
   // Mouse down on grid background → record position for click-to-create detection
   function gridMouseDown(e: React.MouseEvent<HTMLDivElement>, dayISO: string) {
     if (e.button !== 0) return
-    if (!activePlan) return
     ;(e.currentTarget as HTMLElement).dataset.mousedownY = String(e.clientY)
   }
 
@@ -178,21 +169,20 @@ export function ScheduleModule() {
     if (dragRef.current) return
     const startY = Number((e.currentTarget as HTMLElement).dataset.mousedownY ?? 0)
     if (Math.abs(e.clientY - startY) > 8) return
-    if (!activePlan) return
     const y = Math.max(0, e.clientY - e.currentTarget.getBoundingClientRect().top)
     const startMin = clampMin(yToMin(y))
     const endMin = clampMin(startMin + 60)
     setCreating({ dayISO, startTime: toTime(startMin), endTime: toTime(endMin) })
     setNewDesc("")
-    setNewProjectId(allowedProjects[0]?.id ?? "")
+    setNewProjectId("")
     setEditId(null)
   }
 
   function handleCreate() {
-    if (!creating || !activePlan || !newProjectId || !newDesc.trim()) return
+    if (!creating || !newDesc.trim()) return
     saveTimeBlock({
-      weekPlanId: activePlan.id,
-      projectId: newProjectId,
+      weekPlanId: activePlan?.id ?? "",
+      projectId: newProjectId || undefined,
       dateISO: creating.dayISO,
       startTime: creating.startTime,
       endTime: creating.endTime,
@@ -284,9 +274,7 @@ export function ScheduleModule() {
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div>
           <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-sm text-muted-foreground">
-            {activePlan ? "Click a slot to add · drag to move · drag edge to resize" : "Create a weekly plan first to schedule blocks"}
-          </p>
+          <p className="text-sm text-muted-foreground">Click a slot to add · drag to move · drag edge to resize</p>
         </div>
         <div className="flex items-center gap-2">
           {view === "day" && (
@@ -322,17 +310,7 @@ export function ScheduleModule() {
         </div>
       </div>
 
-      {!activePlan ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-20 text-center">
-          <CalendarDays className="h-8 w-8 text-muted-foreground" />
-          <div>
-            <p className="font-medium">No active weekly plan</p>
-            <p className="text-sm text-muted-foreground">Allocate the week first, then schedule blocks.</p>
-          </div>
-          <Button onClick={() => setActiveModule("command-center")}>Set weekly plan</Button>
-        </div>
-      ) : (
-        <div className="flex flex-1 gap-4 overflow-hidden">
+      <div className="flex flex-1 gap-4 overflow-hidden">
           {/* Calendar grid */}
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
             {/* Day header row */}
@@ -520,13 +498,14 @@ export function ScheduleModule() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Project</Label>
+                    <Label className="text-xs">Project <span className="text-muted-foreground">(optional)</span></Label>
                     <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : v)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
+                        <SelectValue placeholder="No project" />
                       </SelectTrigger>
                       <SelectContent>
-                        {allowedProjects.map((p) => (
+                        <SelectItem value="none">No project</SelectItem>
+                        {activeProjects.map((p) => (
                           <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
                         ))}
                       </SelectContent>
@@ -542,7 +521,7 @@ export function ScheduleModule() {
                       <Input type="time" value={creating.endTime} onChange={(e) => setCreating((c) => c && ({ ...c, endTime: e.target.value }))} />
                     </div>
                   </div>
-                  <Button className="w-full" onClick={handleCreate} disabled={!newDesc.trim() || !newProjectId}>
+                  <Button className="w-full" onClick={handleCreate} disabled={!newDesc.trim()}>
                     Add block
                   </Button>
                 </div>
@@ -554,42 +533,44 @@ export function ScheduleModule() {
               <EditPanel
                 block={editBlock}
                 project={projects.find((p) => p.id === editBlock.projectId)}
+                allProjects={activeProjects}
                 onUpdate={(updates) => updateTimeBlock(editBlock.id, updates)}
                 onDelete={() => { deleteTimeBlock(editBlock.id); setEditId(null) }}
                 onClose={() => setEditId(null)}
               />
             )}
 
-            {/* Allocation status */}
-            <div className="rounded-xl border bg-card p-4">
-              <p className="mb-3 text-sm font-semibold">Week allocation</p>
-              <div className="space-y-3">
-                {projectHours.map((item) => {
-                  const project = projects.find((p) => p.id === item.projectId)
-                  const pct = Math.min(100, (item.plannedHours / item.allocatedHours) * 100)
-                  return (
-                    <div key={item.projectId} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="truncate font-medium">{project?.title ?? "Unknown"}</span>
-                        <span className="ml-2 shrink-0 text-muted-foreground">{item.plannedHours}h / {item.allocatedHours}h</span>
+            {/* Allocation status — only when a weekly plan exists */}
+            {activePlan && projectHours.length > 0 && (
+              <div className="rounded-xl border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold">Week allocation</p>
+                <div className="space-y-3">
+                  {projectHours.map((item) => {
+                    const project = projects.find((p) => p.id === item.projectId)
+                    const pct = Math.min(100, (item.plannedHours / item.allocatedHours) * 100)
+                    return (
+                      <div key={item.projectId} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="truncate font-medium">{project?.title ?? "Unknown"}</span>
+                          <span className="ml-2 shrink-0 text-muted-foreground">{item.plannedHours}h / {item.allocatedHours}h</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: project?.color ?? "#6366f1",
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: project?.color ?? "#6366f1",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
-      )}
     </div>
   )
 }
@@ -597,20 +578,20 @@ export function ScheduleModule() {
 // ── Edit panel ────────────────────────────────────────────────────────────────
 interface EditPanelProps {
   block: TimeBlock
-  project: { title: string; color: string } | undefined
+  project: { id: string; title: string; color: string } | undefined
+  allProjects: { id: string; title: string; color: string }[]
   onUpdate: (updates: Partial<TimeBlock>) => void
   onDelete: () => void
   onClose: () => void
 }
 
-function EditPanel({ block, project, onUpdate, onDelete, onClose }: EditPanelProps) {
-  const style = blockStyle(project?.color ?? "#6366f1")
+function EditPanel({ block, project, allProjects, onUpdate, onDelete, onClose }: EditPanelProps) {
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#6366f1" }} />
-          <p className="text-sm font-semibold truncate">{project?.title ?? "Unknown"}</p>
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#94a3b8" }} />
+          <p className="text-sm font-semibold truncate">{project?.title ?? "No project"}</p>
         </div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
@@ -623,6 +604,23 @@ function EditPanel({ block, project, onUpdate, onDelete, onClose }: EditPanelPro
             value={block.taskDescription}
             onChange={(e) => onUpdate({ taskDescription: e.target.value })}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Project <span className="text-muted-foreground">(optional)</span></Label>
+          <Select
+            value={block.projectId ?? "none"}
+            onValueChange={(v) => onUpdate({ projectId: v === "none" ? undefined : v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="No project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No project</SelectItem>
+              {allProjects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
