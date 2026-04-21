@@ -223,7 +223,7 @@ export function WeeklyPlanModule() {
                           <SelectItem value="none">Select project</SelectItem>
                           {[allocation.projectId ? projects.find((project) => project.id === allocation.projectId) : undefined, ...projectOptions]
                             .filter((project, projectIndex, list): project is NonNullable<typeof project> =>
-                              Boolean(project) && list.findIndex((item) => item?.id === project.id) === projectIndex
+                              Boolean(project) && list.findIndex((item) => item?.id === project?.id) === projectIndex
                             )
                             .map((project) => (
                               <SelectItem key={project.id} value={project.id}>
