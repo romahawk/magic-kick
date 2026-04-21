@@ -1,1582 +1,291 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } from "react"
+import { useState } from "react"
 import { useAppStore } from "@/lib/store"
-import { getWeekDays } from "@/lib/game-utils"
-import { cn } from "@/lib/utils"
-import { format, parseISO, isSameDay } from "date-fns"
+import {
+  calculateTimeBlockHours,
+  getActiveWeeklyPlan,
+  getCurrentWeekStartISO,
+  getWeekDates,
+  selectProjectHours,
+  selectTimeBlocksForDay,
+} from "@/lib/weekly-plan"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, Play, Pause, RotateCcw, Timer, Pencil, ExternalLink, Briefcase, FolderKanban, Mail, Rocket, Target, AlertTriangle, ChevronDown, SlidersHorizontal, CalendarCheck2, CheckCircle2, Maximize2, Minimize2 } from "lucide-react"
-import type { ExecutionBlockTemplate, Project, ScheduleItem, TaskCategory } from "@/lib/types"
-import { DEFAULT_EXECUTION_BLOCKS } from "@/lib/execution-os"
-
-const POMODORO_WORK = 25 * 60
-const POMODORO_BREAK = 5 * 60
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
-const DAY_START_HOUR = 6
-const DAY_END_HOUR = 23
-const MINUTES_PER_DAY = 24 * 60
-const GRID_SNAP_MINUTES = 30
-const HOUR_ROW_HEIGHT_PX = 64
-const PIXELS_PER_MINUTE = HOUR_ROW_HEIGHT_PX / 60
-const DEEP_WORK_BLOCK_MINUTES = 90
-const DEFAULT_PROJECT_COLOR = "#3b82f6"
-const LEGACY_COLOR_MAP: Record<string, string> = {
-  "bg-chart-1": "#3b82f6",
-  "bg-chart-2": "#22c55e",
-  "bg-chart-3": "#06b6d4",
-  "bg-chart-4": "#f97316",
-  "bg-chart-5": "#a855f7",
-}
-
-const EXECUTION_BLOCK_STYLES = [
-  { icon: Briefcase, tone: "text-sky-300 border-sky-500/30 bg-sky-500/10" },
-  { icon: FolderKanban, tone: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" },
-  { icon: Mail, tone: "text-amber-200 border-amber-500/30 bg-amber-500/10" },
-  { icon: Rocket, tone: "text-violet-200 border-violet-500/30 bg-violet-500/10" },
-] as const
-
-function normalizeAccentColor(color: string | undefined, fallback = DEFAULT_PROJECT_COLOR) {
-  const trimmed = color?.trim() ?? ""
-  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed
-  return LEGACY_COLOR_MAP[trimmed] ?? fallback
-}
-
-function gradientStyleFromColor(color: string | undefined) {
-  const safeColor = normalizeAccentColor(color)
-  return {
-    backgroundImage: `linear-gradient(135deg, ${safeColor}26 0%, ${safeColor}12 55%, transparent 100%)`,
-    borderColor: `${safeColor}40`,
-  }
-}
-
-function clampMinutes(minutes: number) {
-  return Math.max(0, Math.min(MINUTES_PER_DAY - 1, minutes))
-}
-
-function snapMinutes(minutes: number) {
-  return Math.round(minutes / GRID_SNAP_MINUTES) * GRID_SNAP_MINUTES
-}
-
-function minutesToHHmm(totalMinutes: number) {
-  const clamped = clampMinutes(totalMinutes)
-  const hours = Math.floor(clamped / 60)
-  const minutes = clamped % 60
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
-}
-
-function clampToDayWindow(minutes: number) {
-  const start = DAY_START_HOUR * 60
-  const end = DAY_END_HOUR * 60
-  return Math.max(start, Math.min(end, minutes))
-}
-
-function dateToMinutes(valueISO: string) {
-  const date = parseISO(valueISO)
-  return date.getHours() * 60 + date.getMinutes()
-}
-
-function getDurationMinutes(item: ScheduleItem, fallbackMinutes: number) {
-  if (item.hasExplicitTime === false) return Math.max(15, fallbackMinutes)
-  const start = parseISO(item.startISO).getTime()
-  const end = parseISO(item.endISO).getTime()
-  const diff = Math.round((end - start) / 60000)
-  if (!Number.isFinite(diff)) return Math.max(15, fallbackMinutes)
-  return Math.max(15, diff)
-}
-
-type DisplayScheduleItem = ScheduleItem & {
-  sourceKind?: "schedule" | "project-milestone"
-  milestoneCompleted?: boolean
-  projectId?: Project["id"]
-  milestoneId?: string
-}
-
-type ResizeState = {
-  itemId: string
-  edge: "start" | "end"
-  originY: number
-  initialStartMinutes: number
-  initialEndMinutes: number
-  nextStartMinutes: number
-  nextEndMinutes: number
-}
+import { CalendarDays, CheckCircle2, Clock3, Plus } from "lucide-react"
 
 export function ScheduleModule() {
-  const allSchedule = useAppStore((s) => s.schedule)
-  const allProjects = useAppStore((s) => s.projects)
-  const allTasks = useAppStore((s) => s.tasks)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
-  const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const systemConfig = useAppStore((s) => s.profile.systemConfig)
-  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
-  const categoryColors = taskCategoryColors ?? {}
-  const toggleTask = useAppStore((s) => s.toggleTask)
-  const updateTask = useAppStore((s) => s.updateTask)
-  const updateSystemConfig = useAppStore((s) => s.updateSystemConfig)
-  const updateScheduleItem = useAppStore((s) => s.updateScheduleItem)
-  const addScheduleItem = useAppStore((s) => s.addScheduleItem)
-  const unscheduleTask = useAppStore((s) => s.unscheduleTask)
-  const moveTaskToTodo = useAppStore((s) => s.moveTaskToTodo)
-  const updateMilestone = useAppStore((s) => s.updateMilestone)
-  const toggleMilestone = useAppStore((s) => s.toggleMilestone)
-  const weekDays = getWeekDays()
-  const projects = allProjects.filter((project) => !project.deleted)
-  const milestoneMeta = useMemo(() => {
-    const meta = new Map<string, { project: Project; milestone: Project["milestones"][number] }>()
-    for (const project of projects) {
-      for (const milestone of project.milestones) {
-        meta.set(`${project.id}:${milestone.id}`, { project, milestone })
-      }
-    }
-    return meta
-  }, [projects])
-  const schedule = useMemo<DisplayScheduleItem[]>(() => {
-    const persistedItems: DisplayScheduleItem[] = allSchedule
-      .filter((item) => !item.deleted)
-      .flatMap((item) => {
-        if (!item.linkedProjectId || !item.linkedMilestoneId) {
-          return [{ ...item, sourceKind: "schedule" as const }]
-        }
+  const projects = useAppStore((s) => s.projects).filter((project) => !project.deleted)
+  const weeklyPlans = useAppStore((s) => s.weeklyPlans)
+  const timeBlocks = useAppStore((s) => s.timeBlocks)
+  const executionLogs = useAppStore((s) => s.executionLogs)
+  const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
+  const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
+  const setActiveModule = useAppStore((s) => s.setActiveModule)
 
-        const meta = milestoneMeta.get(`${item.linkedProjectId}:${item.linkedMilestoneId}`)
-        if (!meta || meta.milestone.completed) return []
+  const weekStartISO = getCurrentWeekStartISO()
+  const activePlan = getActiveWeeklyPlan(weeklyPlans, weekStartISO)
+  const weekDays = getWeekDates(weekStartISO)
+  const [selectedDay, setSelectedDay] = useState(weekDays[0]?.iso ?? weekStartISO)
+  const [projectId, setProjectId] = useState("")
+  const [startTime, setStartTime] = useState("09:00")
+  const [endTime, setEndTime] = useState("10:30")
+  const [taskDescription, setTaskDescription] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
-        return [{
-          ...item,
-          title: `${meta.project.title}: ${meta.milestone.title}`,
-          type: "project-milestone",
-          color: meta.project.color,
-          sourceKind: "schedule" as const,
-          milestoneCompleted: false,
-          projectId: meta.project.id,
-          milestoneId: meta.milestone.id,
-        }]
-      })
+  const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
+  const allowedProjects = activePlan
+    ? activePlan.allocations
+        .map((allocation) => projects.find((project) => project.id === allocation.projectId))
+        .filter((project): project is NonNullable<typeof project> => Boolean(project))
+    : []
+  const dayBlocks = selectTimeBlocksForDay(timeBlocks, selectedDay, activePlan?.id)
 
-    const scheduledMilestoneKeys = new Set(
-      persistedItems
-        .filter((item) => item.projectId && item.milestoneId)
-        .map((item) => `${item.projectId}:${item.milestoneId}`)
-    )
-
-    const milestoneItems = projects.flatMap((project) =>
-      project.milestones
-        .filter((milestone) => !milestone.completed)
-        .map((milestone) => {
-        const milestoneKey = `${project.id}:${milestone.id}`
-        if (scheduledMilestoneKeys.has(milestoneKey)) return null
-        const dayISO = weekDays[milestone.dayIndex]?.iso ?? weekDays[0]?.iso
-        if (!dayISO) return null
-        return {
-          id: `project-milestone-${project.id}-${milestone.id}`,
-          title: `${project.title}: ${milestone.title}`,
-          type: "project-milestone",
-          startISO: `${dayISO}T00:00`,
-          endISO: `${dayISO}T00:00`,
-          hasExplicitTime: false,
-          color: project.color,
-          sourceKind: "project-milestone" as const,
-          milestoneCompleted: milestone.completed,
-          projectId: project.id,
-          milestoneId: milestone.id,
-        }
-        })
-    ).filter(Boolean) as DisplayScheduleItem[]
-
-    return [...persistedItems, ...milestoneItems]
-  }, [allSchedule, milestoneMeta, projects, weekDays])
-  const tasks = allTasks.filter((task) => !task.deleted)
-  const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
-  const [selectedDay, setSelectedDay] = useState(
-    weekDays.find((d) => d.isToday)?.iso ?? weekDays[0].iso
-  )
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
-  const [editingMilestoneSchedule, setEditingMilestoneSchedule] = useState<{
-    scheduleItemId: string | null
-    projectId: string
-    milestoneId: string
-    title: string
-    color?: string
-  } | null>(null)
-  const [editTitle, setEditTitle] = useState("")
-  const [editCategory, setEditCategory] = useState<TaskCategory>("Learning")
-  const [editDate, setEditDate] = useState("")
-  const [editStartTime, setEditStartTime] = useState("09:00")
-  const [editEndTime, setEditEndTime] = useState("09:30")
-  const [editEstimate, setEditEstimate] = useState("")
-  const [editBlockTypeId, setEditBlockTypeId] = useState("none")
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
-  const [isGridDragOver, setIsGridDragOver] = useState(false)
-  const [weekDragOverDay, setWeekDragOverDay] = useState<string | null>(null)
-  const [showRecommendedStructure, setShowRecommendedStructure] = useState(false)
-  const [showWeeklyReviewChecklist, setShowWeeklyReviewChecklist] = useState(false)
-  const [isBlockEditorOpen, setIsBlockEditorOpen] = useState(false)
-  const [isCalendarFullscreen, setIsCalendarFullscreen] = useState(false)
-  const [draftExecutionBlocks, setDraftExecutionBlocks] = useState<ExecutionBlockTemplate[]>([])
-  const [resizeState, setResizeState] = useState<ResizeState | null>(null)
-  const dayGridRef = useRef<HTMLDivElement | null>(null)
-  const activeEditCategory = useMemo(
-    () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
-    [categories, editCategory]
-  )
-  const executionBlockTemplate = useMemo(
-    () => systemConfig?.executionBlocks?.length ? systemConfig.executionBlocks : DEFAULT_EXECUTION_BLOCKS,
-    [systemConfig]
-  )
-  const executionBlockById = useMemo(
-    () => new Map(executionBlockTemplate.map((block) => [block.id, block])),
-    [executionBlockTemplate]
-  )
-
-  const dayItems = useMemo(
-    () =>
-      schedule
-        .filter((item) => {
-          const itemDate = parseISO(item.startISO)
-          return format(itemDate, "yyyy-MM-dd") === selectedDay
-        })
-        .sort((a, b) => a.startISO.localeCompare(b.startISO)),
-    [schedule, selectedDay]
-  )
-
-  const timedDayItems = useMemo(() => dayItems.filter((item) => item.hasExplicitTime !== false), [dayItems])
-  const noTimeDayItems = useMemo(() => dayItems.filter((item) => item.hasExplicitTime === false), [dayItems])
-  const weekItems = useMemo(() => [...schedule].sort((a, b) => a.startISO.localeCompare(b.startISO)), [schedule])
-  const hourMarkers = useMemo(
-    () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, idx) => DAY_START_HOUR + idx),
-    []
-  )
-  const [currentTimeMarker, setCurrentTimeMarker] = useState(() => new Date())
-  const isSelectedDayToday = useMemo(
-    () => format(new Date(), "yyyy-MM-dd") === selectedDay,
-    [selectedDay]
-  )
-  const currentTimeMinutes = useMemo(
-    () => currentTimeMarker.getHours() * 60 + currentTimeMarker.getMinutes() + currentTimeMarker.getSeconds() / 60,
-    [currentTimeMarker]
-  )
-  const selectedDayExecutionItems = useMemo(
-    () => timedDayItems.filter((item) => item.blockTypeId && executionBlockById.has(item.blockTypeId)),
-    [executionBlockById, timedDayItems]
-  )
-  const selectedDayDeepWorkItems = useMemo(
-    () =>
-      timedDayItems.filter((item) => {
-        if (!item.blockTypeId) return false
-        const block = executionBlockById.get(item.blockTypeId)
-        return Boolean(block && block.duration >= DEEP_WORK_BLOCK_MINUTES)
-      }),
-    [executionBlockById, timedDayItems]
-  )
-  const selectedDayMicroItems = useMemo(
-    () => timedDayItems.filter((item) => !item.blockTypeId || !executionBlockById.has(item.blockTypeId)),
-    [executionBlockById, timedDayItems]
-  )
-  const selectedDayExecutionMinutes = useMemo(
-    () => selectedDayExecutionItems.reduce((total, item) => total + getDurationMinutes(item, 30), 0),
-    [selectedDayExecutionItems]
-  )
-  const sunday = weekDays[weekDays.length - 1]
-  const sundayIso = sunday.iso
-  const sundayReview = schedule.find(
-    (item) =>
-      item.startISO.startsWith(`${sundayIso}T`) &&
-      item.title.toLowerCase().includes("weekly review")
-  )
-  const selectedDayBlockHealth = useMemo(() => {
-    if (selectedDayExecutionMinutes >= 240 && selectedDayDeepWorkItems.length >= 2 && selectedDayMicroItems.length <= 2) {
-      return {
-        label: "Execution-ready",
-        description: "The day is shaped around meaningful blocks with limited fragmentation.",
-        tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-      }
-    }
-    if (selectedDayExecutionMinutes >= 180 && selectedDayDeepWorkItems.length >= 1) {
-      return {
-        label: "Workable",
-        description: "The day has real execution blocks, but it could use one more deep-work window.",
-        tone: "border-sky-500/30 bg-sky-500/10 text-sky-200",
-      }
-    }
-    return {
-      label: "Fragmented",
-      description: "Too much of the day is still shaped like small tasks instead of execution blocks.",
-      tone: "border-amber-500/30 bg-amber-500/10 text-amber-100",
-    }
-  }, [selectedDayDeepWorkItems.length, selectedDayExecutionMinutes, selectedDayMicroItems.length])
-
-  function toggleScheduleCompletion(item: DisplayScheduleItem) {
-    if (item.linkedTaskId) {
-      toggleTask(item.linkedTaskId)
+  function handleAddTimeBlock() {
+    if (!activePlan) {
+      setError("Create a weekly plan before scheduling time blocks.")
       return
     }
-    if (item.projectId && item.milestoneId) {
-      toggleMilestone(item.projectId, item.milestoneId)
+    if (!projectId) {
+      setError("Choose an allocated project.")
+      return
     }
-  }
-
-  function applyResizedTime(item: DisplayScheduleItem, startMinutes: number, endMinutes: number) {
-    const nextStartMinutes = clampToDayWindow(snapMinutes(startMinutes))
-    const nextEndMinutes = clampToDayWindow(snapMinutes(endMinutes))
-    if (nextEndMinutes <= nextStartMinutes) return
-
-    if (item.projectId && item.milestoneId) {
-      const existingScheduleItem = allSchedule.find(
-        (entry) =>
-          !entry.deleted &&
-          entry.linkedProjectId === item.projectId &&
-          entry.linkedMilestoneId === item.milestoneId
-      )
-
-      const schedulePayload = {
-        title: item.title,
-        type: "project-milestone",
-        startISO: `${selectedDay}T${minutesToHHmm(nextStartMinutes)}`,
-        endISO: `${selectedDay}T${minutesToHHmm(nextEndMinutes)}`,
-        hasExplicitTime: true,
-        color: item.color,
-        blockTypeId: item.blockTypeId,
-        linkedProjectId: item.projectId,
-        linkedMilestoneId: item.milestoneId,
-      }
-
-      if (existingScheduleItem) {
-        updateScheduleItem(existingScheduleItem.id, schedulePayload)
-      } else {
-        addScheduleItem(schedulePayload)
-      }
+    if (!taskDescription.trim()) {
+      setError("Add a task description for the block.")
       return
     }
 
-    if (!item.linkedTaskId) return
-    updateTask(
-      item.linkedTaskId,
-      { dueDate: selectedDay },
-      {
-        startHHmm: minutesToHHmm(nextStartMinutes),
-        endHHmm: minutesToHHmm(nextEndMinutes),
-        blockTypeId: item.blockTypeId ?? "",
-      }
-    )
-  }
+    const durationHours = calculateTimeBlockHours(startTime, endTime)
+    const metric = projectHours.find((item) => item.projectId === projectId)
+    if (!metric) {
+      setError("This project is not allocated in the active weekly plan.")
+      return
+    }
+    if (metric.plannedHours + durationHours > metric.allocatedHours) {
+      setError("This block would exceed the project's weekly allocation.")
+      return
+    }
 
-  function startResize(event: ReactMouseEvent<HTMLButtonElement>, item: DisplayScheduleItem, edge: "start" | "end") {
-    event.preventDefault()
-    event.stopPropagation()
-    const initialStartMinutes = dateToMinutes(item.startISO)
-    const initialEndMinutes = dateToMinutes(item.endISO)
-    setResizeState({
-      itemId: item.id,
-      edge,
-      originY: event.clientY,
-      initialStartMinutes,
-      initialEndMinutes,
-      nextStartMinutes: initialStartMinutes,
-      nextEndMinutes: initialEndMinutes,
+    saveTimeBlock({
+      weekPlanId: activePlan.id,
+      projectId,
+      dateISO: selectedDay,
+      startTime,
+      endTime,
+      taskDescription: taskDescription.trim(),
+      actualHours: undefined,
+      status: "planned",
+      deleted: false,
     })
-  }
-
-  useEffect(() => {
-    if (!resizeState) return
-    const activeResize = resizeState
-
-    function handleMouseMove(event: MouseEvent) {
-      const deltaMinutes = snapMinutes((event.clientY - activeResize.originY) / PIXELS_PER_MINUTE)
-      if (activeResize.edge === "start") {
-        const nextStartMinutes = clampToDayWindow(
-          Math.min(activeResize.initialStartMinutes + deltaMinutes, activeResize.initialEndMinutes - GRID_SNAP_MINUTES)
-        )
-        setResizeState((current) =>
-          current
-            ? {
-                ...current,
-                nextStartMinutes,
-              }
-            : current
-        )
-        return
-      }
-
-      const nextEndMinutes = clampToDayWindow(
-        Math.max(activeResize.initialEndMinutes + deltaMinutes, activeResize.initialStartMinutes + GRID_SNAP_MINUTES)
-      )
-      setResizeState((current) =>
-        current
-          ? {
-              ...current,
-              nextEndMinutes,
-            }
-          : current
-      )
-    }
-
-    function handleMouseUp() {
-      const item = schedule.find((entry) => entry.id === activeResize.itemId)
-      if (item) {
-        applyResizedTime(item, activeResize.nextStartMinutes, activeResize.nextEndMinutes)
-      }
-      setResizeState(null)
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    window.addEventListener("mouseup", handleMouseUp)
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [addScheduleItem, allSchedule, resizeState, schedule, selectedDay, updateScheduleItem, updateTask])
-
-  useEffect(() => {
-    if (!isSelectedDayToday) return
-    const timer = window.setInterval(() => setCurrentTimeMarker(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [isSelectedDayToday])
-
-  function moveItemToSlot(scheduleItemId: string, minutesFromStartOfDay: number) {
-    const item = schedule.find((entry) => entry.id === scheduleItemId)
-    if (item?.projectId && item.milestoneId) {
-      const startMinutes = clampToDayWindow(snapMinutes(minutesFromStartOfDay))
-      const endMinutes = clampToDayWindow(startMinutes + 30)
-      const dayIndex = Math.max(0, weekDays.findIndex((day) => day.iso === selectedDay))
-      const existingScheduleItem = allSchedule.find(
-        (entry) =>
-          !entry.deleted &&
-          entry.linkedProjectId === item.projectId &&
-          entry.linkedMilestoneId === item.milestoneId
-      )
-
-      updateMilestone(item.projectId, item.milestoneId, { dayIndex })
-
-      const schedulePayload = {
-        title: item.title,
-        type: "project-milestone",
-        startISO: `${selectedDay}T${minutesToHHmm(startMinutes)}`,
-        endISO: `${selectedDay}T${minutesToHHmm(endMinutes)}`,
-        hasExplicitTime: true,
-        color: item.color,
-        linkedProjectId: item.projectId,
-        linkedMilestoneId: item.milestoneId,
-      }
-
-      if (existingScheduleItem) {
-        updateScheduleItem(existingScheduleItem.id, schedulePayload)
-      } else {
-        addScheduleItem(schedulePayload)
-      }
-      return
-    }
-    if (!item?.linkedTaskId) return
-    const linkedTask = tasks.find((entry) => entry.id === item.linkedTaskId)
-    const duration = getDurationMinutes(item, linkedTask?.estimateMin ?? 30)
-    const windowStart = DAY_START_HOUR * 60
-    const windowEnd = DAY_END_HOUR * 60
-    const maxStart = Math.max(windowStart, windowEnd - duration)
-    const snappedStart = clampToDayWindow(snapMinutes(minutesFromStartOfDay))
-    const startMinutes = Math.min(snappedStart, maxStart)
-    const endMinutes = clampToDayWindow(startMinutes + duration)
-
-    updateTask(
-      item.linkedTaskId,
-      {
-        dueDate: selectedDay,
-      },
-      {
-        startHHmm: minutesToHHmm(startMinutes),
-        endHHmm: minutesToHHmm(endMinutes),
-      }
-    )
-  }
-
-  function upsertMilestoneScheduleItem(input: {
-    scheduleItemId?: string | null
-    projectId: string
-    milestoneId: string
-    title: string
-    color?: string
-    dateISO: string
-    startHHmm: string
-    endHHmm: string
-    blockTypeId?: string
-  }) {
-    const dayIndex = weekDays.findIndex((day) => day.iso === input.dateISO)
-    if (dayIndex >= 0) {
-      updateMilestone(input.projectId, input.milestoneId, { dayIndex })
-    }
-
-    const schedulePayload = {
-      title: input.title,
-      type: "project-milestone",
-      startISO: `${input.dateISO}T${input.startHHmm}`,
-      endISO: `${input.dateISO}T${input.endHHmm}`,
-      hasExplicitTime: true,
-      color: input.color,
-      blockTypeId: input.blockTypeId,
-      linkedProjectId: input.projectId,
-      linkedMilestoneId: input.milestoneId,
-    }
-
-    if (input.scheduleItemId) {
-      updateScheduleItem(input.scheduleItemId, schedulePayload)
-      return
-    }
-
-    addScheduleItem(schedulePayload)
-  }
-
-  function onGridDragOver(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault()
-    setIsGridDragOver(true)
-  }
-
-  function onGridDragLeave() {
-    setIsGridDragOver(false)
-  }
-
-  function onGridDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault()
-    const draggedId = draggedItemId ?? event.dataTransfer.getData("text/plain")
-    setIsGridDragOver(false)
-    setDraggedItemId(null)
-    if (!draggedId) return
-    const grid = dayGridRef.current
-    if (!grid) return
-    const rect = grid.getBoundingClientRect()
-    const y = event.clientY - rect.top + grid.scrollTop
-    const minutes = DAY_START_HOUR * 60 + Math.floor(y / PIXELS_PER_MINUTE)
-    moveItemToSlot(draggedId, minutes)
-  }
-
-  function moveItemToDay(scheduleItemId: string, targetDayISO: string) {
-    const item = schedule.find((entry) => entry.id === scheduleItemId)
-    if (!item) return
-    if (item.projectId && item.milestoneId) {
-      const dayIndex = weekDays.findIndex((day) => day.iso === targetDayISO)
-      if (dayIndex >= 0) {
-        updateMilestone(item.projectId, item.milestoneId, { dayIndex })
-        if (item.hasExplicitTime !== false && item.sourceKind === "schedule") {
-          const startHHmm = format(parseISO(item.startISO), "HH:mm")
-          const endHHmm = format(parseISO(item.endISO), "HH:mm")
-          updateScheduleItem(item.id, {
-            startISO: `${targetDayISO}T${startHHmm}`,
-            endISO: `${targetDayISO}T${endHHmm}`,
-          })
-        }
-      }
-      return
-    }
-    if (!item.linkedTaskId) {
-      const startHHmm = format(parseISO(item.startISO), "HH:mm")
-      const endHHmm = format(parseISO(item.endISO), "HH:mm")
-      updateScheduleItem(item.id, {
-        startISO: `${targetDayISO}T${startHHmm}`,
-        endISO: `${targetDayISO}T${endHHmm}`,
-      })
-      return
-    }
-    const hasExplicitTime = item.hasExplicitTime !== false
-    if (!hasExplicitTime) {
-      updateTask(item.linkedTaskId, { dueDate: targetDayISO })
-      return
-    }
-    const startHHmm = format(parseISO(item.startISO), "HH:mm")
-    const endHHmm = format(parseISO(item.endISO), "HH:mm")
-    updateTask(
-      item.linkedTaskId,
-      { dueDate: targetDayISO },
-      { startHHmm, endHHmm }
-    )
-  }
-
-  function startWeekItemDrag(event: DragEvent<HTMLElement>, scheduleItemId: string) {
-    setDraggedItemId(scheduleItemId)
-    event.dataTransfer.setData("text/plain", scheduleItemId)
-    event.dataTransfer.effectAllowed = "move"
-  }
-
-  function onWeekDayDragOver(event: DragEvent<HTMLElement>, dayISO: string) {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = "move"
-    if (weekDragOverDay !== dayISO) setWeekDragOverDay(dayISO)
-  }
-
-  function onWeekDayDrop(event: DragEvent<HTMLElement>, dayISO: string) {
-    event.preventDefault()
-    const draggedId = draggedItemId ?? event.dataTransfer.getData("text/plain")
-    setWeekDragOverDay(null)
-    setDraggedItemId(null)
-    if (!draggedId) return
-    moveItemToDay(draggedId, dayISO)
-  }
-
-  function openTaskEditor(scheduleItemId: string) {
-    const item = schedule.find((entry) => entry.id === scheduleItemId)
-    if (!item) return
-    if (item.projectId && item.milestoneId) {
-      const hasExplicitTime = item.hasExplicitTime !== false
-      setEditingMilestoneSchedule({
-        scheduleItemId: item.sourceKind === "schedule" ? item.id : null,
-        projectId: item.projectId,
-        milestoneId: item.milestoneId,
-        title: item.title,
-        color: item.color,
-      })
-      setEditTitle(item.title)
-      setEditDate(format(parseISO(item.startISO), "yyyy-MM-dd"))
-      setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "09:00")
-      setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "09:30")
-      setEditEstimate("")
-      setEditBlockTypeId(item.blockTypeId ?? "none")
-      return
-    }
-    if (!item.linkedTaskId) return
-    const task = tasks.find((entry) => entry.id === item.linkedTaskId)
-    if (!task) return
-    const hasExplicitTime = item.hasExplicitTime !== false
-    setEditingTaskId(task.id)
-    setEditTitle(task.title)
-    setEditCategory(task.category)
-    setEditDate(task.dueDate ?? format(parseISO(item.startISO), "yyyy-MM-dd"))
-    setEditStartTime(hasExplicitTime ? format(parseISO(item.startISO), "HH:mm") : "")
-    setEditEndTime(hasExplicitTime ? format(parseISO(item.endISO), "HH:mm") : "")
-    setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
-    setEditBlockTypeId(item.blockTypeId ?? "none")
-  }
-
-  function saveTaskFromSchedule() {
-    if (editingMilestoneSchedule) {
-      upsertMilestoneScheduleItem({
-        scheduleItemId: editingMilestoneSchedule.scheduleItemId,
-        projectId: editingMilestoneSchedule.projectId,
-        milestoneId: editingMilestoneSchedule.milestoneId,
-        title: editTitle.trim() || editingMilestoneSchedule.title,
-        color: editingMilestoneSchedule.color,
-        dateISO: editDate,
-        startHHmm: editStartTime,
-        endHHmm: editEndTime,
-        blockTypeId: editBlockTypeId === "none" ? undefined : editBlockTypeId,
-      })
-      setEditingMilestoneSchedule(null)
-      return
-    }
-    if (!editingTaskId) return
-    updateTask(
-      editingTaskId,
-      {
-        title: editTitle.trim(),
-        category: activeEditCategory,
-        dueDate: editDate || undefined,
-        estimateMin: editEstimate ? Number(editEstimate) : undefined,
-      },
-      {
-        startHHmm: editStartTime,
-        endHHmm: editEndTime,
-        blockTypeId: editBlockTypeId === "none" ? "" : editBlockTypeId,
-      }
-    )
-    setEditingTaskId(null)
-  }
-
-  function handleRemoveTimeAssignment() {
-    if (editingMilestoneSchedule?.scheduleItemId) {
-      updateScheduleItem(editingMilestoneSchedule.scheduleItemId, {
-        deleted: true,
-      } as Partial<ScheduleItem>)
-      setEditingMilestoneSchedule(null)
-      return
-    }
-    if (!editingTaskId) return
-    unscheduleTask(editingTaskId)
-    setEditingTaskId(null)
-  }
-
-  function handleMoveToTodo() {
-    if (!editingTaskId) return
-    moveTaskToTodo(editingTaskId)
-    setEditingTaskId(null)
-  }
-
-  function scheduleWeeklyReview() {
-    if (sundayReview) return
-    addScheduleItem({
-      title: "Weekly Review Ritual",
-      type: "review",
-      startISO: `${sundayIso}T18:00`,
-      endISO: `${sundayIso}T18:30`,
-      hasExplicitTime: true,
-      color: "bg-chart-3",
-    })
-  }
-
-  function openBlockEditor() {
-    setDraftExecutionBlocks(executionBlockTemplate.map((block) => ({ ...block })))
-    setIsBlockEditorOpen(true)
-  }
-
-  function updateDraftBlock(index: number, field: keyof ExecutionBlockTemplate, value: string) {
-    setDraftExecutionBlocks((current) =>
-      current.map((block, blockIndex) =>
-        blockIndex === index
-          ? {
-              ...block,
-              [field]:
-                field === "duration"
-                  ? Math.max(15, Math.min(240, Number(value) || 15))
-                  : value,
-            }
-          : block
-      )
-    )
-  }
-
-  function saveExecutionBlocks() {
-    updateSystemConfig({
-      executionBlocks: draftExecutionBlocks.map((block, index) => ({
-        id: block.id || executionBlockTemplate[index]?.id || `block-${index + 1}`,
-        title: block.title.trim() || `Block ${index + 1}`,
-        purpose: block.purpose.trim() || "Execution block",
-        duration: Math.max(15, Math.min(240, Number(block.duration) || 60)),
-      })),
-    })
-    setIsBlockEditorOpen(false)
-  }
-
-  function resetExecutionBlocks() {
-    setDraftExecutionBlocks(DEFAULT_EXECUTION_BLOCKS.map((block) => ({ ...block })))
+    setTaskDescription("")
+    setError(null)
   }
 
   return (
-    <Tabs defaultValue="day" className="flex flex-col gap-6">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-            <p className="text-sm text-muted-foreground">Plan execution blocks first, then fit microtasks around them.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-            <TabsList className="w-full justify-start sm:w-auto">
-              <TabsTrigger value="day">Day View</TabsTrigger>
-              <TabsTrigger value="week">Week View</TabsTrigger>
-              <TabsTrigger value="pomodoro">Pomodoro</TabsTrigger>
-            </TabsList>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5 px-2 sm:px-3"
-              onClick={() => setIsCalendarFullscreen((current) => !current)}
-              aria-label={isCalendarFullscreen ? "Exit calendar fullscreen" : "Expand calendar fullscreen"}
-            >
-              {isCalendarFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">{isCalendarFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="gap-1.5">
-              <a href="https://calendar.google.com/" target="_blank" rel="noreferrer noopener">
-                Google Calendar
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </Button>
-          </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
+          <p className="text-sm text-muted-foreground">
+            Turn weekly allocation into concrete blocks. Blocks can only be created against projects that already have time.
+          </p>
         </div>
-
-        <div className={cn("grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start", isCalendarFullscreen && "xl:grid-cols-1")}>
-          <div
-            className={cn(
-              "flex min-w-0 flex-col gap-4",
-              isCalendarFullscreen &&
-                "fixed inset-2 z-50 overflow-auto rounded-2xl border border-border bg-background p-3 shadow-2xl sm:inset-4 sm:p-4"
-            )}
-          >
-            {isCalendarFullscreen ? (
-              <div className="flex items-center justify-between rounded-xl border border-border bg-background/80 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Schedule Fullscreen</p>
-                  <p className="text-xs text-muted-foreground">Focus on the calendar surface only.</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setIsCalendarFullscreen(false)}
-                >
-                  <Minimize2 className="h-3.5 w-3.5" />
-                  Exit Fullscreen
-                </Button>
-              </div>
-            ) : null}
-
-            <TabsContent value="day" className="mt-0 flex flex-col gap-4">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-stretch">
-                <Card className="border-border/70 xl:min-w-[420px] xl:max-w-[620px]">
-                  <CardContent className="p-3">
-                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
-                        <p className="text-[11px] text-muted-foreground">Deep work</p>
-                        <p className="text-lg font-semibold text-foreground">{selectedDayDeepWorkItems.length}</p>
-                      </div>
-                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
-                        <p className="text-[11px] text-muted-foreground">Execution hrs</p>
-                        <p className="text-lg font-semibold text-foreground">{Math.round(selectedDayExecutionMinutes / 60)}</p>
-                      </div>
-                      <div className="rounded-xl border border-border/70 bg-background/40 px-3 py-2">
-                        <p className="text-[11px] text-muted-foreground">Micro / loose</p>
-                        <p className="text-lg font-semibold text-foreground">{selectedDayMicroItems.length + noTimeDayItems.length}</p>
-                      </div>
-                      <div className={cn("rounded-xl border px-3 py-2", selectedDayBlockHealth.tone)}>
-                        <p className="text-[11px] opacity-80">Status</p>
-                        <p className="text-lg font-semibold">{selectedDayBlockHealth.label}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border/70 xl:flex-1">
-                  <CardContent className="p-3">
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
-                      {weekDays.map((d) => (
-                        <button
-                          key={d.iso}
-                          onClick={() => setSelectedDay(d.iso)}
-                          className={cn(
-                            "flex min-w-[3.75rem] flex-col items-center rounded-xl px-3 py-2 text-xs transition-colors",
-                            selectedDay === d.iso
-                              ? "bg-primary text-primary-foreground"
-                              : d.isToday
-                                ? "bg-primary/10 text-primary"
-                                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                          )}
-                        >
-                          <span className="font-medium">{d.label}</span>
-                          <span className="text-lg font-bold">{d.short}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-          {/* Day schedule */}
-          {dayItems.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-2 py-8">
-                <CalendarDays className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No events for this day.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {noTimeDayItems.length > 0 ? (
-                <Card>
-                  <CardContent className="space-y-2 p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">No Exact Time</p>
-                    {noTimeDayItems.map((item) => (
-                      <div
-                        key={item.id}
-                        draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
-                        onDragStart={(event) => {
-                          setDraggedItemId(item.id)
-                          event.dataTransfer.setData("text/plain", item.id)
-                        }}
-                        onDragEnd={() => {
-                          setDraggedItemId(null)
-                          setIsGridDragOver(false)
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2",
-                          (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : ""
-                        )}
-                      >
-                        {(item.linkedTaskId || item.projectId) ? (
-                          <Checkbox
-                            checked={Boolean(taskMap.get(item.linkedTaskId ?? "")?.completed || item.milestoneCompleted)}
-                            onCheckedChange={() => toggleScheduleCompletion(item)}
-                            onClick={(event) => event.stopPropagation()}
-                            aria-label={`Complete ${item.title}`}
-                          />
-                        ) : null}
-                        <div className="h-8 w-1 rounded-full" style={{ backgroundColor: normalizeAccentColor(item.color, "#64748b") }} />
-                        <p className={cn("flex-1 text-sm font-medium", (taskMap.get(item.linkedTaskId ?? "")?.completed || item.milestoneCompleted) && "line-through text-muted-foreground")}>{item.title}</p>
-                        <Badge variant="outline" className="text-[10px]">
-                          {item.sourceKind === "project-milestone" ? "Project milestone" : "Loose task"}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
-                        {item.milestoneCompleted ? (
-                          <Badge className="h-5 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
-                            Completed
-                          </Badge>
-                        ) : null}
-                        {(item.linkedTaskId || item.projectId) ? (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openTaskEditor(item.id)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    ))}
-                    <p className="text-[11px] text-muted-foreground">
-                      Drag a task into the time grid to assign a time slot.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              <Card>
-                <CardContent className="p-0">
-                  <div
-                    ref={dayGridRef}
-                    onDragOver={onGridDragOver}
-                    onDragLeave={onGridDragLeave}
-                    onDrop={onGridDrop}
-                    className={cn(
-                      "max-h-[70vh] overflow-y-auto rounded-lg border border-border/60",
-                      isGridDragOver ? "bg-primary/5" : ""
-                    )}
-                  >
-                    <div
-                      className="grid grid-cols-[2.5rem_1fr] sm:grid-cols-[3.25rem_1fr]"
-                      style={{ height: `${(DAY_END_HOUR - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
-                    >
-                      <div className="relative border-r border-border/70 bg-muted/20">
-                        {hourMarkers.map((hour) => (
-                          <div
-                            key={`label-${hour}`}
-                            className="absolute left-0.5 top-0 -translate-y-1/2 text-[9px] text-muted-foreground sm:left-1 sm:text-[10px]"
-                            style={{ top: `${(hour - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
-                          >
-                            {String(hour).padStart(2, "0")}:00
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="relative">
-                        {hourMarkers.map((hour) => (
-                          <div
-                            key={`line-${hour}`}
-                            className="absolute left-0 right-0 border-t border-border/80"
-                            style={{ top: `${(hour - DAY_START_HOUR) * 60 * PIXELS_PER_MINUTE}px` }}
-                          />
-                        ))}
-                        {hourMarkers.slice(0, -1).map((hour) => (
-                          <div
-                            key={`half-${hour}`}
-                            className="absolute left-0 right-0 border-t border-dashed border-border/40"
-                            style={{ top: `${((hour - DAY_START_HOUR) * 60 + 30) * PIXELS_PER_MINUTE}px` }}
-                          />
-                        ))}
-                        {isSelectedDayToday && currentTimeMinutes >= DAY_START_HOUR * 60 && currentTimeMinutes <= DAY_END_HOUR * 60 ? (
-                          <div
-                            className="absolute left-0 right-0 z-20"
-                            style={{ top: `${(currentTimeMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE}px` }}
-                          >
-                            <div className="absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full bg-primary shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
-                            <div className="border-t border-primary" />
-                          </div>
-                        ) : null}
-
-                        {timedDayItems.map((item) => {
-                          const start = parseISO(item.startISO)
-                          const end = parseISO(item.endISO)
-                          const startMinutes = dateToMinutes(item.startISO)
-                          const rawEndMinutes = dateToMinutes(item.endISO)
-                          const isResizing = resizeState?.itemId === item.id
-                          const visualStartMinutes = isResizing ? resizeState.nextStartMinutes : startMinutes
-                          const visualEndMinutes = isResizing ? resizeState.nextEndMinutes : rawEndMinutes
-                          const durationMinutes = Math.max(15, visualEndMinutes - visualStartMinutes)
-                          const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
-                          const linkedTask = item.linkedTaskId ? taskMap.get(item.linkedTaskId) : undefined
-                          const isCompleted = Boolean(linkedTask?.completed || item.milestoneCompleted)
-                          const categoryColor = linkedTask ? categoryColors[linkedTask.category] : undefined
-                          const cardStyle = linkedTask && categoryColor
-                            ? gradientStyleFromColor(categoryColor)
-                            : { borderColor: `${normalizeAccentColor(item.color, "#64748b")}40` }
-                          if (startMinutes < DAY_START_HOUR * 60 || startMinutes > DAY_END_HOUR * 60) return null
-                          const top = (visualStartMinutes - DAY_START_HOUR * 60) * PIXELS_PER_MINUTE
-                          const height = Math.max(56, durationMinutes * PIXELS_PER_MINUTE)
-                          return (
-                            <div
-                              key={item.id}
-                              draggable={!isResizing && Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
-                              onDragStart={(event) => {
-                                setDraggedItemId(item.id)
-                                event.dataTransfer.setData("text/plain", item.id)
-                              }}
-                              onDragEnd={() => {
-                                setDraggedItemId(null)
-                                setIsGridDragOver(false)
-                              }}
-                              className={cn(
-                                "absolute left-2 right-2 overflow-hidden rounded-md border bg-card/95 px-3 py-2 shadow-sm backdrop-blur-[1px]",
-                                (item.linkedTaskId || item.sourceKind === "project-milestone") ? "cursor-grab active:cursor-grabbing" : "",
-                                isCompleted && "opacity-65"
-                              )}
-                              style={{ ...cardStyle, top: `${top}px`, height: `${height}px` }}
-                            >
-                              <div className="flex h-full items-start gap-2">
-                                {(item.linkedTaskId || item.projectId) ? (
-                                  <Checkbox
-                                    checked={isCompleted}
-                                    onCheckedChange={() => toggleScheduleCompletion(item)}
-                                    onClick={(event) => event.stopPropagation()}
-                                    aria-label={`Complete ${item.title}`}
-                                    className="mt-0.5"
-                                  />
-                                ) : null}
-                                <div className="mt-0.5 h-full w-1 rounded-full" style={{ backgroundColor: normalizeAccentColor(categoryColor ?? item.color, "#64748b") }} />
-                                <div className="flex min-w-0 flex-1 flex-col justify-between">
-                                  <p className={cn("truncate text-xs font-medium leading-tight", isCompleted && "line-through text-muted-foreground")}>{item.title}</p>
-                                  <p className="text-[10px] leading-tight text-muted-foreground">
-                                    {minutesToHHmm(visualStartMinutes)} - {minutesToHHmm(visualEndMinutes)}
-                                  </p>
-                                  <div className="mt-1 flex items-center gap-1.5">
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        "h-5 border-border/70 px-1.5 text-[9px] uppercase tracking-wide",
-                                        assignedBlock ? "text-emerald-300" : "text-amber-200"
-                                      )}
-                                    >
-                                      {assignedBlock ? assignedBlock.title : "Microtask"}
-                                    </Badge>
-                                    <span className="text-[9px] text-muted-foreground">{durationMinutes} min</span>
-                                  </div>
-                                </div>
-                                {(item.linkedTaskId || item.projectId) ? (
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                ) : null}
-                              </div>
-                              <button
-                                type="button"
-                                className="absolute inset-x-2 top-0 h-2 cursor-ns-resize rounded-t-md"
-                                onMouseDown={(event) => startResize(event, item, "start")}
-                                aria-label={`Adjust start time for ${item.title}`}
-                              />
-                              <button
-                                type="button"
-                                className="absolute inset-x-2 bottom-0 h-2 cursor-ns-resize rounded-b-md"
-                                onMouseDown={(event) => startResize(event, item, "end")}
-                                aria-label={`Adjust end time for ${item.title}`}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-            </TabsContent>
-
-            <TabsContent value="week" className="mt-0">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {weekDays.map((day) => {
-              const items = weekItems.filter((item) => {
-                const itemDate = parseISO(item.startISO)
-                return isSameDay(itemDate, day.date)
-              })
-              return (
-                <Card
-                  key={day.iso}
-                  className={cn(
-                    day.isToday && "ring-2 ring-primary",
-                    weekDragOverDay === day.iso && "ring-2 ring-primary/70 bg-primary/5"
-                  )}
-                  onDragOver={(event) => onWeekDayDragOver(event, day.iso)}
-                  onDragLeave={() => {
-                    if (weekDragOverDay === day.iso) setWeekDragOverDay(null)
-                  }}
-                  onDrop={(event) => onWeekDayDrop(event, day.iso)}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between text-sm">
-                      <span>{day.label} {day.short}</span>
-                      {day.isToday && <Badge className="bg-primary text-primary-foreground text-[10px]">Today</Badge>}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-1.5" onDragOver={(event) => onWeekDayDragOver(event, day.iso)} onDrop={(event) => onWeekDayDrop(event, day.iso)}>
-                    {items.length === 0 ? (
-                      <p className="py-2 text-center text-xs text-muted-foreground">Free day</p>
-                    ) : (
-                      items.map((item) => {
-                        const start = parseISO(item.startISO)
-                        const end = parseISO(item.endISO)
-                        const hasExplicitTime = item.hasExplicitTime !== false
-                        const linkedTask = item.linkedTaskId ? taskMap.get(item.linkedTaskId) : null
-                        const assignedBlock = item.blockTypeId ? executionBlockById.get(item.blockTypeId) : undefined
-                        const isCompletedTask = Boolean(linkedTask?.completed || item.milestoneCompleted)
-                        return (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              "flex items-center gap-2 rounded-md border border-border p-2",
-                              (item.linkedTaskId || item.projectId) && "cursor-grab active:cursor-grabbing",
-                              isCompletedTask && "border-emerald-500/50 bg-emerald-500/10"
-                            )}
-                            draggable={Boolean(item.linkedTaskId || item.sourceKind === "project-milestone")}
-                            onDragStart={(event) => {
-                              startWeekItemDrag(event, item.id)
-                            }}
-                            onDragEnd={() => {
-                              setDraggedItemId(null)
-                              setWeekDragOverDay(null)
-                            }}
-                          >
-                            {(item.linkedTaskId || item.projectId) ? (
-                              <Checkbox
-                                checked={isCompletedTask}
-                                onCheckedChange={() => toggleScheduleCompletion(item)}
-                                onClick={(event) => event.stopPropagation()}
-                                aria-label={`Complete ${item.title}`}
-                              />
-                            ) : null}
-                            <div className="h-6 w-0.5 rounded-full" style={{ backgroundColor: normalizeAccentColor(linkedTask ? categoryColors[linkedTask.category] : item.color, "#64748b") }} />
-                            <div className="flex-1 min-w-0">
-                              <p className={cn("text-xs font-medium truncate", isCompletedTask && "line-through text-muted-foreground")}>{item.title}</p>
-                              {hasExplicitTime ? (
-                                <p className="text-[10px] text-muted-foreground">
-                                  {format(start, "HH:mm")} - {format(end, "HH:mm")}
-                                </p>
-                              ) : null}
-                              {assignedBlock ? (
-                                <p className="text-[10px] text-emerald-300">{assignedBlock.title}</p>
-                              ) : null}
-                            </div>
-                            {isCompletedTask ? (
-                              <Badge className="h-5 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
-                                Completed
-                              </Badge>
-                            ) : null}
-                            {(item.linkedTaskId || item.projectId) ? (
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openTaskEditor(item.id)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            ) : null}
-                          </div>
-                        )
-                      })
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-            </TabsContent>
-
-            <TabsContent value="pomodoro" className="mt-0">
-              <PomodoroTimer />
-            </TabsContent>
-          </div>
-
-          <aside className={cn("flex flex-col gap-4 xl:sticky xl:top-4", isCalendarFullscreen && "hidden")}>
-            <Card className="border-border/60 bg-primary/5">
-              <CardContent className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowRecommendedStructure((current) => !current)}
-                        className="flex items-center gap-2 text-left text-sm font-medium text-primary transition-opacity hover:opacity-80"
-                        aria-expanded={showRecommendedStructure}
-                      >
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", showRecommendedStructure ? "rotate-0" : "-rotate-90")} />
-                        <Target className="h-4 w-4" />
-                        Recommended Daily Structure
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Reference only. Use this when shaping a cleaner day.</p>
-                  </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={openBlockEditor}>
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    Customize
-                  </Button>
-                </div>
-
-                {showRecommendedStructure ? (
-                  <div className="space-y-3">
-                    {executionBlockTemplate.map((block, index) => {
-                      const style = EXECUTION_BLOCK_STYLES[index % EXECUTION_BLOCK_STYLES.length]
-                      const Icon = style.icon
-                      return (
-                        <div key={block.id} className="rounded-xl border border-border/70 bg-background/50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3">
-                              <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl border", style.tone)}>
-                                <Icon className="h-4 w-4" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{block.title}</p>
-                                <p className="text-xs text-muted-foreground">{block.purpose}</p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="border-border/70 text-[10px]">
-                              {block.duration} min
-                            </Badge>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60 bg-background/40">
-              <CardContent className="space-y-3 p-4">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Block-First Rule</p>
-                  <p className="text-sm font-medium text-foreground">Protect the large blocks. Push small tasks to the edges.</p>
-                  <p className="text-xs text-muted-foreground">
-                    Assign scheduled work to one of your execution block types when it deserves real protected time. Leave quick items unassigned so they stay treated as microtasks.
-                  </p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                    <p className="text-xs text-muted-foreground">Execution blocks</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{selectedDayExecutionItems.length}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                    <p className="text-xs text-muted-foreground">Microtasks</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{selectedDayMicroItems.length}</p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                    <p className="text-xs text-muted-foreground">Loose items</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{noTimeDayItems.length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60 bg-secondary/10">
-              <CardContent className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CalendarCheck2 className="h-4 w-4" />
-                      <p className="text-sm font-medium">Weekly Review Ritual</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Reference only. Keep the system clean before Monday.</p>
-                  </div>
-                  <Badge variant={sundayReview ? "secondary" : "outline"}>
-                    {sunday.label} {sunday.short}
-                  </Badge>
-                </div>
-
-                <div className="rounded-xl border border-border bg-background/40 p-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowWeeklyReviewChecklist((current) => !current)}
-                    className="flex w-full items-center gap-2 text-left text-sm font-medium transition-opacity hover:opacity-80"
-                    aria-expanded={showWeeklyReviewChecklist}
-                  >
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", showWeeklyReviewChecklist ? "rotate-0" : "-rotate-90")} />
-                    Review checklist
-                  </button>
-                  {showWeeklyReviewChecklist ? (
-                    <div className="mt-3 space-y-2">
-                      {[
-                        "Review weekly outcomes",
-                        "Archive completed tasks",
-                        "Pause unnecessary projects",
-                        "Define next week outcomes",
-                        "Choose Monday focus tasks",
-                      ].map((item) => (
-                        <div key={item} className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                          <span>{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/40 p-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {sundayReview ? "Review scheduled" : "Not scheduled yet"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {sundayReview
-                        ? "Sunday 30-minute review is already on the calendar."
-                        : `Add it to ${sunday.label} in one click.`}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant={sundayReview ? "outline" : "default"}
-                    size="sm"
-                    onClick={scheduleWeeklyReview}
-                    disabled={Boolean(sundayReview)}
-                  >
-                    {sundayReview ? "Scheduled" : "Schedule Review"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
-        </div>
+        <Button variant="outline" onClick={() => setActiveModule("weekly-plan")}>
+          {activePlan ? "Edit weekly plan" : "Create weekly plan"}
+        </Button>
       </div>
 
-      <Dialog
-        open={Boolean(editingTaskId || editingMilestoneSchedule)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingTaskId(null)
-            setEditingMilestoneSchedule(null)
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingMilestoneSchedule ? "Edit Milestone From Schedule" : "Edit Task From Schedule"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
+      {!activePlan ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <CalendarDays className="h-8 w-8 text-muted-foreground" />
             <div>
-              <Label htmlFor="schedule-task-title">Title</Label>
-              <Input id="schedule-task-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              <p className="font-medium">No active weekly plan</p>
+              <p className="text-sm text-muted-foreground">Allocate the week first, then shape daily execution blocks.</p>
             </div>
-            {!editingMilestoneSchedule ? (
-              <div>
-              <Label>Category</Label>
-              <Select value={activeEditCategory} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              </div>
-            ) : null}
-            <div>
-              <Label htmlFor="schedule-task-date">Date</Label>
-              <Input id="schedule-task-date" type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label htmlFor="schedule-task-start">Start</Label>
-                <Input id="schedule-task-start" type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="schedule-task-end">End</Label>
-                <Input id="schedule-task-end" type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} />
-              </div>
-            </div>
-            {!editingMilestoneSchedule ? (
-              <div>
-              <Label htmlFor="schedule-task-estimate">Estimate (min)</Label>
-              <Input id="schedule-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} />
-              </div>
-            ) : null}
-            <div>
-              <Label>Execution Block Type</Label>
-              <Select value={editBlockTypeId} onValueChange={setEditBlockTypeId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None / Microtask</SelectItem>
-                  {executionBlockTemplate.map((block) => (
-                    <SelectItem key={block.id} value={block.id}>
-                      {block.title} ({block.duration} min)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={saveTaskFromSchedule} className="w-full">{editingMilestoneSchedule ? "Save Milestone" : "Save Task"}</Button>
-            <Button variant="outline" onClick={handleRemoveTimeAssignment} className="w-full">
-              Remove Assigned Time
-            </Button>
-            {!editingMilestoneSchedule ? (
-              <Button variant="secondary" onClick={handleMoveToTodo} className="w-full">
-                Move to ToDo List
-              </Button>
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isBlockEditorOpen} onOpenChange={setIsBlockEditorOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Customize Daily Structure</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Rename blocks and update their purpose and duration so the schedule template fits the user, whether that means focused study, training, coding, or admin.
-            </p>
-            <div className="space-y-3">
-              {draftExecutionBlocks.map((block, index) => (
-                <div key={block.id} className="grid gap-3 rounded-xl border border-border/70 bg-background/50 p-4 md:grid-cols-[1.2fr_1.5fr_120px]">
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`block-title-${block.id}`}>Block Name</Label>
-                    <Input
-                      id={`block-title-${block.id}`}
-                      value={block.title}
-                      onChange={(event) => updateDraftBlock(index, "title", event.target.value)}
-                      placeholder={`Block ${index + 1}`}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`block-purpose-${block.id}`}>Purpose</Label>
-                    <Input
-                      id={`block-purpose-${block.id}`}
-                      value={block.purpose}
-                      onChange={(event) => updateDraftBlock(index, "purpose", event.target.value)}
-                      placeholder="What this block is for"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`block-duration-${block.id}`}>Minutes</Label>
-                    <Input
-                      id={`block-duration-${block.id}`}
-                      type="number"
-                      min={15}
-                      max={240}
-                      step={15}
-                      value={String(block.duration)}
-                      onChange={(event) => updateDraftBlock(index, "duration", event.target.value)}
-                    />
-                  </div>
+            <Button onClick={() => setActiveModule("weekly-plan")}>Set weekly plan</Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock3 className="h-4 w-4" />
+                Add Time Block
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr_120px_120px_auto]">
+                <div className="space-y-2">
+                  <Label>Project</Label>
+                  <Select value={projectId || "none"} onValueChange={(value) => setProjectId(value === "none" ? "" : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select allocated project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select allocated project</SelectItem>
+                      {allowedProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Button type="button" variant="outline" onClick={resetExecutionBlocks}>
-                Reset Defaults
-              </Button>
-              <Button type="button" onClick={saveExecutionBlocks}>
-                Save Structure
-              </Button>
-            </div>
+                <div className="space-y-2">
+                  <Label>Day</Label>
+                  <Select value={selectedDay} onValueChange={setSelectedDay}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {weekDays.map((day) => (
+                        <SelectItem key={day.iso} value={day.iso}>
+                          {day.label} {day.dayNumber}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Start</Label>
+                  <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>End</Label>
+                  <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleAddTimeBlock}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add block
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="block-description">Block description</Label>
+                <Input
+                  id="block-description"
+                  value={taskDescription}
+                  onChange={(event) => setTaskDescription(event.target.value)}
+                  placeholder="What exactly gets done in this block?"
+                />
+              </div>
+
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">This Day&apos;s Blocks</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {dayBlocks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No blocks scheduled for this day yet.</p>
+                ) : (
+                  dayBlocks.map((block) => {
+                    const project = projects.find((item) => item.id === block.projectId)
+                    return (
+                      <div key={block.id} className="space-y-3 rounded-xl border border-border/70 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{block.taskDescription}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {project?.title ?? "Unknown project"} · {block.startTime} - {block.endTime}
+                            </p>
+                          </div>
+                          <Badge variant={block.status === "done" ? "default" : "outline"}>{block.status}</Badge>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-[140px_140px_auto]">
+                          <div className="space-y-2">
+                            <Label>Actual hours</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.25}
+                              value={block.actualHours ?? block.plannedHours}
+                              onChange={(event) => updateTimeBlock(block.id, { actualHours: Number(event.target.value) || 0 })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Status</Label>
+                            <Select value={block.status} onValueChange={(value) => updateTimeBlock(block.id, { status: value as "planned" | "done" | "missed" })}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="planned">Planned</SelectItem>
+                                <SelectItem value="done">Done</SelectItem>
+                                <SelectItem value="missed">Missed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-end">
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                updateTimeBlock(block.id, {
+                                  status: "done",
+                                  actualHours: block.actualHours ?? block.plannedHours,
+                                })
+                              }
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Mark done
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Project Hour Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {projectHours.map((item) => {
+                  const project = projects.find((projectEntry) => projectEntry.id === item.projectId)
+                  return (
+                    <div key={item.projectId} className="rounded-xl border border-border/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">{project?.title ?? "Unknown project"}</p>
+                        <Badge variant="outline">{item.priority}</Badge>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                        <HourMetric label="Allocated" value={`${item.allocatedHours}h`} />
+                        <HourMetric label="Planned" value={`${item.plannedHours}h`} />
+                        <HourMetric label="Actual" value={`${item.actualHours}h`} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
-    </Tabs>
+        </>
+      )}
+    </div>
   )
 }
 
-function PomodoroTimer() {
-  const [mode, setMode] = useState<"work" | "break">("work")
-  const [timeLeft, setTimeLeft] = useState(POMODORO_WORK)
-  const [running, setRunning] = useState(false)
-  const [completedPomodoros, setCompletedPomodoros] = useState(0)
-
-  const totalTime = mode === "work" ? POMODORO_WORK : POMODORO_BREAK
-  const progress = ((totalTime - timeLeft) / totalTime) * 100
-  const minutes = Math.floor(timeLeft / 60)
-  const seconds = timeLeft % 60
-
-  const handleComplete = useCallback(() => {
-    if (mode === "work") {
-      setCompletedPomodoros((p) => p + 1)
-      setMode("break")
-      setTimeLeft(POMODORO_BREAK)
-    } else {
-      setMode("work")
-      setTimeLeft(POMODORO_WORK)
-    }
-    setRunning(false)
-  }, [mode])
-
-  useEffect(() => {
-    if (!running) return
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleComplete()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [running, handleComplete])
-
-  function reset() {
-    setRunning(false)
-    setTimeLeft(mode === "work" ? POMODORO_WORK : POMODORO_BREAK)
-  }
-
+function HourMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mx-auto max-w-sm">
-      <Card>
-        <CardContent className="flex flex-col items-center gap-6 p-8">
-          <div className="flex items-center gap-2">
-            <Timer className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              {mode === "work" ? "Focus Time" : "Break Time"}
-            </span>
-          </div>
-
-          {/* Timer circle */}
-          <div className="relative flex h-48 w-48 items-center justify-center">
-            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 200 200">
-              <circle
-                cx="100"
-                cy="100"
-                r="90"
-                fill="none"
-                className="stroke-secondary"
-                strokeWidth="8"
-              />
-              <circle
-                cx="100"
-                cy="100"
-                r="90"
-                fill="none"
-                className={mode === "work" ? "stroke-primary" : "stroke-chart-2"}
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 90}`}
-                strokeDashoffset={`${2 * Math.PI * 90 * (1 - progress / 100)}`}
-                style={{ transition: "stroke-dashoffset 0.5s ease" }}
-              />
-            </svg>
-            <div className="z-10 text-center">
-              <p className="font-mono text-4xl font-bold tabular-nums text-foreground">
-                {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-              </p>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={reset}
-              aria-label="Reset timer"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button
-              size="lg"
-              onClick={() => setRunning(!running)}
-              className="gap-2 px-8"
-            >
-              {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              {running ? "Pause" : "Start"}
-            </Button>
-          </div>
-
-          {/* Stats */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>Completed today: <strong className="text-foreground">{completedPomodoros}</strong></span>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-base font-semibold">{value}</p>
     </div>
   )
 }

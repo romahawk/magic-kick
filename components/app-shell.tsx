@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar"
 import { BottomNav } from "./bottom-nav"
 import { TopBar } from "./top-bar"
 import { CommandCenter } from "./modules/command-center"
+import { WeeklyPlanModule } from "./modules/weekly-plan-module"
 import { GoalsModule } from "./modules/goals-module"
 import { TodoModule } from "./modules/todo-module"
 import { ProjectsModule } from "./modules/projects-module"
@@ -17,6 +18,7 @@ import { ErrorBoundary } from "./error-boundary"
 
 const MODULE_MAP = {
   "command-center": CommandCenter,
+  "weekly-plan": WeeklyPlanModule,
   goals: GoalsModule,
   todo: TodoModule,
   projects: ProjectsModule,

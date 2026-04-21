@@ -1,39 +1,88 @@
 # Sprint Backlog
 
-**Sprint window:** 2026-03-02 to 2026-03-15
-**Status:** Active
+**Sprint window:** 2026-03-31 to 2026-04-13
+**Status:** Planned
+**Theme:** Weekly Execution OS - foundation and control layer
 
 ---
 
-## Issue 12 — Harden repository workflow automation
+## Priority Order
 
-**Outcome:** The repo enforces the same standards described in the docs.
-
-### Acceptance Criteria
-- [ ] CI runs both `npm run lint` and `npm run build` on every pull request
-- [ ] A policy-check workflow validates required repo files and docs on pull requests
-- [ ] A Monday weekly-sync workflow opens a planning issue automatically
+1. Weekly allocation architecture
+2. Weekly planning UI
+3. Execution tracking foundation
+4. Review loop scaffolding
 
 ---
 
-## Issue 13 — Finish repository operating docs
+## Planned Issues
 
-**Outcome:** A new contributor or future AI session can resume work without tribal knowledge.
+### Issue #36 - Weekly Execution OS: add weekly execution domain models and store slice
+
+**Outcome:** The app has first-class weekly execution entities in local state.
 
 ### Acceptance Criteria
-- [ ] `CLAUDE.md` defines AI role boundaries and commit gates
-- [ ] `docs/DAILY_CHECKLIST.md` exists with start-of-day and end-of-day checks
-- [ ] `docs/NEXT_SESSION_START.md` exists with ordered startup steps
-- [ ] `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` lists workflow files and usage
+- [ ] `WeeklyPlan`, `WeeklyAllocation`, `TimeBlock`, `ExecutionLog`, and `WeeklyReview` interfaces exist
+- [ ] Zustand store supports CRUD operations for the new entities
+- [ ] Store migration preserves existing user data safely
+- [ ] New entities fit the current sync metadata pattern
 
 ---
 
-## Issue 14 — Close README compliance gaps
+### Issue #37 - Weekly Execution OS: extend Firestore sync schema for new execution entities
 
-**Outcome:** The README reflects the real project status and local developer workflow.
+**Outcome:** Weekly execution data persists through the current offline-first sync layer.
 
 ### Acceptance Criteria
-- [ ] README includes a 30-second pitch and current status section
-- [ ] README documents `npm install`, `npm run dev`, `npm run build`, and `npm run test`
-- [ ] README includes a documentation index linking core repo docs
-- [ ] Deployment section states current hosting status and target platform
+- [ ] Sync collection typing includes weekly plans, time blocks, execution logs, and weekly reviews
+- [ ] Firestore adapters can pull and push the new collections
+- [ ] Existing user-scoped storage shape remains intact for this phase
+- [ ] New documents preserve created/updated timestamp behavior
+
+---
+
+### Issue #35 - Weekly Execution OS: build weekly planning constraints and selectors
+
+**Outcome:** Allocation rules are enforced in code before UI polish.
+
+### Acceptance Criteria
+- [ ] Capacity cannot be exceeded
+- [ ] No more than 3 projects can be active in a weekly plan
+- [ ] Each allocated project requires hours, priority, and weekly outcome
+- [ ] Derived totals exist for allocated, remaining, planned, and actual hours
+
+---
+
+### Issue #33 - Weekly Execution OS: build Weekly Plan screen with hard capacity guardrails
+
+**Outcome:** Users can create a valid weekly plan without overcommitting.
+
+### Acceptance Criteria
+- [ ] Weekly Plan screen exists in the app shell
+- [ ] UI shows total capacity, allocated hours, and remaining hours
+- [ ] UI blocks invalid plans instead of merely warning
+- [ ] Weekly outcome is assigned inside the weekly allocation workflow
+
+---
+
+### Issue #38 - Weekly Execution OS: refactor Command Center and Schedule around weekly allocation
+
+**Outcome:** Daily execution surfaces reflect the active weekly plan.
+
+### Acceptance Criteria
+- [ ] Command Center reads from active weekly plan
+- [ ] Schedule only creates blocks against allocated projects
+- [ ] Per-project `allocated / planned / actual` status is visible
+- [ ] Quick execution actions remain low-friction
+
+---
+
+### Issue #34 - Weekly Execution OS: build weekly review loop
+
+**Outcome:** Every week ends with explicit project decisions.
+
+### Acceptance Criteria
+- [ ] Weekly review UI exists
+- [ ] Each allocated project records outcome achieved yes/no
+- [ ] Planned vs actual is visible during review
+- [ ] Review requires continue, adjust, or remove decision
