@@ -112,6 +112,11 @@ export function selectTimeBlocksForWeek(timeBlocks: TimeBlock[], weekPlanId?: st
   return timeBlocks.filter((block) => !block.deleted && block.weekPlanId === weekPlanId)
 }
 
+export function selectTimeBlocksForDates(timeBlocks: TimeBlock[], dayISOList: string[]) {
+  const dates = new Set(dayISOList)
+  return timeBlocks.filter((block) => !block.deleted && dates.has(block.dateISO))
+}
+
 export function selectTimeBlocksForDay(timeBlocks: TimeBlock[], dateISO: string, weekPlanId?: string) {
   return selectTimeBlocksForWeek(timeBlocks, weekPlanId)
     .filter((block) => block.dateISO === dateISO)
@@ -141,11 +146,11 @@ export function selectProjectHours(plan: WeeklyPlan | undefined, timeBlocks: Tim
   })
 }
 
-export function buildExecutionLogId(weekPlanId: string, projectId: string, dateISO: string) {
-  return `${weekPlanId}:${projectId}:${dateISO}`
+export function buildExecutionLogId(weekPlanId: string, projectId: string | undefined, dateISO: string) {
+  return `${weekPlanId}:${projectId ?? ""}:${dateISO}`
 }
 
-export function buildExecutionLogFromBlocks(weekPlanId: string, projectId: string, dateISO: string, blocks: TimeBlock[]): ExecutionLog {
+export function buildExecutionLogFromBlocks(weekPlanId: string, projectId: string | undefined, dateISO: string, blocks: TimeBlock[]): ExecutionLog {
   const relevantBlocks = blocks.filter(
     (block) => !block.deleted && block.weekPlanId === weekPlanId && block.projectId === projectId && block.dateISO === dateISO
   )
@@ -154,7 +159,7 @@ export function buildExecutionLogFromBlocks(weekPlanId: string, projectId: strin
   return {
     id: buildExecutionLogId(weekPlanId, projectId, dateISO),
     weekPlanId,
-    projectId,
+    projectId: projectId ?? "",
     dateISO,
     plannedHours,
     actualHours,

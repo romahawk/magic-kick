@@ -102,7 +102,7 @@ export interface WeeklyPlan extends SyncFields {
 export interface TimeBlock extends SyncFields {
   id: string
   weekPlanId: string
-  projectId: string
+  projectId?: string
   dateISO: string
   startTime: string
   endTime: string
@@ -231,7 +231,6 @@ export interface SyncState {
 
 export type ModuleId =
   | "command-center"
-  | "weekly-plan"
   | "goals"
   | "todo"
   | "projects"
