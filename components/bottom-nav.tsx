@@ -29,7 +29,7 @@ export function BottomNav() {
       role="navigation"
       aria-label="Bottom navigation"
     >
-      <ul className="flex items-center justify-around px-1 py-1.5 [padding-bottom:calc(env(safe-area-inset-bottom)+0.375rem)]">
+      <ul className="flex items-center justify-around px-1 py-1.5 pb-[calc(env(safe-area-inset-bottom)+0.375rem)]">
         {BOTTOM_ITEMS.map((item) => (
           <li key={item.id}>
             <button
