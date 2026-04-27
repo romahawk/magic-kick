@@ -1753,7 +1753,7 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             })
             nextTasks = [...s.tasks, newTask]
-            tasksPending = { ...tasksPending, [`block-${id}`]: newTask.clientUpdatedAt ?? ts }
+            tasksPending = { ...tasksPending, [`block-${id}`]: ts }
           } else if (linkedTaskId) {
             const titleChanged = existingBlock.taskDescription !== block.taskDescription
             const statusChanged = existingBlock.status !== block.status
