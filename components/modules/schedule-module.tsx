@@ -46,6 +46,14 @@ function toY(time: string) {
   return ((toMin(time) - DAY_START * 60) / 60) * HOUR_PX
 }
 
+function fmtOverrun(diffHours: number) {
+  const mins = Math.round(diffHours * 60)
+  if (mins < 60) return `+${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `+${h}h ${m}m` : `+${h}h`
+}
+
 function yToMin(y: number) {
   return snap(DAY_START * 60 + (y / HOUR_PX) * 60)
 }
@@ -433,6 +441,9 @@ export function ScheduleModule() {
                           >
                             <p className="truncate font-medium leading-tight">{block.taskDescription}</p>
                             <p className="truncate opacity-75">{displayStart}–{displayEnd}</p>
+                            {block.status === "done" && block.actualHours != null && block.actualHours > block.plannedHours ? (
+                              <p className="mt-0.5 text-[10px] font-semibold text-amber-400">{fmtOverrun(block.actualHours - block.plannedHours)} over</p>
+                            ) : null}
                             {block.status === "done" && (
                               <CheckCircle2 className="absolute right-1 top-1 h-3 w-3" />
                             )}

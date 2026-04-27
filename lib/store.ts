@@ -642,9 +642,27 @@ export const useAppStore = create<AppState>()(
         const toggled = current.tasks.find((t) => t.id === id)
         if (!toggled) return
 
+        const newCompleted = !toggled.completed
         const tasks = current.tasks.map((t) =>
-          t.id === id ? { ...t, completed: !t.completed, clientUpdatedAt: ts, deleted: false } : t
+          t.id === id ? { ...t, completed: newCompleted, clientUpdatedAt: ts, deleted: false } : t
         )
+
+        // Sync completion to linked TimeBlock
+        const linkedBlock = current.timeBlocks.find((b) => !b.deleted && b.linkedTaskId === id)
+        let nextTimeBlocks = current.timeBlocks
+        let nextExecutionLogs = current.executionLogs
+        let timeBlocksPending = current.sync.pending.timeBlocks
+        let executionLogsPending = current.sync.pending.executionLogs
+        if (linkedBlock) {
+          const updatedBlock = { ...linkedBlock, status: (newCompleted ? "done" : "planned") as "done" | "planned", clientUpdatedAt: ts }
+          nextTimeBlocks = current.timeBlocks.map((b) => b.id === linkedBlock.id ? updatedBlock : b)
+          timeBlocksPending = { ...timeBlocksPending, [linkedBlock.id]: ts }
+          const nextLog = touchEntity(buildExecutionLogFromBlocks(linkedBlock.weekPlanId, linkedBlock.projectId, linkedBlock.dateISO, nextTimeBlocks))
+          nextExecutionLogs = current.executionLogs.some((e) => e.id === nextLog.id)
+            ? current.executionLogs.map((e) => e.id === nextLog.id ? nextLog : e)
+            : [...current.executionLogs, nextLog]
+          executionLogsPending = { ...executionLogsPending, [nextLog.id]: nextLog.clientUpdatedAt ?? ts }
+        }
 
         let profile = normalizeProfileForToday(current.profile, new Date())
         if (!toggled.completed) {
@@ -663,6 +681,8 @@ export const useAppStore = create<AppState>()(
 
         set((state) => ({
           tasks,
+          timeBlocks: nextTimeBlocks,
+          executionLogs: nextExecutionLogs,
           profile: evaluated.profile,
           achievements: evaluated.achievements,
           sync: {
@@ -671,6 +691,8 @@ export const useAppStore = create<AppState>()(
               ...state.sync.pending,
               profile: { ...state.sync.pending.profile, profile: evaluated.profile.clientUpdatedAt ?? ts },
               tasks: { ...state.sync.pending.tasks, [id]: ts },
+              timeBlocks: timeBlocksPending,
+              executionLogs: executionLogsPending,
               achievements: evaluated.achievements.reduce<Record<string, number>>((acc, item) => {
                 acc[item.id] = item.clientUpdatedAt ?? ts
                 return acc
@@ -1688,10 +1710,16 @@ export const useAppStore = create<AppState>()(
         const ts = now()
         const id = block.id ?? generateId()
         const plannedHours = block.plannedHours ?? calculateTimeBlockHours(block.startTime, block.endTime)
+
+        const existingBlock = get().timeBlocks.find((b) => b.id === id)
+        const isNew = !existingBlock
+        const linkedTaskId = isNew ? `block-${id}` : existingBlock.linkedTaskId
+
         const item = touchEntity({
           ...block,
           id,
           plannedHours,
+          linkedTaskId,
           deleted: false,
         })
         set((s) => {
@@ -1704,15 +1732,55 @@ export const useAppStore = create<AppState>()(
           const executionLogs = s.executionLogs.some((entry) => entry.id === nextLog.id)
             ? s.executionLogs.map((entry) => (entry.id === nextLog.id ? nextLog : entry))
             : [...s.executionLogs, nextLog]
+
+          let nextTasks = s.tasks
+          let tasksPending = s.sync.pending.tasks
+
+          if (isNew) {
+            const category = s.profile.taskCategories?.[0] ?? "General"
+            const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
+            const newTask = touchEntity({
+              id: `block-${id}`,
+              title: block.taskDescription,
+              category,
+              lane: "backlog" as TaskLane,
+              order: maxOrder + 1,
+              dueDate: block.dateISO,
+              estimateMin: Math.round(plannedHours * 60),
+              completed: false,
+              linkedProjectId: block.projectId,
+              xpValue: calculateTaskXP({ category, estimateMin: Math.round(plannedHours * 60), pomodorosPlanned: undefined, linkedProjectId: block.projectId }),
+              deleted: false,
+            })
+            nextTasks = [...s.tasks, newTask]
+            tasksPending = { ...tasksPending, [`block-${id}`]: newTask.clientUpdatedAt ?? ts }
+          } else if (linkedTaskId) {
+            const titleChanged = existingBlock.taskDescription !== block.taskDescription
+            const statusChanged = existingBlock.status !== block.status
+            if (titleChanged || statusChanged) {
+              nextTasks = s.tasks.map((t) => {
+                if (t.id !== linkedTaskId) return t
+                const updates: Partial<Task> = {}
+                if (titleChanged) updates.title = block.taskDescription
+                if (statusChanged) updates.completed = block.status === "done"
+                return touchEntity({ ...t, ...updates })
+              })
+              const updated = nextTasks.find((t) => t.id === linkedTaskId)
+              if (updated) tasksPending = { ...tasksPending, [linkedTaskId]: updated.clientUpdatedAt ?? ts }
+            }
+          }
+
           return {
             timeBlocks: nextTimeBlocks,
             executionLogs,
+            tasks: nextTasks,
             sync: {
               ...s.sync,
               pending: {
                 ...s.sync.pending,
                 timeBlocks: { ...s.sync.pending.timeBlocks, [id]: item.clientUpdatedAt ?? ts },
                 executionLogs: { ...s.sync.pending.executionLogs, [nextLog.id]: nextLog.clientUpdatedAt ?? ts },
+                tasks: tasksPending,
               },
             },
           }
@@ -1745,15 +1813,26 @@ export const useAppStore = create<AppState>()(
           const executionLogs = s.executionLogs.some((entry) => entry.id === nextLog.id)
             ? s.executionLogs.map((entry) => (entry.id === nextLog.id ? nextLog : entry))
             : [...s.executionLogs, nextLog]
+
+          const { linkedTaskId } = target
+          const nextTasks = linkedTaskId
+            ? s.tasks.map((t) => t.id === linkedTaskId ? { ...t, deleted: true, clientUpdatedAt: ts } : t)
+            : s.tasks
+          const tasksPending = linkedTaskId
+            ? { ...s.sync.pending.tasks, [linkedTaskId]: ts }
+            : s.sync.pending.tasks
+
           return {
             timeBlocks: nextTimeBlocks,
             executionLogs,
+            tasks: nextTasks,
             sync: {
               ...s.sync,
               pending: {
                 ...s.sync.pending,
                 timeBlocks: { ...s.sync.pending.timeBlocks, [id]: ts },
                 executionLogs: { ...s.sync.pending.executionLogs, [nextLog.id]: nextLog.clientUpdatedAt ?? ts },
+                tasks: tasksPending,
               },
             },
           }

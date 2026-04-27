@@ -110,6 +110,7 @@ export interface TimeBlock extends SyncFields {
   plannedHours: number
   actualHours?: number
   status: TimeBlockStatus
+  linkedTaskId?: string
 }
 
 export interface ExecutionLog extends SyncFields {

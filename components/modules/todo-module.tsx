@@ -10,25 +10,25 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Archive, ChevronDown, ChevronRight, Clock, Focus, LayoutList, Pencil, Rows3, Save, Search, Tags, Trash2, Zap } from "lucide-react"
+import { Archive, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Tags, Trash2, Zap } from "lucide-react"
 import type { Task, TaskCategory, TaskLane } from "@/lib/types"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
-const TASK_LANES: Array<{ id: TaskLane; title: string; description: string }> = [
-  { id: "daily-focus", title: "Daily Focus", description: "Only the few tasks that deserve today." },
-  { id: "backlog", title: "Backlog", description: "Important work waiting for a focus slot." },
-  { id: "parking-lot", title: "Parking Lot", description: "Ideas and tasks not needed this month." },
+const TASK_LANES: Array<{ id: TaskLane; title: string; description: string; icon: ElementType }> = [
+  { id: "backlog", title: "Backlog", description: "Important work waiting for a focus slot.", icon: LayoutList },
+  { id: "daily-focus", title: "Daily Focus", description: "Only the few tasks that deserve today.", icon: Focus },
+  { id: "parking-lot", title: "Parking Lot", description: "Ideas and tasks not needed this month.", icon: Archive },
 ]
 
 export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
+  const allTimeBlocks = useAppStore((s) => s.timeBlocks)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
@@ -46,17 +46,21 @@ export function TodoModule() {
   const categoryColors = taskCategoryColors ?? {}
   const tasks = useMemo(() => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [allTasks])
 
-  const [viewMode, setViewMode] = useState<"list" | "board">("list")
+  const taskTimeSlots = useMemo(() => {
+    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }> = {}
+    for (const block of allTimeBlocks) {
+      if (!block.deleted && block.linkedTaskId) {
+        map[block.linkedTaskId] = { startTime: block.startTime, endTime: block.endTime, plannedHours: block.plannedHours, actualHours: block.actualHours, status: block.status }
+      }
+    }
+    return map
+  }, [allTimeBlocks])
+
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
   const [sortBy, setSortBy] = useState("date-asc")
   const [archiveOpen, setArchiveOpen] = useState(false)
-  const [openLanes, setOpenLanes] = useState<Record<TaskLane, boolean>>({
-    "daily-focus": true,
-    backlog: true,
-    "parking-lot": true,
-  })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -103,24 +107,9 @@ export function TodoModule() {
 
   const openTasks = useMemo(() => sortedTasks.filter((task) => !task.completed), [sortedTasks])
   const archivedTasks = useMemo(() => sortedTasks.filter((task) => task.completed), [sortedTasks])
-  const dailyFocusTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus"), [openTasks])
   const backlogTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "backlog"), [openTasks])
+  const dailyFocusTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus"), [openTasks])
   const parkingLotTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "parking-lot"), [openTasks])
-
-  const boardTasks = useMemo(() => {
-    if (filterStatus === "completed") return archivedTasks
-    if (filterStatus === "active") return openTasks
-    return sortedTasks
-  }, [archivedTasks, filterStatus, openTasks, sortedTasks])
-
-  const groupedByCategory = useMemo(() => {
-    const map: Record<string, Task[]> = {}
-    for (const task of boardTasks) {
-      if (!map[task.category]) map[task.category] = []
-      map[task.category].push(task)
-    }
-    return map
-  }, [boardTasks])
 
   function openTask(task: Task) {
     setSelectedTask(task)
@@ -161,11 +150,32 @@ export function TodoModule() {
     setIsEditing(false)
   }
 
-  function toggleLane(lane: TaskLane) {
-    setOpenLanes((prev) => ({
-      ...prev,
-      [lane]: !prev[lane],
-    }))
+  function makeDragHandlers(lane: TaskLane) {
+    return {
+      onDragStart: (taskId: string) => setDraggedTaskId(taskId),
+      onDropOnTask: (targetTask: Task) => {
+        if (!draggedTaskId || draggedTaskId === targetTask.id) return
+        const draggedLane = tasks.find((t) => t.id === draggedTaskId)?.lane ?? "backlog"
+        if ((targetTask.lane ?? "backlog") === draggedLane) {
+          if (sortBy === "manual") reorderTasks(draggedTaskId, targetTask.id)
+        } else {
+          handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
+        }
+        setDraggedTaskId(null)
+      },
+      onDropOnLane: () => {
+        if (!draggedTaskId) return
+        handleMoveTask(draggedTaskId, lane)
+        setDraggedTaskId(null)
+      },
+      onDragEnd: () => setDraggedTaskId(null),
+    }
+  }
+
+  const laneTasks: Record<TaskLane, Task[]> = {
+    backlog: backlogTasks,
+    "daily-focus": dailyFocusTasks,
+    "parking-lot": parkingLotTasks,
   }
 
   return (
@@ -175,8 +185,9 @@ export function TodoModule() {
         <p className="text-sm text-muted-foreground">{openTasks.length} open tasks across focus, backlog, and parking lot</p>
       </div>
 
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 basis-full sm:min-w-[260px] sm:flex-1">
+        <div className="relative min-w-0 basis-full sm:min-w-65 sm:flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
@@ -184,7 +195,7 @@ export function TodoModule() {
           <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
-            {categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}
+            {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -203,8 +214,6 @@ export function TodoModule() {
             <SelectItem value="manual">Manual order</SelectItem>
           </SelectContent>
         </Select>
-        <IconToggleButton active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lane View" icon={LayoutList} />
-        <IconToggleButton active={viewMode === "board"} onClick={() => setViewMode("board")} label="By Category" icon={Rows3} />
         <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -221,11 +230,7 @@ export function TodoModule() {
                 <Label htmlFor="new-category">Add Category</Label>
                 <div className="flex gap-2">
                   <Input id="new-category" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Category name" />
-                  <Button type="button" onClick={() => {
-                    if (!newCategory.trim()) return
-                    addCategory(newCategory)
-                    setNewCategory("")
-                  }}>Add</Button>
+                  <Button type="button" onClick={() => { if (!newCategory.trim()) return; addCategory(newCategory); setNewCategory("") }}>Add</Button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -233,30 +238,25 @@ export function TodoModule() {
                 <div className="grid grid-cols-3 gap-2">
                   <Select value={renameFrom} onValueChange={setRenameFrom}>
                     <SelectTrigger><SelectValue placeholder="Current" /></SelectTrigger>
-                    <SelectContent>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent>
+                    <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} placeholder="New name" />
-                  <Button type="button" variant="outline" onClick={() => {
-                    if (!renameFrom || !renameTo.trim()) return
-                    renameCategory(renameFrom, renameTo)
-                    setRenameFrom("")
-                    setRenameTo("")
-                  }}>Rename</Button>
+                  <Button type="button" variant="outline" onClick={() => { if (!renameFrom || !renameTo.trim()) return; renameCategory(renameFrom, renameTo); setRenameFrom(""); setRenameTo("") }}>Rename</Button>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Delete Category</Label>
                 <div className="flex flex-wrap gap-2">
-                  {categories.map((category) => <Button key={category} type="button" variant="outline" size="sm" onClick={() => removeCategory(category)} disabled={categories.length <= 1}>Delete {category}</Button>)}
+                  {categories.map((c) => <Button key={c} type="button" variant="outline" size="sm" onClick={() => removeCategory(c)} disabled={categories.length <= 1}>Delete {c}</Button>)}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Category Colors</Label>
                 <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div key={category} className="flex items-center justify-between rounded-md border border-border p-2">
-                      <span className="text-sm">{category}</span>
-                      <input type="color" value={categoryColors[category] ?? "#64748b"} onChange={(e) => setCategoryColor(category, e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0" aria-label={`Pick color for ${category}`} />
+                  {categories.map((c) => (
+                    <div key={c} className="flex items-center justify-between rounded-md border border-border p-2">
+                      <span className="text-sm">{c}</span>
+                      <input type="color" value={categoryColors[c] ?? "#64748b"} onChange={(e) => setCategoryColor(c, e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0" aria-label={`Pick color for ${c}`} />
                     </div>
                   ))}
                 </div>
@@ -266,95 +266,58 @@ export function TodoModule() {
         </Dialog>
       </div>
 
+      {/* Row 1 — Summary cards: Backlog | Daily Focus | Parking Lot */}
       <div className="grid gap-3 md:grid-cols-3">
-        <LaneSummaryCard title="Daily Focus" count={dailyFocusTasks.length} limit={`${dailyFocusLimit} max`} description="Only the few tasks that deserve today." icon={Focus} tone={dailyFocusTasks.length > dailyFocusLimit ? "warning" : "default"} />
-        <LaneSummaryCard title="Backlog" count={backlogTasks.length} limit="Queue" description="Important work waiting for a focus slot." icon={LayoutList} tone="default" />
-        <LaneSummaryCard title="Parking Lot" count={parkingLotTasks.length} limit="Later" description="Ideas and tasks not needed this month." icon={Archive} tone="muted" />
+        <LaneSummaryCard title="Backlog" count={backlogTasks.length} badge="Queue" description="Important work waiting for a focus slot." icon={LayoutList} tone="default" />
+        <LaneSummaryCard title="Daily Focus" count={dailyFocusTasks.length} badge={`${dailyFocusLimit} max`} description="Only the few tasks that deserve today." icon={Focus} tone={dailyFocusTasks.length > dailyFocusLimit ? "warning" : "default"} />
+        <LaneSummaryCard title="Parking Lot" count={parkingLotTasks.length} badge="Later" description="Ideas and tasks not needed this month." icon={Archive} tone="muted" />
       </div>
 
-      {viewMode === "list" ? (
-        <div className="flex flex-col gap-4">
-          {filterStatus !== "completed" ? (
-            <>
-              <TaskLaneSection lane="daily-focus" open={openLanes["daily-focus"]} onToggleOpen={() => toggleLane("daily-focus")} tasks={dailyFocusTasks} limit={dailyFocusLimit} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
-                if (!draggedTaskId || draggedTaskId === targetTask.id) return
-                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
-                  if (sortBy !== "manual") return
-                  reorderTasks(draggedTaskId, targetTask.id)
-                }
-                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
-                setDraggedTaskId(null)
-              }} onDropOnLane={() => {
-                if (!draggedTaskId) return
-                handleMoveTask(draggedTaskId, "daily-focus")
-                setDraggedTaskId(null)
-              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
-              <TaskLaneSection lane="backlog" open={openLanes.backlog} onToggleOpen={() => toggleLane("backlog")} tasks={backlogTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
-                if (!draggedTaskId || draggedTaskId === targetTask.id) return
-                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
-                  if (sortBy !== "manual") return
-                  reorderTasks(draggedTaskId, targetTask.id)
-                }
-                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
-                setDraggedTaskId(null)
-              }} onDropOnLane={() => {
-                if (!draggedTaskId) return
-                handleMoveTask(draggedTaskId, "backlog")
-                setDraggedTaskId(null)
-              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
-              <TaskLaneSection lane="parking-lot" open={openLanes["parking-lot"]} onToggleOpen={() => toggleLane("parking-lot")} tasks={parkingLotTasks} categoryColors={categoryColors} onToggle={toggleTask} onSelect={openTask} onDragStart={(taskId) => setDraggedTaskId(taskId)} onDropOnTask={(targetTask) => {
-                if (!draggedTaskId || draggedTaskId === targetTask.id) return
-                if ((targetTask.lane ?? "backlog") === (tasks.find((task) => task.id === draggedTaskId)?.lane ?? "backlog")) {
-                  if (sortBy !== "manual") return
-                  reorderTasks(draggedTaskId, targetTask.id)
-                }
-                else handleMoveTask(draggedTaskId, targetTask.lane ?? "backlog", targetTask.id)
-                setDraggedTaskId(null)
-              }} onDropOnLane={() => {
-                if (!draggedTaskId) return
-                handleMoveTask(draggedTaskId, "parking-lot")
-                setDraggedTaskId(null)
-              }} draggable={true} onDragEnd={() => setDraggedTaskId(null)} />
-            </>
-          ) : null}
-          {(filterStatus === "all" || filterStatus === "completed") && archivedTasks.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center justify-between text-sm">
-                  <span>Archive</span>
-                  <Button variant="outline" size="sm" onClick={() => setArchiveOpen((value) => !value)}>{archiveOpen ? "Hide" : "Show"} ({archivedTasks.length})</Button>
-                </CardTitle>
-              </CardHeader>
-              {archiveOpen ? <CardContent className="flex flex-col gap-2">{archivedTasks.map((task) => <TaskRow key={`arch-${task.id}`} task={task} categoryColor={categoryColors[task.category]} onToggle={toggleTask} onSelect={openTask} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} />)}</CardContent> : null}
-            </Card>
-          ) : null}
+      {/* Row 2 — Kanban columns: Backlog | Daily Focus | Parking Lot */}
+      {filterStatus !== "completed" ? (
+        <div className="grid gap-4 md:grid-cols-3 items-start">
+          {TASK_LANES.map((laneConfig) => {
+            const handlers = makeDragHandlers(laneConfig.id)
+            return (
+              <KanbanColumn
+                key={laneConfig.id}
+                lane={laneConfig.id}
+                tasks={laneTasks[laneConfig.id]}
+                limit={laneConfig.id === "daily-focus" ? dailyFocusLimit : undefined}
+                categoryColors={categoryColors}
+                taskTimeSlots={taskTimeSlots}
+                onToggle={toggleTask}
+                onSelect={openTask}
+                {...handlers}
+              />
+            )
+          })}
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category) => (
-            <Card key={category}>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: categoryColors[category] ?? "#64748b" }} />
-                  {category}
-                  <Badge variant="secondary" className="ml-auto text-[10px]">{groupedByCategory[category]?.length ?? 0}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1.5">
-                {(groupedByCategory[category] ?? []).map((task) => (
-                  <button key={task.id} onClick={() => openTask(task)} className={cn("flex items-center gap-2 rounded-md border border-border p-2 text-left text-sm transition-colors hover:bg-secondary/50", task.completed && "line-through opacity-50")}>
-                    <Checkbox checked={task.completed} onCheckedChange={() => toggleTask(task.id)} onClick={(e) => e.stopPropagation()} aria-label={`Complete ${task.title}`} />
-                    <span className="flex-1 truncate">{task.title}</span>
-                    <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge>
-                  </button>
-                ))}
-                {(!groupedByCategory[category] || groupedByCategory[category].length === 0) ? <p className="py-2 text-center text-xs text-muted-foreground">No tasks</p> : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      ) : null}
 
+      {/* Archive */}
+      {(filterStatus === "all" || filterStatus === "completed") && archivedTasks.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-sm">
+              <span>Archive</span>
+              <Button variant="outline" size="sm" onClick={() => setArchiveOpen((v) => !v)}>
+                <ChevronDown className={cn("mr-1 h-3 w-3 transition-transform", archiveOpen && "rotate-180")} />
+                {archiveOpen ? "Hide" : "Show"} ({archivedTasks.length})
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {archiveOpen ? (
+            <CardContent className="flex flex-col gap-2">
+              {archivedTasks.map((task) => (
+                <TaskCard key={`arch-${task.id}`} task={task} categoryColor={categoryColors[task.category]} onToggle={toggleTask} onSelect={openTask} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} showLane />
+              ))}
+            </CardContent>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {/* Task detail sheet */}
       <Sheet open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
         <SheetContent>
           <SheetHeader><SheetTitle>{selectedTask?.title}</SheetTitle></SheetHeader>
@@ -365,16 +328,16 @@ export function TodoModule() {
                   <div><Label htmlFor="edit-task-title">Title</Label><Input id="edit-task-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></div>
                   <div>
                     <Label>Category</Label>
-                    <Select value={categories.includes(editCategory) ? editCategory : categories[0] ?? "General"} onValueChange={(value) => setEditCategory(value as TaskCategory)}>
+                    <Select value={categories.includes(editCategory) ? editCategory : categories[0] ?? "General"} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent>
+                      <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Lane</Label>
-                    <Select value={editLane} onValueChange={(value) => setEditLane(value as TaskLane)}>
+                    <Select value={editLane} onValueChange={(v) => setEditLane(v as TaskLane)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{TASK_LANES.map((lane) => <SelectItem key={lane.id} value={lane.id}>{lane.title}</SelectItem>)}</SelectContent>
+                      <SelectContent>{TASK_LANES.map((l) => <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div><Label htmlFor="edit-task-due">Due date</Label><Input id="edit-task-due" type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
@@ -384,7 +347,6 @@ export function TodoModule() {
                   </div>
                 </div>
               ) : null}
-
               <div className="flex flex-wrap items-center gap-2">
                 <Badge style={{ backgroundColor: categoryColors[selectedTask.category] ?? "#334155", color: "#ffffff" }}>{selectedTask.category}</Badge>
                 <Badge variant="outline">{TASK_LANE_LABELS[selectedTask.lane ?? "backlog"]}</Badge>
@@ -402,24 +364,16 @@ export function TodoModule() {
               {selectedTask.estimateMin ? <p className="text-sm text-muted-foreground">Estimated: {selectedTask.estimateMin} min</p> : null}
               {selectedTask.pomodorosPlanned ? <p className="text-sm text-muted-foreground">Pomodoros planned: {selectedTask.pomodorosPlanned}</p> : null}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => {
-                  if (isEditing) saveTaskEdits()
-                  else {
-                    setTaskFormError(null)
-                    setIsEditing(true)
-                  }
-                }}>
+                <Button variant="outline" onClick={() => { if (isEditing) saveTaskEdits(); else { setTaskFormError(null); setIsEditing(true) } }}>
                   {isEditing ? <Save className="mr-1 h-4 w-4" /> : <Pencil className="mr-1 h-4 w-4" />}
                   {isEditing ? "Save" : "Edit"}
                 </Button>
-                <Button variant={selectedTask.completed ? "secondary" : "default"} onClick={() => {
-                  toggleTask(selectedTask.id)
-                  setSelectedTask(null)
-                }}>{selectedTask.completed ? "Mark Incomplete" : "Mark Complete"}</Button>
-                <Button variant="destructive" size="icon" onClick={() => {
-                  deleteTask(selectedTask.id)
-                  setSelectedTask(null)
-                }}><Trash2 className="h-4 w-4" /></Button>
+                <Button variant={selectedTask.completed ? "secondary" : "default"} onClick={() => { toggleTask(selectedTask.id); setSelectedTask(null) }}>
+                  {selectedTask.completed ? "Mark Incomplete" : "Mark Complete"}
+                </Button>
+                <Button variant="destructive" size="icon" onClick={() => { deleteTask(selectedTask.id); setSelectedTask(null) }}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           ) : null}
@@ -429,135 +383,153 @@ export function TodoModule() {
   )
 }
 
-function IconToggleButton({ active, onClick, label, icon: Icon }: { active: boolean; onClick: () => void; label: string; icon: ElementType }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button type="button" size="icon" variant={active ? "default" : "outline"} onClick={onClick} aria-label={label}>
-          <Icon className="h-4 w-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent sideOffset={8}>{label}</TooltipContent>
-    </Tooltip>
-  )
-}
+// ── Lane summary card (row 1) ────────────────────────────────────────────────
 
-function LaneSummaryCard({ title, count, limit, description, icon: Icon, tone }: { title: string; count: number; limit: string; description: string; icon: ElementType; tone: "default" | "warning" | "muted" }) {
+function LaneSummaryCard({ title, count, badge, description, icon: Icon, tone }: {
+  title: string; count: number; badge: string; description: string; icon: ElementType; tone: "default" | "warning" | "muted"
+}) {
   return (
     <Card className={cn(tone === "warning" && "border-amber-500/40 bg-amber-500/10", tone === "muted" && "border-border/60 bg-secondary/10")}>
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/60"><Icon className="h-4 w-4" /></div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2"><p className="font-medium">{title}</p><Badge variant="outline" className="text-[10px]">{limit}</Badge></div>
-          <p className="text-2xl font-semibold">{count}</p>
+      <CardContent className="flex items-center gap-2.5 px-4 py-2.5">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary/60">
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium">{title}</p>
+            <Badge variant="outline" className="text-[10px]">{badge}</Badge>
+          </div>
           <p className="text-xs text-muted-foreground">{description}</p>
         </div>
+        <p className="text-2xl font-semibold tabular-nums">{count}</p>
       </CardContent>
     </Card>
   )
 }
 
-function TaskLaneSection({
-  lane,
-  open,
-  onToggleOpen,
-  tasks,
-  categoryColors,
-  onToggle,
-  onSelect,
-  onDragStart,
-  onDropOnTask,
-  onDropOnLane,
-  draggable,
-  onDragEnd,
-  limit,
-}: {
-  lane: TaskLane
-  open: boolean
-  onToggleOpen: () => void
-  tasks: Task[]
-  categoryColors: Record<string, string>
-  onToggle: (id: string) => void
-  onSelect: (task: Task) => void
-  onDragStart: (taskId: string) => void
-  onDropOnTask: (task: Task) => void
-  onDropOnLane: () => void
-  draggable: boolean
-  onDragEnd: () => void
-  limit?: number
+// ── Kanban column (row 2) ────────────────────────────────────────────────────
+
+function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd }: {
+  lane: TaskLane; tasks: Task[]; limit?: number; categoryColors: Record<string, string>
+  taskTimeSlots: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }>
+  onToggle: (id: string) => void; onSelect: (task: Task) => void
+  onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
+  onDropOnLane: () => void; onDragEnd: () => void
 }) {
-  const config = TASK_LANES.find((item) => item.id === lane)
+  const config = TASK_LANES.find((l) => l.id === lane)
+  const atLimit = typeof limit === "number" && tasks.length >= limit
+
   return (
-    <Collapsible open={open} onOpenChange={onToggleOpen}>
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-3">
-            <CollapsibleTrigger asChild>
-              <button className="flex min-w-0 items-start gap-2 text-left">
-                {open ? <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}
-                <div>
-                  <CardTitle className="text-base">{config?.title ?? TASK_LANE_LABELS[lane]}</CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">{config?.description}</p>
-                </div>
-              </button>
-            </CollapsibleTrigger>
-            <div className="flex items-center gap-2">
-              {typeof limit === "number" ? <Badge variant="outline" className="text-[10px]">{tasks.length}/{limit}</Badge> : null}
-              <Badge variant="secondary" className="text-[10px]">{tasks.length}</Badge>
-            </div>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2 px-1">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm">{config?.title ?? lane}</p>
+          <p className="text-xs text-muted-foreground leading-snug">{config?.description}</p>
+        </div>
+        <div className="shrink-0">
+          {typeof limit === "number" ? (
+            <Badge variant={atLimit ? "destructive" : "outline"} className="text-[10px]">{tasks.length}/{limit}</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px]">{tasks.length}</Badge>
+          )}
+        </div>
+      </div>
+      <div
+        className="flex flex-col gap-2 min-h-45 max-h-[60vh] overflow-y-auto rounded-xl border-2 border-dashed border-border/50 p-2 transition-colors hover:border-border/80"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); onDropOnLane() }}
+      >
+        {tasks.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-10 text-xs text-muted-foreground select-none">
+            Drop tasks here
           </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent
-            className="flex flex-col gap-2"
-            onDragOver={(e) => {
-              if (!draggable) return
-              e.preventDefault()
-            }}
-            onDrop={(e) => {
-              if (!draggable) return
-              e.preventDefault()
-              onDropOnLane()
-            }}
-          >
-            {tasks.length === 0 ? <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">No tasks in this lane.</p> : null}
-            {tasks.map((task) => (
-              <TaskRow key={task.id} task={task} categoryColor={categoryColors[task.category]} onToggle={onToggle} onSelect={onSelect} onDragStart={onDragStart} onDropOnTask={onDropOnTask} draggable={draggable && !task.completed} onDragEnd={onDragEnd} />
-            ))}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+        ) : null}
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            categoryColor={categoryColors[task.category]}
+            timeSlot={taskTimeSlots[task.id]}
+            onToggle={onToggle}
+            onSelect={onSelect}
+            onDragStart={onDragStart}
+            onDropOnTask={onDropOnTask}
+            onDragEnd={onDragEnd}
+            draggable={!task.completed}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
-function TaskRow({ task, categoryColor, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd }: { task: Task; categoryColor?: string; onToggle: (id: string) => void; onSelect: (task: Task) => void; onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void; draggable?: boolean; onDragEnd: () => void }) {
+// ── Task card ────────────────────────────────────────────────────────────────
+
+function fmtTime(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number)
+  return `${h}:${String(m).padStart(2, "0")}`
+}
+
+function fmtOverrun(diffHours: number) {
+  const mins = Math.round(diffHours * 60)
+  if (mins < 60) return `+${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `+${h}h ${m}m` : `+${h}h`
+}
+
+function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd, showLane = false }: {
+  task: Task; categoryColor?: string; timeSlot?: { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }
+  onToggle: (id: string) => void; onSelect: (task: Task) => void
+  onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
+  draggable?: boolean; onDragEnd: () => void; showLane?: boolean
+}) {
   return (
     <div
-      className={cn("flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30", draggable ? "cursor-grab active:cursor-grabbing" : "", task.completed && "opacity-50")}
+      className={cn("flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30", draggable ? "cursor-grab active:cursor-grabbing" : "", task.completed && "opacity-50")}
       onClick={() => onSelect(task)}
       draggable={draggable}
       onDragStart={() => onDragStart(task.id)}
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault()
-        onDropOnTask(task)
-      }}
+      onDrop={(e) => { e.preventDefault(); onDropOnTask(task) }}
       onDragEnd={onDragEnd}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onSelect(task)}
     >
-      <Checkbox checked={task.completed} onCheckedChange={() => onToggle(task.id)} onClick={(e) => e.stopPropagation()} aria-label={`Complete ${task.title}`} />
-      <div className="min-w-0 flex-1">
-        <p className={cn("truncate text-sm font-medium", task.completed && "line-through")}>{task.title}</p>
-        <div className="mt-0.5 flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px]" style={categoryColor ? { backgroundColor: categoryColor, color: "#ffffff" } : undefined}>{task.category}</Badge>
-          <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge>
-          {task.dueDate ? <span className={cn("text-[10px] text-muted-foreground", isOverdue(task.dueDate) && "font-medium text-destructive")}>{isDueToday(task.dueDate) ? "Today" : task.dueDate}</span> : null}
-        </div>
+      <div className="flex items-start gap-2">
+        <Checkbox checked={task.completed} onCheckedChange={() => onToggle(task.id)} onClick={(e) => e.stopPropagation()} aria-label={`Complete ${task.title}`} className="mt-0.5 shrink-0" />
+        <p className={cn("flex-1 text-sm font-medium leading-snug", task.completed && "line-through")}>{task.title}</p>
       </div>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground"><Zap className="h-3 w-3" />{task.xpValue}</div>
+      <div className="ml-6 flex flex-wrap items-center gap-1.5">
+        <Badge variant="secondary" className="text-[10px]" style={categoryColor ? { backgroundColor: categoryColor, color: "#fff" } : undefined}>
+          {task.category}
+        </Badge>
+        {showLane ? <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge> : null}
+        {timeSlot ? (
+          <Badge variant="outline" className="gap-1 text-[10px] font-normal tabular-nums">
+            <Clock className="h-2.5 w-2.5" />{fmtTime(timeSlot.startTime)} – {fmtTime(timeSlot.endTime)}
+          </Badge>
+        ) : null}
+        {timeSlot?.status === "done" && timeSlot.actualHours != null && timeSlot.actualHours > timeSlot.plannedHours ? (
+          <Badge variant="outline" className="gap-1 text-[10px] font-medium tabular-nums border-amber-500/50 text-amber-500">
+            {fmtOverrun(timeSlot.actualHours - timeSlot.plannedHours)} over
+          </Badge>
+        ) : null}
+        {task.dueDate ? (
+          <span className={cn("text-[10px] text-muted-foreground", isOverdue(task.dueDate) && "font-medium text-destructive")}>
+            {isDueToday(task.dueDate) ? "Today" : task.dueDate}
+          </span>
+        ) : null}
+        {task.estimateMin && !timeSlot ? (
+          <Badge variant="secondary" className="gap-1 text-[10px]">
+            <Clock className="h-2.5 w-2.5" />{task.estimateMin}m
+          </Badge>
+        ) : null}
+        <span className="ml-auto flex items-center gap-0.5 text-[10px] text-muted-foreground">
+          <Zap className="h-2.5 w-2.5" />{task.xpValue}
+        </span>
+      </div>
     </div>
   )
 }
