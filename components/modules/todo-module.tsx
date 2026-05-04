@@ -346,7 +346,7 @@ export function TodoModule() {
 
       {/* Task detail sheet */}
       <Sheet open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
-        <SheetContent>
+        <SheetContent className="px-6">
           <SheetHeader><SheetTitle>{selectedTask?.title}</SheetTitle></SheetHeader>
           {selectedTask ? (
             <div className="mt-4 flex flex-col gap-4">
