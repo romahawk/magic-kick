@@ -29,6 +29,7 @@ const TASK_LANES: Array<{ id: TaskLane; title: string; description: string; icon
 export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
   const allTimeBlocks = useAppStore((s) => s.timeBlocks)
+  const allScheduleItems = useAppStore((s) => s.schedule)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
@@ -48,13 +49,23 @@ export function TodoModule() {
 
   const taskTimeSlots = useMemo(() => {
     const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }> = {}
+    for (const item of allScheduleItems) {
+      if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
+        map[item.linkedTaskId] = {
+          startTime: item.startISO.slice(11, 16),
+          endTime: item.endISO.slice(11, 16),
+          plannedHours: 0,
+          status: "planned",
+        }
+      }
+    }
     for (const block of allTimeBlocks) {
       if (!block.deleted && block.linkedTaskId) {
         map[block.linkedTaskId] = { startTime: block.startTime, endTime: block.endTime, plannedHours: block.plannedHours, actualHours: block.actualHours, status: block.status }
       }
     }
     return map
-  }, [allTimeBlocks])
+  }, [allScheduleItems, allTimeBlocks])
 
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
@@ -69,6 +80,8 @@ export function TodoModule() {
   const [editCategory, setEditCategory] = useState<TaskCategory>("Learning")
   const [editLane, setEditLane] = useState<TaskLane>("backlog")
   const [editDueDate, setEditDueDate] = useState("")
+  const [editStartTime, setEditStartTime] = useState("")
+  const [editEndTime, setEditEndTime] = useState("")
   const [editEstimate, setEditEstimate] = useState("")
   const [editPomodoros, setEditPomodoros] = useState("")
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
@@ -119,6 +132,8 @@ export function TodoModule() {
     setEditCategory(task.category)
     setEditLane(task.lane ?? "backlog")
     setEditDueDate(task.dueDate ?? "")
+    setEditStartTime(taskTimeSlots[task.id]?.startTime ?? "")
+    setEditEndTime(taskTimeSlots[task.id]?.endTime ?? "")
     setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
     setEditPomodoros(task.pomodorosPlanned ? String(task.pomodorosPlanned) : "")
   }
@@ -138,6 +153,14 @@ export function TodoModule() {
       setTaskFormError(`Daily Focus is limited to ${dailyFocusLimit} tasks.`)
       return
     }
+    if (editDueDate && editEndTime && !editStartTime) {
+      setTaskFormError("Set a start time before choosing an end time.")
+      return
+    }
+    if (editStartTime && editEndTime && editEndTime <= editStartTime) {
+      setTaskFormError("End time must be later than the start time.")
+      return
+    }
     updateTask(selectedTask.id, {
       title: editTitle.trim() || selectedTask.title,
       category: categories.includes(editCategory) ? editCategory : selectedTask.category,
@@ -145,6 +168,10 @@ export function TodoModule() {
       dueDate: editDueDate || undefined,
       estimateMin: editEstimate ? Number(editEstimate) : undefined,
       pomodorosPlanned: editPomodoros ? Number(editPomodoros) : undefined,
+    }, {
+      startHHmm: editDueDate ? editStartTime || undefined : undefined,
+      endHHmm: editDueDate ? editEndTime || undefined : undefined,
+      clearTimeSlot: Boolean(editDueDate) && !editStartTime && !editEndTime,
     })
     setTaskFormError(null)
     setIsEditing(false)
@@ -342,6 +369,10 @@ export function TodoModule() {
                   </div>
                   <div><Label htmlFor="edit-task-due">Due date</Label><Input id="edit-task-due" type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
                   <div className="grid grid-cols-2 gap-2">
+                    <div><Label htmlFor="edit-task-start">Start time</Label><Input id="edit-task-start" type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} disabled={!editDueDate} /></div>
+                    <div><Label htmlFor="edit-task-end">End time</Label><Input id="edit-task-end" type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} disabled={!editDueDate} /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
                     <div><Label htmlFor="edit-task-estimate">Estimate (min)</Label><Input id="edit-task-estimate" type="number" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} /></div>
                     <div><Label htmlFor="edit-task-pomodoros">Pomodoros</Label><Input id="edit-task-pomodoros" type="number" value={editPomodoros} onChange={(e) => setEditPomodoros(e.target.value)} /></div>
                   </div>
@@ -360,6 +391,11 @@ export function TodoModule() {
                   <span className={cn(isOverdue(selectedTask.dueDate) && "text-destructive")}>Due: {selectedTask.dueDate}</span>
                   {isDueToday(selectedTask.dueDate) ? <Badge className="bg-primary text-primary-foreground text-[10px]">Today</Badge> : null}
                 </div>
+              ) : null}
+              {taskTimeSlots[selectedTask.id] ? (
+                <p className="text-sm text-muted-foreground">
+                  Time slot: {fmtTime(taskTimeSlots[selectedTask.id].startTime)} - {fmtTime(taskTimeSlots[selectedTask.id].endTime)}
+                </p>
               ) : null}
               {selectedTask.estimateMin ? <p className="text-sm text-muted-foreground">Estimated: {selectedTask.estimateMin} min</p> : null}
               {selectedTask.pomodorosPlanned ? <p className="text-sm text-muted-foreground">Pomodoros planned: {selectedTask.pomodorosPlanned}</p> : null}
