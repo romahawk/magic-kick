@@ -968,6 +968,7 @@ function WeeklyProjectGrid({
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault()
                         onOpenSlotComposer(project.id, i)
@@ -1013,6 +1014,7 @@ function WeeklyProjectGrid({
                       <div
                         className="mt-1 rounded-md border border-border/70 bg-background/95 p-2 text-left shadow-sm"
                         onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
                       >
                         <div className="mb-2 flex items-center gap-1">
                           <Button

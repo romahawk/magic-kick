@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { format, parseISO, isToday } from "date-fns"
+import { buildCurrentMonthRetrospective, buildCurrentWeekRetrospective, type RetrospectiveSummary } from "@/lib/retrospective"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,9 +20,15 @@ const MOOD_LABELS = ["", "Rough", "Meh", "Okay", "Good", "Amazing"]
 const MOOD_COLORS = ["", "text-destructive", "text-chart-4", "text-muted-foreground", "text-chart-2", "text-primary"]
 
 export function JournalModule() {
+  const allTasks = useAppStore((s) => s.tasks)
+  const allGoals = useAppStore((s) => s.goals)
+  const allProjects = useAppStore((s) => s.projects)
   const allJournal = useAppStore((s) => s.journal)
   const profile = useAppStore((s) => s.profile)
   const addJournalEntry = useAppStore((s) => s.addJournalEntry)
+  const tasks = allTasks.filter((task) => !task.deleted)
+  const goals = allGoals.filter((goal) => !goal.deleted)
+  const projects = allProjects.filter((project) => !project.deleted)
   const journal = allJournal.filter((j) => !j.deleted)
   const [open, setOpen] = useState(false)
 
@@ -35,6 +42,8 @@ export function JournalModule() {
   const dailyEntries = journal.filter((j) => j.type === "daily")
   const weeklyEntries = journal.filter((j) => j.type === "weekly")
   const todayEntry = journal.find((j) => isToday(parseISO(j.dateISO)) && j.type === "daily")
+  const weeklyRetrospective = buildCurrentWeekRetrospective(tasks, goals, projects)
+  const monthlyRetrospective = buildCurrentMonthRetrospective(tasks, goals, projects)
 
   function handleSubmit() {
     if (!highlights.trim()) return
@@ -165,6 +174,10 @@ export function JournalModule() {
         </TabsContent>
 
         <TabsContent value="weekly" className="mt-4 flex flex-col gap-3">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <RetrospectiveCard title="This Week" summary={weeklyRetrospective} emptyLabel="No completed work yet this week." />
+            <RetrospectiveCard title="This Month" summary={monthlyRetrospective} emptyLabel="No completed work yet this month." />
+          </div>
           {weeklyEntries.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center gap-2 py-8">
@@ -179,6 +192,102 @@ export function JournalModule() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function RetrospectiveCard({ title, summary, emptyLabel }: { title: string; summary: RetrospectiveSummary; emptyLabel: string }) {
+  const totalCompleted =
+    summary.completedTasks.length +
+    summary.completedGoals.length +
+    summary.completedMilestones.length
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">{title} Retrospective</CardTitle>
+          <Badge variant="outline" className="text-[10px]">
+            {totalCompleted} wins
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {totalCompleted === 0 ? (
+          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="secondary">{summary.completedTasks.length} tasks</Badge>
+              <Badge variant="secondary">{summary.completedMilestones.length} milestones</Badge>
+              <Badge variant="secondary">{summary.completedGoals.length} goals</Badge>
+            </div>
+            <RetrospectiveGroup
+              label="Tasks by life category"
+              items={summary.tasksByCategory.map((item) => `${item.category} (${item.count})`)}
+            />
+            {summary.completedTasks.length > 0 ? (
+              <div>
+                <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-primary">Completed tasks</p>
+                <div className="flex flex-col gap-1.5">
+                  {summary.completedTasks.map((task) => (
+                    <div key={task.id} className="rounded-md border border-border/60 bg-background/40 px-2 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 text-sm text-foreground">{task.title}</p>
+                        {task.completedAt ? (
+                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                            {format(parseISO(task.completedAt), "MMM d")}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <Badge variant="outline" className="text-[10px]">{task.category}</Badge>
+                        {task.linkedProjectId ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {summary.tasksByProject.find((item) => item.projectId === task.linkedProjectId)?.projectTitle ?? "Project"}
+                          </Badge>
+                        ) : null}
+                        {task.estimateMin ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {task.estimateMin} min
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <RetrospectiveGroup
+              label="Completed project work"
+              items={[
+                ...summary.tasksByProject.map((item) => `${item.projectTitle}: ${item.count} tasks`),
+                ...summary.milestonesByProject.map((item) => `${item.projectTitle}: ${item.count} milestones`),
+              ]}
+            />
+            <RetrospectiveGroup
+              label="Achieved goals by category"
+              items={summary.goalsByCategory.map((item) => `${item.category} (${item.count})`)}
+            />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function RetrospectiveGroup({ label, items }: { label: string; items: string[] }) {
+  if (items.length === 0) return null
+  return (
+    <div>
+      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-primary">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => (
+          <Badge key={item} variant="outline" className="text-[10px]">
+            {item}
+          </Badge>
+        ))}
+      </div>
     </div>
   )
 }
