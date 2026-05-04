@@ -653,8 +653,17 @@ export const useAppStore = create<AppState>()(
         if (!toggled) return
 
         const newCompleted = !toggled.completed
+        const completedAtISO = format(new Date(), "yyyy-MM-dd")
         const tasks = current.tasks.map((t) =>
-          t.id === id ? { ...t, completed: newCompleted, clientUpdatedAt: ts, deleted: false } : t
+          t.id === id
+            ? {
+                ...t,
+                completed: newCompleted,
+                completedAt: newCompleted ? (t.completedAt ?? completedAtISO) : undefined,
+                clientUpdatedAt: ts,
+                deleted: false,
+              }
+            : t
         )
 
         // Sync completion to linked TimeBlock
@@ -1260,15 +1269,23 @@ export const useAppStore = create<AppState>()(
 
       updateGoal: (id, updates) => {
         const ts = now()
+        const completedAtISO = format(new Date(), "yyyy-MM-dd")
         set((s) => ({
           goals: s.goals.map((goal) =>
             goal.id === id
-              ? {
-                  ...goal,
-                  ...updates,
-                  clientUpdatedAt: ts,
-                  deleted: false,
-                }
+              ? (() => {
+                  const nextStatus = updates.status ?? goal.status
+                  return {
+                    ...goal,
+                    ...updates,
+                    completedAt:
+                      nextStatus === "completed"
+                        ? goal.completedAt ?? completedAtISO
+                        : undefined,
+                    clientUpdatedAt: ts,
+                    deleted: false,
+                  }
+                })()
               : goal
           ),
           sync: {
@@ -1283,9 +1300,19 @@ export const useAppStore = create<AppState>()(
 
       updateGoalProgress: (id, progress) => {
         const ts = now()
+        const completedAtISO = format(new Date(), "yyyy-MM-dd")
         set((s) => ({
           goals: s.goals.map((g) =>
-            g.id === id ? { ...g, progress, status: progress >= 100 ? "completed" : g.status, clientUpdatedAt: ts, deleted: false } : g
+            g.id === id
+              ? {
+                  ...g,
+                  progress,
+                  status: progress >= 100 ? "completed" : g.status === "completed" ? "active" : g.status,
+                  completedAt: progress >= 100 ? (g.completedAt ?? completedAtISO) : g.status === "completed" ? undefined : g.completedAt,
+                  clientUpdatedAt: ts,
+                  deleted: false,
+                }
+              : g
           ),
           sync: {
             ...s.sync,
@@ -1355,7 +1382,7 @@ export const useAppStore = create<AppState>()(
       convertWishlistToGoal: (id) => {
         const ts = now()
         set((s) => ({
-          goals: s.goals.map((g) => (g.id === id ? { ...g, status: "active", horizon: "mid", clientUpdatedAt: ts, deleted: false } : g)),
+          goals: s.goals.map((g) => (g.id === id ? { ...g, status: "active", horizon: "mid", completedAt: undefined, clientUpdatedAt: ts, deleted: false } : g)),
           sync: {
             ...s.sync,
             pending: {
@@ -2162,11 +2189,19 @@ export const useAppStore = create<AppState>()(
           ...task,
           lane: task.lane ?? "backlog",
           order: task.order ?? index + 1,
+          completedAt:
+            task.completed && typeof task.completedAt === "string" && task.completedAt.trim()
+              ? task.completedAt
+              : undefined,
           xpValue: task.xpValue ?? calculateTaskXP(task),
         }))
         const goals = normalizeCollection(merged.goals).map((goal, index) => ({
           ...goal,
           order: goal.order ?? index + 1,
+          completedAt:
+            goal.status === "completed" && typeof goal.completedAt === "string" && goal.completedAt.trim()
+              ? goal.completedAt
+              : undefined,
         }))
         const projects = normalizeCollection(merged.projects).map((project) => ({
           ...project,

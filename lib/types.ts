@@ -18,6 +18,7 @@ export interface Task extends SyncFields {
   estimateMin?: number
   pomodorosPlanned?: number
   completed: boolean
+  completedAt?: string
   linkedProjectId?: string
   xpValue: number
 }
@@ -33,6 +34,7 @@ export interface Goal extends SyncFields {
   notes: string
   status: "active" | "completed" | "wishlist"
   progress: number
+  completedAt?: string
 }
 
 export interface ProjectMilestone {

@@ -15,8 +15,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Bidirectional completion sync: marking a block "done" in Schedule completes the linked Todo task and vice versa
 - Time slot badge on kanban task cards for schedule-linked tasks (e.g. "9:00 – 10:00")
 - Overrun indicator: amber "+Xm over" badge on kanban cards and inside calendar blocks when actual hours exceed planned hours (only shown when status is "done")
+- Journal retrospectives: weekly and monthly summary cards now roll up completed tasks, milestones, and goals by life category and project
 
 ### Changed
+- completed tasks and goals now preserve `completedAt` metadata so review flows can use completion history instead of treating finished work as archive-only
 - Command Center redesigned for single-viewport density: status strip replaces "Week Health" card, priority dots replace text badges, allocation rows use single progress bars, Plan tab shows capacity inline
 - CI now runs lint before type-check and build on pull requests
 - README reorganized around product status, setup, deployment status, and documentation links
