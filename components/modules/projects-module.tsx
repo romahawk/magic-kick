@@ -19,8 +19,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle } from "lucide-react"
-import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
+import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle, ListTodo } from "lucide-react"
+import type { Project, ProjectMilestone, ProjectStatus, Task, TaskCategory } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -32,6 +32,7 @@ const LEGACY_COLOR_MAP: Record<string, string> = {
   "bg-chart-4": "#f97316",
   "bg-chart-5": "#a855f7",
 }
+const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 function normalizeUrl(url: string) {
   const trimmed = url.trim()
@@ -86,10 +87,13 @@ const VIEW_CONTROLS = [
 export function ProjectsModule() {
   const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
+  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const addProject = useAppStore((s) => s.addProject)
+  const addTask = useAppStore((s) => s.addTask)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
   const toggleMilestone = useAppStore((s) => s.toggleMilestone)
+  const toggleTask = useAppStore((s) => s.toggleTask)
   const addMilestone = useAppStore((s) => s.addMilestone)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
   const deleteMilestone = useAppStore((s) => s.deleteMilestone)
@@ -97,6 +101,7 @@ export function ProjectsModule() {
   const focusedProjectId = useAppStore((s) => s.profile.focusedProjectId)
   const setFocusedProject = useAppStore((s) => s.setFocusedProject)
   const weekDays = getWeekDays()
+  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
   const activeProjects = selectActiveProjects(projects)
@@ -118,6 +123,13 @@ export function ProjectsModule() {
   const [editingMilestone, setEditingMilestone] = useState<{ projectId: string; milestoneId: string } | null>(null)
   const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
   const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
+  const [slotComposer, setSlotComposer] = useState<{
+    projectId: string
+    dayIndex: number
+    mode: "milestone" | "task"
+    title: string
+    category: TaskCategory
+  } | null>(null)
   const [timelineView, setTimelineView] = useState<"weekly" | "yearly">("weekly")
   const [selectedStatus, setSelectedStatus] = useState<ProjectStatus>("active")
   const [focusMode, setFocusMode] = useState(false)
@@ -294,6 +306,40 @@ export function ProjectsModule() {
       dayIndex: draft.dayIndex,
     })
     updateMilestoneDraft(projectId, { title: "", dayIndex: draft.dayIndex })
+  }
+
+  function openSlotComposer(projectId: string, dayIndex: number) {
+    setSlotComposer({
+      projectId,
+      dayIndex,
+      mode: "task",
+      title: "",
+      category: (categories[0] ?? "General") as TaskCategory,
+    })
+  }
+
+  function closeSlotComposer() {
+    setSlotComposer(null)
+  }
+
+  function saveSlotComposer(weekDateISO: string) {
+    if (!slotComposer?.title.trim()) return
+    if (slotComposer.mode === "milestone") {
+      addMilestone(slotComposer.projectId, {
+        title: slotComposer.title.trim(),
+        dayIndex: slotComposer.dayIndex,
+      })
+    } else {
+      addTask({
+        title: slotComposer.title.trim(),
+        category: slotComposer.category,
+        completed: false,
+        lane: "backlog",
+        dueDate: weekDateISO,
+        linkedProjectId: slotComposer.projectId,
+      })
+    }
+    closeSlotComposer()
   }
 
   function startEditingMilestone(projectId: string, milestone: ProjectMilestone) {
@@ -648,6 +694,7 @@ export function ProjectsModule() {
                       <WeeklyProjectGrid
                         projects={section.projects}
                         tasks={tasks}
+                        taskCategories={categories}
                         weekDays={weekDays}
                         onEdit={openEditDialog}
                         focusedProjectId={focusedProjectId}
@@ -656,6 +703,12 @@ export function ProjectsModule() {
                         onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                         onDelete={deleteProject}
                         onToggleMilestone={toggleMilestone}
+                        onToggleTask={toggleTask}
+                        slotComposer={slotComposer}
+                        onOpenSlotComposer={openSlotComposer}
+                        onCloseSlotComposer={closeSlotComposer}
+                        onUpdateSlotComposer={setSlotComposer}
+                        onSaveSlotComposer={saveSlotComposer}
                       />
                     </CardContent>
                   </CollapsibleContent>
@@ -669,6 +722,7 @@ export function ProjectsModule() {
               <WeeklyProjectGrid
                 projects={displayProjects}
                 tasks={tasks}
+                taskCategories={categories}
                 weekDays={weekDays}
                 onEdit={openEditDialog}
                 focusedProjectId={focusedProjectId}
@@ -677,6 +731,12 @@ export function ProjectsModule() {
                 onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                 onDelete={deleteProject}
                 onToggleMilestone={toggleMilestone}
+                onToggleTask={toggleTask}
+                slotComposer={slotComposer}
+                onOpenSlotComposer={openSlotComposer}
+                onCloseSlotComposer={closeSlotComposer}
+                onUpdateSlotComposer={setSlotComposer}
+                onSaveSlotComposer={saveSlotComposer}
               />
             </CardContent>
           </Card>
@@ -761,6 +821,7 @@ export function ProjectsModule() {
 function WeeklyProjectGrid({
   projects,
   tasks,
+  taskCategories,
   weekDays,
   onEdit,
   focusedProjectId,
@@ -769,9 +830,16 @@ function WeeklyProjectGrid({
   onToggleTimelineVisibility,
   onDelete,
   onToggleMilestone,
+  onToggleTask,
+  slotComposer,
+  onOpenSlotComposer,
+  onCloseSlotComposer,
+  onUpdateSlotComposer,
+  onSaveSlotComposer,
 }: {
   projects: Project[]
   tasks: Task[]
+  taskCategories: string[]
   weekDays: ReturnType<typeof getWeekDays>
   onEdit: (project: Project) => void
   focusedProjectId?: string
@@ -780,6 +848,24 @@ function WeeklyProjectGrid({
   onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   onDelete: (projectId: string) => void
   onToggleMilestone: (projectId: string, milestoneId: string) => void
+  onToggleTask: (taskId: string) => void
+  slotComposer: {
+    projectId: string
+    dayIndex: number
+    mode: "milestone" | "task"
+    title: string
+    category: TaskCategory
+  } | null
+  onOpenSlotComposer: (projectId: string, dayIndex: number) => void
+  onCloseSlotComposer: () => void
+  onUpdateSlotComposer: Dispatch<SetStateAction<{
+    projectId: string
+    dayIndex: number
+    mode: "milestone" | "task"
+    title: string
+    category: TaskCategory
+  } | null>>
+  onSaveSlotComposer: (weekDateISO: string) => void
 }) {
   return (
     <>
@@ -808,6 +894,7 @@ function WeeklyProjectGrid({
         const openMilestones = sortedMilestones.filter((milestone) => !milestone.completed)
         const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
+        const openProjectTasks = projectTasks.filter((task) => !task.completed)
         const completedTasks = projectTasks.filter((t) => t.completed).length
         const completedMilestoneCount = completedMilestones.length
         const totalMilestones = project.milestones.length
@@ -866,22 +953,36 @@ function WeeklyProjectGrid({
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1">
-              {weekDays.map((_, i) => {
+              {weekDays.map((day, i) => {
                 const dayMilestones = openMilestones.filter((m) => m.dayIndex === i)
+                const dayTasks = openProjectTasks.filter((task) => task.dueDate === day.iso)
+                const isComposerOpen = slotComposer?.projectId === project.id && slotComposer.dayIndex === i
                 return (
                   <div
                     key={i}
+                    onClick={() => onOpenSlotComposer(project.id, i)}
                     className={cn(
-                      "min-h-14 rounded-md border border-border p-1 text-center transition-colors",
-                      dayMilestones.length > 0 ? "border-primary/30 bg-primary/5" : "bg-secondary/30"
+                      "min-h-14 rounded-md border border-border p-1 text-center transition-colors cursor-pointer",
+                      dayMilestones.length > 0 || dayTasks.length > 0 ? "border-primary/30 bg-primary/5" : "bg-secondary/30 hover:bg-secondary/50"
                     )}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        onOpenSlotComposer(project.id, i)
+                      }
+                    }}
                   >
-                    {dayMilestones.length > 0 ? (
-                      <div className="flex max-h-16 flex-col gap-1 overflow-y-auto pr-0.5">
+                    {dayMilestones.length > 0 || dayTasks.length > 0 ? (
+                      <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-0.5">
                         {dayMilestones.map((milestone) => (
                           <button
                             key={milestone.id}
-                            onClick={() => onToggleMilestone(project.id, milestone.id)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onToggleMilestone(project.id, milestone.id)
+                            }}
                             className={cn(
                               "flex items-center gap-1 rounded px-1 py-0.5 text-left transition-colors",
                               milestone.completed ? "bg-primary/20" : "hover:bg-primary/10"
@@ -892,6 +993,95 @@ function WeeklyProjectGrid({
                             <span className="line-clamp-1 text-[9px] leading-tight text-muted-foreground">{milestone.title}</span>
                           </button>
                         ))}
+                        {dayTasks.map((task) => (
+                          <button
+                            key={task.id}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onToggleTask(task.id)
+                            }}
+                            className="flex items-center gap-1 rounded border border-emerald-500/20 bg-emerald-500/10 px-1 py-0.5 text-left transition-colors hover:bg-emerald-500/15"
+                            aria-label={`Toggle task: ${task.title}`}
+                          >
+                            <ListTodo className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                            <span className="line-clamp-1 text-[9px] leading-tight text-emerald-100">{task.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {isComposerOpen ? (
+                      <div
+                        className="mt-1 rounded-md border border-border/70 bg-background/95 p-2 text-left shadow-sm"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="mb-2 flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={slotComposer.mode === "task" ? "default" : "outline"}
+                            className="h-7 px-2 text-[10px]"
+                            onClick={() => onUpdateSlotComposer((current) => current ? { ...current, mode: "task" } : current)}
+                          >
+                            Task
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={slotComposer.mode === "milestone" ? "default" : "outline"}
+                            className="h-7 px-2 text-[10px]"
+                            onClick={() => onUpdateSlotComposer((current) => current ? { ...current, mode: "milestone" } : current)}
+                          >
+                            Milestone
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="ml-auto h-7 w-7"
+                            onClick={onCloseSlotComposer}
+                            aria-label="Close slot composer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <Input
+                          value={slotComposer.title}
+                          onChange={(event) => onUpdateSlotComposer((current) => current ? { ...current, title: event.target.value } : current)}
+                          placeholder={slotComposer.mode === "task" ? "Task title" : "Milestone title"}
+                          className="h-8 text-xs"
+                          autoFocus
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault()
+                              onSaveSlotComposer(day.iso)
+                            }
+                          }}
+                        />
+                        {slotComposer.mode === "task" ? (
+                          <Select
+                            value={taskCategories.includes(slotComposer.category) ? slotComposer.category : taskCategories[0] ?? "General"}
+                            onValueChange={(value) => onUpdateSlotComposer((current) => current ? { ...current, category: value as TaskCategory } : current)}
+                          >
+                            <SelectTrigger className="mt-2 h-8 text-xs">
+                              <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {taskCategories.map((category) => (
+                                <SelectItem key={`${project.id}-${day.iso}-${category}`} value={category}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : null}
+                        <div className="mt-2 flex gap-1">
+                          <Button type="button" size="sm" className="h-7 flex-1 text-[10px]" onClick={() => onSaveSlotComposer(day.iso)}>
+                            Add
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={onCloseSlotComposer}>
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
                   </div>

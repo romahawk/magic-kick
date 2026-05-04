@@ -119,6 +119,16 @@ function normalizeTimeHHmm(input?: string) {
   return /^\d{2}:\d{2}$/.test(trimmed) ? trimmed : undefined
 }
 
+function startOfTaskWeek(dateISO: string) {
+  return getCurrentWeekStartISO(parseISO(`${dateISO}T00:00`))
+}
+
+function buildTaskEndTime(startHHmm: string, estimateMin?: number, endHHmm?: string) {
+  const normalizedEnd = normalizeTimeHHmm(endHHmm)
+  if (normalizedEnd) return normalizedEnd
+  return format(addMinutes(parseISO(`2000-01-01T${startHHmm}`), estimateMin ?? 60), "HH:mm")
+}
+
 function createEmptyPending(): PendingRecord {
   return {
     profile: {},
@@ -311,7 +321,7 @@ export interface AppState {
   updateTask: (
     id: string,
     updates: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>,
-    timing?: { startHHmm?: string; endHHmm?: string; blockTypeId?: string }
+    timing?: { startHHmm?: string; endHHmm?: string; blockTypeId?: string; clearTimeSlot?: boolean }
   ) => void
   unscheduleTask: (id: string) => void
   moveTaskToTodo: (id: string) => void
@@ -704,6 +714,10 @@ export const useAppStore = create<AppState>()(
 
       addTask: (task) => {
         const { timeHHmm, ...taskInput } = task
+        const startHHmm = normalizeTimeHHmm(timeHHmm)
+        const weekPlanId = taskInput.dueDate && startHHmm
+          ? get().ensureWeeklyPlan(startOfTaskWeek(taskInput.dueDate))
+          : undefined
         const id = generateId()
         const xpValue = taskInput.xpValue ?? calculateTaskXP(taskInput)
         set((s) => {
@@ -711,10 +725,10 @@ export const useAppStore = create<AppState>()(
           const item = touchEntity({ ...taskInput, lane: taskInput.lane ?? "backlog", id, xpValue, order: maxOrder + 1, deleted: false })
           const nextTasks = [...s.tasks, item]
           const nextSchedule = [...s.schedule]
+          const nextTimeBlocks = [...s.timeBlocks]
           const ts = item.clientUpdatedAt ?? now()
 
           if (item.dueDate) {
-            const startHHmm = normalizeTimeHHmm(timeHHmm)
             const scheduleId = `task-${item.id}`
             nextSchedule.push(
               touchEntity({
@@ -731,6 +745,24 @@ export const useAppStore = create<AppState>()(
                 deleted: false,
               })
             )
+
+            if (startHHmm && weekPlanId) {
+              nextTimeBlocks.push(
+                touchEntity({
+                  id: `task-block-${item.id}`,
+                  weekPlanId,
+                  projectId: item.linkedProjectId,
+                  dateISO: item.dueDate,
+                  startTime: startHHmm,
+                  endTime: buildTaskEndTime(startHHmm, item.estimateMin),
+                  taskDescription: item.title,
+                  plannedHours: Math.max(0.25, (item.estimateMin ?? 60) / 60),
+                  status: item.completed ? "done" : "planned",
+                  linkedTaskId: item.id,
+                  deleted: false,
+                })
+              )
+            }
           }
 
           const evaluated = runAchievementEngine({
@@ -743,6 +775,7 @@ export const useAppStore = create<AppState>()(
           return {
             tasks: nextTasks,
             schedule: nextSchedule,
+            timeBlocks: nextTimeBlocks,
             profile: evaluated.profile,
             achievements: evaluated.achievements,
             sync: {
@@ -757,6 +790,12 @@ export const useAppStore = create<AppState>()(
                   }
                   return acc
                 }, { ...s.sync.pending.schedule }),
+                timeBlocks: nextTimeBlocks.reduce<Record<string, number>>((acc, block) => {
+                  if (block.id.startsWith("task-block-")) {
+                    acc[block.id] = block.clientUpdatedAt ?? ts
+                  }
+                  return acc
+                }, { ...s.sync.pending.timeBlocks }),
                 achievements: evaluated.achievements.reduce<Record<string, number>>((acc, achievement) => {
                   acc[achievement.id] = achievement.clientUpdatedAt ?? ts
                   return acc
@@ -891,6 +930,18 @@ export const useAppStore = create<AppState>()(
 
       updateTask: (id, updates, timing) => {
         const ts = now()
+        const currentTask = get().tasks.find((task) => task.id === id)
+        if (!currentTask) return
+        const currentLinkedBlock = get().timeBlocks.find((block) => !block.deleted && block.linkedTaskId === id)
+        const requestedStart = normalizeTimeHHmm(timing?.startHHmm)
+        const requestedEnd = normalizeTimeHHmm(timing?.endHHmm)
+        const clearTimeSlot = Boolean(timing?.clearTimeSlot)
+        const nextDueDate = updates.dueDate !== undefined ? updates.dueDate : currentTask.dueDate
+        const targetWeekPlanId =
+          !clearTimeSlot && nextDueDate && (requestedStart || requestedEnd || currentLinkedBlock)
+            ? get().ensureWeeklyPlan(startOfTaskWeek(nextDueDate))
+            : undefined
+
         set((s) => {
           const current = s.tasks.find((t) => t.id === id)
           if (!current) return {}
@@ -931,39 +982,40 @@ export const useAppStore = create<AppState>()(
 
           const tasks = s.tasks.map((task) => (task.id === id ? merged : task))
           const schedule = [...s.schedule]
+          const timeBlocks = [...s.timeBlocks]
           const scheduleIndex = schedule.findIndex((item) => item.linkedTaskId === id)
+          const linkedBlockIndex = timeBlocks.findIndex((block) => !block.deleted && block.linkedTaskId === id)
           let scheduleTouchedId: string | null = null
+          let timeBlockTouchedId: string | null = null
 
           if (merged.dueDate) {
             const existing = scheduleIndex >= 0 ? schedule[scheduleIndex] : null
             const existingHasExplicitTime = existing?.hasExplicitTime ?? true
             const existingStart = existingHasExplicitTime && existing ? format(parseISO(existing.startISO), "HH:mm") : undefined
             const existingEnd = existingHasExplicitTime && existing ? format(parseISO(existing.endISO), "HH:mm") : undefined
-            const requestedStart = normalizeTimeHHmm(timing?.startHHmm)
-            const requestedEnd = normalizeTimeHHmm(timing?.endHHmm)
             const hasExplicitTime = Boolean(requestedStart || requestedEnd || existingStart || existingEnd)
             const startHHmm = requestedStart ?? existingStart ?? "09:00"
             const endHHmm =
               requestedEnd ??
               existingEnd ??
-              format(addMinutes(parseISO(`${merged.dueDate}T${startHHmm}`), merged.estimateMin ?? 30), "HH:mm")
+              buildTaskEndTime(startHHmm, merged.estimateMin)
 
-              const nextSchedule: ScheduleItem = {
-                id: existing?.id ?? `task-${id}`,
-                title: merged.title,
-                type: "task",
-                startISO: hasExplicitTime ? `${merged.dueDate}T${startHHmm}` : `${merged.dueDate}T00:00`,
-                endISO: hasExplicitTime ? `${merged.dueDate}T${endHHmm}` : `${merged.dueDate}T00:00`,
-                hasExplicitTime,
-                color: existing?.color ?? "bg-chart-1",
-                blockTypeId:
-                  timing?.blockTypeId !== undefined
-                    ? timing.blockTypeId || undefined
-                    : existing?.blockTypeId,
-                linkedTaskId: id,
-                deleted: false,
-                clientUpdatedAt: ts,
-              }
+            const nextSchedule: ScheduleItem = {
+              id: existing?.id ?? `task-${id}`,
+              title: merged.title,
+              type: "task",
+              startISO: hasExplicitTime ? `${merged.dueDate}T${startHHmm}` : `${merged.dueDate}T00:00`,
+              endISO: hasExplicitTime ? `${merged.dueDate}T${endHHmm}` : `${merged.dueDate}T00:00`,
+              hasExplicitTime,
+              color: existing?.color ?? "bg-chart-1",
+              blockTypeId:
+                timing?.blockTypeId !== undefined
+                  ? timing.blockTypeId || undefined
+                  : existing?.blockTypeId,
+              linkedTaskId: id,
+              deleted: false,
+              clientUpdatedAt: ts,
+            }
 
             if (scheduleIndex >= 0) {
               schedule[scheduleIndex] = nextSchedule
@@ -980,9 +1032,48 @@ export const useAppStore = create<AppState>()(
             scheduleTouchedId = schedule[scheduleIndex].id
           }
 
+          const existingLinkedBlock = linkedBlockIndex >= 0 ? timeBlocks[linkedBlockIndex] : null
+          const blockStartTime = clearTimeSlot ? undefined : requestedStart ?? existingLinkedBlock?.startTime
+          if (merged.dueDate && blockStartTime && targetWeekPlanId) {
+            const blockEndTime = buildTaskEndTime(
+              blockStartTime,
+              merged.estimateMin,
+              requestedEnd ?? existingLinkedBlock?.endTime
+            )
+            const nextTimeBlock = touchEntity({
+              id: existingLinkedBlock?.id ?? `task-block-${id}`,
+              weekPlanId: targetWeekPlanId,
+              projectId: merged.linkedProjectId,
+              dateISO: merged.dueDate,
+              startTime: blockStartTime,
+              endTime: blockEndTime,
+              taskDescription: merged.title,
+              plannedHours: calculateTimeBlockHours(blockStartTime, blockEndTime),
+              actualHours: existingLinkedBlock?.actualHours,
+              status: merged.completed ? "done" : existingLinkedBlock?.status === "missed" ? "missed" : "planned",
+              linkedTaskId: id,
+              deleted: false,
+            })
+
+            if (linkedBlockIndex >= 0) {
+              timeBlocks[linkedBlockIndex] = nextTimeBlock
+            } else {
+              timeBlocks.push(nextTimeBlock)
+            }
+            timeBlockTouchedId = nextTimeBlock.id
+          } else if (linkedBlockIndex >= 0) {
+            timeBlocks[linkedBlockIndex] = {
+              ...timeBlocks[linkedBlockIndex],
+              deleted: true,
+              clientUpdatedAt: ts,
+            }
+            timeBlockTouchedId = timeBlocks[linkedBlockIndex].id
+          }
+
           return {
             tasks,
             schedule,
+            timeBlocks,
             profile,
             sync: {
               ...s.sync,
@@ -991,6 +1082,7 @@ export const useAppStore = create<AppState>()(
                 profile: profile.clientUpdatedAt ? { ...s.sync.pending.profile, profile: profile.clientUpdatedAt } : s.sync.pending.profile,
                 tasks: { ...s.sync.pending.tasks, [id]: ts },
                 schedule: scheduleTouchedId ? { ...s.sync.pending.schedule, [scheduleTouchedId]: ts } : s.sync.pending.schedule,
+                timeBlocks: timeBlockTouchedId ? { ...s.sync.pending.timeBlocks, [timeBlockTouchedId]: ts } : s.sync.pending.timeBlocks,
               },
             },
           }
