@@ -385,43 +385,48 @@ export function ScheduleModule() {
       <div className="flex flex-1 gap-4 overflow-hidden">
           {/* Calendar grid */}
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
-            {/* Day header row */}
-            <div className="flex border-b bg-muted/30">
-              <div className="w-14 shrink-0 border-r" />
-              {visibleDays.map((day) => {
-                const isToday = day.iso === nowDayISO
-                return (
-                  <div
-                    key={day.iso}
-                    className={cn(
-                      "flex flex-1 flex-col items-center py-2 text-center",
-                      view === "week" && "border-r last:border-r-0"
-                    )}
-                  >
-                    <span className="text-xs text-muted-foreground">{day.label}</span>
-                    <span
-                      className={cn(
-                        "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
-                        isToday && "bg-primary text-primary-foreground"
-                      )}
-                    >
-                      {day.dayNumber}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+            <div className="flex flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+              <div className="flex min-h-full min-w-full flex-col">
+                {/* Day header row */}
+                <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+                  <div className="w-14 shrink-0 border-r" />
+                  {visibleDays.map((day) => {
+                    const isToday = day.iso === nowDayISO
+                    return (
+                      <div
+                        key={day.iso}
+                        className={cn(
+                          "flex flex-1 flex-col items-center py-2 text-center",
+                          view === "week" && "border-r last:border-r-0"
+                        )}
+                      >
+                        <span className="text-xs text-muted-foreground">{day.label}</span>
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                            isToday && "bg-primary text-primary-foreground"
+                          )}
+                        >
+                          {day.dayNumber}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
 
-            {/* Scrollable grid body */}
-            <div className="flex flex-1 overflow-y-auto">
+                {/* Scrollable grid body */}
+                <div className="flex flex-1">
               {/* Time labels */}
               <div className="relative w-14 shrink-0 border-r">
                 <div style={{ height: GRID_HEIGHT }}>
-                  {HOUR_LABELS.map(({ h, label }) => (
+                  {HOUR_LABELS.map(({ h, label }, index) => (
                     <div
                       key={h}
-                      className="absolute right-2 -translate-y-1/2 text-[10px] text-muted-foreground"
-                      style={{ top: (h - DAY_START) * HOUR_PX }}
+                      className={cn(
+                        "absolute right-2 text-[10px] text-muted-foreground",
+                        index === 0 ? "translate-y-0" : "-translate-y-1/2"
+                      )}
+                      style={{ top: index === 0 ? 6 : (h - DAY_START) * HOUR_PX }}
                     >
                       {label}
                     </div>
@@ -556,6 +561,8 @@ export function ScheduleModule() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
               </div>
             </div>
 
