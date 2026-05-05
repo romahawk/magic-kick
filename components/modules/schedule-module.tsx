@@ -174,7 +174,7 @@ export function ScheduleModule() {
   const weekBlocks = selectTimeBlocksForDates(timeBlocks, weekDays.map((d) => d.iso))
 
   const taskTimeSlots = useMemo(() => {
-    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }> = {}
+    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: TimeBlockStatus }> = {}
     for (const item of scheduleItems) {
       if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
         map[item.linkedTaskId] = {
@@ -200,13 +200,13 @@ export function ScheduleModule() {
   }, [scheduleItems, timeBlocks])
 
   const displayBlocks: DisplayBlock[] = (() => {
-    const persistedBlocks = weekBlocks
+    const persistedBlocks: DisplayBlock[] = weekBlocks
       .filter((block) => {
         if (!block.linkedTaskId) return true
         const linkedTask = tasks.find((task) => task.id === block.linkedTaskId)
         return !linkedTask || !isRecurringTask(linkedTask)
       })
-      .map((block) => ({
+      .map((block): DisplayBlock => ({
         id: block.id,
         sourceType: "time-block" as const,
         linkedTaskId: block.linkedTaskId,
@@ -220,14 +220,14 @@ export function ScheduleModule() {
         status: block.status,
       }))
 
-    const recurringBlocks = tasks.flatMap((task) => {
+    const recurringBlocks: DisplayBlock[] = tasks.flatMap((task) => {
       if (task.deleted || task.completed || !isRecurringTask(task)) return []
       const slot = taskTimeSlots[task.id]
       if (!slot) return []
 
       return weekDays
         .filter((day) => taskRepeatsOnDate(task, day.iso))
-        .map((day) => ({
+        .map((day): DisplayBlock => ({
           id: `recurring-${task.id}-${day.iso}`,
           sourceType: "recurring-task" as const,
           linkedTaskId: task.id,
