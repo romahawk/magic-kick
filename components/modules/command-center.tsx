@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { format } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
@@ -15,7 +15,7 @@ import {
   selectTimeBlocksForDay,
   validateWeeklyPlan,
 } from "@/lib/weekly-plan"
-import type { ProjectPriority, WeeklyAllocation } from "@/lib/types"
+import type { Project, ProjectPriority, WeeklyAllocation } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -60,92 +60,10 @@ export function CommandCenter() {
   const todayISO = new Date().toISOString().slice(0, 10)
   const todayBlocks = selectTimeBlocksForDay(timeBlocks, todayISO, activePlan?.id)
   const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
+  const activePlanValidation = activePlan
+    ? validateWeeklyPlan(activePlan, activeProjects)
+    : { isValid: false, errors: [], allocatedHours: 0, remainingHours: 0, isOverCapacity: false }
 
-  // ── Plan tab draft state ─────────────────────────────────────────────────
-  const [draftCapacity, setDraftCapacity] = useState(
-    String(activePlan?.totalCapacityHours ?? DEFAULT_WEEKLY_CAPACITY_HOURS)
-  )
-  const [draftAllocations, setDraftAllocations] = useState<WeeklyAllocation[]>(
-    activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")]
-  )
-  const [planSaveModal, setPlanSaveModal] = useState<{
-    open: boolean
-    status: "success" | "error"
-    title: string
-    description: string
-  }>({
-    open: false,
-    status: "success",
-    title: "",
-    description: "",
-  })
-
-  const planDraft = {
-    id: activePlan?.id ?? weekStartISO,
-    weekStartISO,
-    totalCapacityHours: Math.max(1, Number(draftCapacity) || 0),
-    allocations: draftAllocations,
-    status: existingReview?.completed ? ("reviewed" as const) : ("active" as const),
-    deleted: false,
-  }
-
-  const validation = validateWeeklyPlan(planDraft, activeProjects)
-  const projectOptions = activeProjects.filter((p) => !draftAllocations.some((a) => a.projectId === p.id))
-
-  useEffect(() => {
-    setDraftCapacity(String(activePlan?.totalCapacityHours ?? DEFAULT_WEEKLY_CAPACITY_HOURS))
-    setDraftAllocations(activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")])
-  }, [activePlan?.id, activePlan?.totalCapacityHours, activePlan?.allocations])
-
-  function updateAllocation(index: number, updates: Partial<WeeklyAllocation>) {
-    setDraftAllocations((cur) => cur.map((a, i) => (i === index ? { ...a, ...updates } : a)))
-  }
-  function addAllocation() {
-    if (draftAllocations.length >= MAX_WEEKLY_PLAN_PROJECTS) return
-    setDraftAllocations((cur) => [...cur, emptyAllocation("P2")])
-  }
-  function removeAllocation(index: number) {
-    setDraftAllocations((cur) => cur.filter((_, i) => i !== index))
-  }
-  function handleSavePlan() {
-    if (!validation.isValid) {
-      setPlanSaveModal({
-        open: true,
-        status: "error",
-        title: "Plan not saved",
-        description: Array.from(new Set(validation.errors)).join(" "),
-      })
-      return
-    }
-
-    try {
-      saveWeeklyPlan({
-        id: activePlan?.id ?? weekStartISO,
-        weekStartISO,
-        totalCapacityHours: Number(draftCapacity) || DEFAULT_WEEKLY_CAPACITY_HOURS,
-        allocations: draftAllocations,
-        status: existingReview?.completed ? "reviewed" : "active",
-        reviewedAt: activePlan?.reviewedAt,
-        deleted: false,
-      })
-
-      setPlanSaveModal({
-        open: true,
-        status: "success",
-        title: "Plan saved",
-        description: `Your week for ${format(new Date(`${weekStartISO}T12:00:00`), "MMM d")} is locked in and ready to execute.`,
-      })
-    } catch (error) {
-      setPlanSaveModal({
-        open: true,
-        status: "error",
-        title: "Save failed",
-        description: error instanceof Error ? error.message : "Something went wrong while saving your weekly plan.",
-      })
-    }
-  }
-
-  // ── Review tab state ─────────────────────────────────────────────────────
   const [nextWeekCapacity, setNextWeekCapacity] = useState(
     String(existingReview?.nextWeekCapacityHours ?? "")
   )
@@ -159,6 +77,7 @@ export function CommandCenter() {
       ])
     )
   )
+
   function updateReview(
     projectId: string,
     updates: Partial<{ achieved: boolean; decision: "continue" | "adjust" | "remove"; notes: string }>
@@ -173,18 +92,19 @@ export function CommandCenter() {
       },
     }))
   }
+
   function handleSaveReview() {
     if (!activePlan) return
     saveWeeklyReview({
       id: weekStartISO,
       weekPlanId: activePlan.id,
       weekStartISO,
-      summary: activePlan.allocations.map((a) => {
-        const metric = projectHours.find((m) => m.projectId === a.projectId)
-        const entry = reviewState[a.projectId]
+      summary: activePlan.allocations.map((allocation) => {
+        const metric = projectHours.find((item) => item.projectId === allocation.projectId)
+        const entry = reviewState[allocation.projectId]
         return {
-          projectId: a.projectId,
-          outcomePlanned: a.weeklyOutcome,
+          projectId: allocation.projectId,
+          outcomePlanned: allocation.weeklyOutcome,
           outcomeAchieved: entry?.achieved ?? false,
           plannedHours: metric?.plannedHours ?? 0,
           actualHours: metric?.actualHours ?? 0,
@@ -216,10 +136,7 @@ export function CommandCenter() {
           <TabsTrigger value="review">Review</TabsTrigger>
         </TabsList>
 
-        {/* ── Week tab ── */}
         <TabsContent value="week" className="mt-4 space-y-4">
-
-          {/* Status strip */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border/60 bg-card px-4 py-2.5 text-sm">
             <div className="flex flex-wrap gap-1.5">
               {weekDays.map((day) => (
@@ -232,8 +149,8 @@ export function CommandCenter() {
               <StatusPill label="Capacity" value={activePlan ? `${activePlan.totalCapacityHours}h` : "—"} />
               <StatusPill
                 label="Free"
-                value={activePlan ? `${validation.remainingHours}h` : "—"}
-                highlight={activePlan ? (validation.isOverCapacity ? "warn" : "ok") : undefined}
+                value={activePlan ? `${activePlanValidation.remainingHours}h` : "—"}
+                highlight={activePlan ? (activePlanValidation.isOverCapacity ? "warn" : "ok") : undefined}
               />
               <StatusPill label="Today" value={`${todayBlocks.length} blocks`} />
             </div>
@@ -254,15 +171,14 @@ export function CommandCenter() {
             </Card>
           ) : (
             <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-
-              {/* Left — allocation rows */}
               <div className="space-y-1.5">
-                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Committed this week</p>
+                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Committed this week
+                </p>
                 {projectHours.map((item) => {
                   const project = projects.find((p) => p.id === item.projectId)
-                  const deliveredPct = item.allocatedHours > 0
-                    ? Math.min(100, (item.actualHours / item.allocatedHours) * 100)
-                    : 0
+                  const deliveredPct =
+                    item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
                   return (
                     <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
                       <PriorityDot priority={item.priority} />
@@ -282,7 +198,6 @@ export function CommandCenter() {
                 })}
               </div>
 
-              {/* Right — today's blocks */}
               <div className="space-y-1.5">
                 <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Today — {format(new Date(`${todayISO}T12:00:00`), "EEE d")}
@@ -308,91 +223,17 @@ export function CommandCenter() {
           )}
         </TabsContent>
 
-        {/* ── Plan tab ── */}
         <TabsContent value="plan" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base">Capacity &amp; Allocation</CardTitle>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-muted-foreground">{planDraft.totalCapacityHours}h capacity</span>
-                  <span className="text-muted-foreground">{validation.allocatedHours}h allocated</span>
-                  <span className={cn("font-medium", validation.isOverCapacity ? "text-amber-400" : "text-emerald-400")}>
-                    {validation.remainingHours}h free
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Label htmlFor="weekly-capacity" className="shrink-0">Weekly hours</Label>
-                <Input id="weekly-capacity" type="number" min={1} max={80} value={draftCapacity} onChange={(e) => setDraftCapacity(e.target.value)} className="w-24" />
-              </div>
-
-              <div className="space-y-2">
-                {draftAllocations.map((allocation, index) => (
-                  <div key={`${allocation.projectId || "empty"}-${index}`} className="grid gap-2 rounded-lg border border-border/70 p-3 lg:grid-cols-[1.8fr_0.7fr_0.7fr_2fr_auto]">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Project</Label>
-                      <Select value={allocation.projectId || "none"} onValueChange={(v) => updateAllocation(index, { projectId: v === "none" ? "" : v })}>
-                        <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Select project</SelectItem>
-                          {[
-                            allocation.projectId ? activeProjects.find((p) => p.id === allocation.projectId) : undefined,
-                            ...projectOptions,
-                          ]
-                            .filter((p, i, list): p is NonNullable<typeof p> => Boolean(p) && list.findIndex((x) => x?.id === p?.id) === i)
-                            .map((p) => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Priority</Label>
-                      <Select value={allocation.priority} onValueChange={(v) => updateAllocation(index, { priority: v as ProjectPriority })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{PRIORITY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Hours</Label>
-                      <Input type="number" min={1} max={40} value={allocation.hoursAllocated || ""} onChange={(e) => updateAllocation(index, { hoursAllocated: Number(e.target.value) || 0 })} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Weekly outcome</Label>
-                      <Input value={allocation.weeklyOutcome} onChange={(e) => updateAllocation(index, { weeklyOutcome: e.target.value })} placeholder="One concrete result for this week" />
-                    </div>
-                    <div className="flex items-end">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeAllocation(index)} aria-label={`Remove allocation ${index + 1}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" variant="outline" onClick={addAllocation} disabled={draftAllocations.length >= MAX_WEEKLY_PLAN_PROJECTS}>
-                  <Plus className="mr-2 h-4 w-4" />Add project
-                </Button>
-                <Button type="button" onClick={handleSavePlan}>Save plan</Button>
-              </div>
-
-              {validation.errors.length > 0 && (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                  <div className="mb-1 flex items-center gap-2 text-sm font-medium text-amber-100">
-                    <AlertTriangle className="h-4 w-4" />Fix before saving
-                  </div>
-                  <div className="space-y-0.5 text-sm text-amber-50">
-                    {Array.from(new Set(validation.errors)).map((e) => <p key={e}>{e}</p>)}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PlanTabContent
+            key={`${activePlan?.id ?? weekStartISO}:${activePlan?.clientUpdatedAt ?? 0}`}
+            activePlan={activePlan}
+            activeProjects={activeProjects}
+            existingReviewCompleted={existingReview?.completed}
+            saveWeeklyPlan={saveWeeklyPlan}
+            weekStartISO={weekStartISO}
+          />
         </TabsContent>
 
-        {/* ── Review tab ── */}
         <TabsContent value="review" className="mt-4">
           <Card>
             <CardHeader className="pb-3">
@@ -407,12 +248,12 @@ export function CommandCenter() {
                 <>
                   {activePlan.allocations.map((allocation) => {
                     const project = projects.find((p) => p.id === allocation.projectId)
-                    const metric = projectHours.find((m) => m.projectId === allocation.projectId)
+                    const metric = projectHours.find((item) => item.projectId === allocation.projectId)
                     const entry = reviewState[allocation.projectId]
                     return (
                       <div key={allocation.projectId} className="space-y-2 rounded-lg border border-border/70 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex min-w-0 items-center gap-2">
                             <PriorityDot priority={allocation.priority} />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium">{project?.title ?? "Unknown"}</p>
@@ -428,7 +269,7 @@ export function CommandCenter() {
                         <div className="grid gap-2 sm:grid-cols-[auto_1fr_2fr]">
                           <div className="space-y-1">
                             <Label className="text-xs">Achieved?</Label>
-                            <Select value={String(entry?.achieved ?? false)} onValueChange={(v) => updateReview(allocation.projectId, { achieved: v === "true" })}>
+                            <Select value={String(entry?.achieved ?? false)} onValueChange={(value) => updateReview(allocation.projectId, { achieved: value === "true" })}>
                               <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="true">Yes</SelectItem>
@@ -438,7 +279,7 @@ export function CommandCenter() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Decision</Label>
-                            <Select value={entry?.decision ?? "continue"} onValueChange={(v) => updateReview(allocation.projectId, { decision: v as "continue" | "adjust" | "remove" })}>
+                            <Select value={entry?.decision ?? "continue"} onValueChange={(value) => updateReview(allocation.projectId, { decision: value as "continue" | "adjust" | "remove" })}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="continue">Continue</SelectItem>
@@ -466,6 +307,186 @@ export function CommandCenter() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function PlanTabContent({
+  activePlan,
+  activeProjects,
+  existingReviewCompleted,
+  saveWeeklyPlan,
+  weekStartISO,
+}: {
+  activePlan: ReturnType<typeof getActiveWeeklyPlan>
+  activeProjects: Project[]
+  existingReviewCompleted?: boolean
+  saveWeeklyPlan: ReturnType<typeof useAppStore.getState>["saveWeeklyPlan"]
+  weekStartISO: string
+}) {
+  const [draftCapacity, setDraftCapacity] = useState(
+    String(activePlan?.totalCapacityHours ?? DEFAULT_WEEKLY_CAPACITY_HOURS)
+  )
+  const [draftAllocations, setDraftAllocations] = useState<WeeklyAllocation[]>(
+    activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")]
+  )
+  const [planSaveModal, setPlanSaveModal] = useState<{
+    open: boolean
+    status: "success" | "error"
+    title: string
+    description: string
+  }>({
+    open: false,
+    status: "success",
+    title: "",
+    description: "",
+  })
+
+  const planDraft = {
+    id: activePlan?.id ?? weekStartISO,
+    weekStartISO,
+    totalCapacityHours: Math.max(1, Number(draftCapacity) || 0),
+    allocations: draftAllocations,
+    status: existingReviewCompleted ? ("reviewed" as const) : ("active" as const),
+    deleted: false,
+  }
+
+  const validation = validateWeeklyPlan(planDraft, activeProjects)
+  const projectOptions = activeProjects.filter((project) => !draftAllocations.some((allocation) => allocation.projectId === project.id))
+
+  function updateAllocation(index: number, updates: Partial<WeeklyAllocation>) {
+    setDraftAllocations((current) => current.map((allocation, allocationIndex) => (allocationIndex === index ? { ...allocation, ...updates } : allocation)))
+  }
+
+  function addAllocation() {
+    if (draftAllocations.length >= MAX_WEEKLY_PLAN_PROJECTS) return
+    setDraftAllocations((current) => [...current, emptyAllocation("P2")])
+  }
+
+  function removeAllocation(index: number) {
+    setDraftAllocations((current) => current.filter((_, allocationIndex) => allocationIndex !== index))
+  }
+
+  function handleSavePlan() {
+    if (!validation.isValid) {
+      setPlanSaveModal({
+        open: true,
+        status: "error",
+        title: "Plan not saved",
+        description: Array.from(new Set(validation.errors)).join(" "),
+      })
+      return
+    }
+
+    try {
+      saveWeeklyPlan({
+        id: activePlan?.id ?? weekStartISO,
+        weekStartISO,
+        totalCapacityHours: Number(draftCapacity) || DEFAULT_WEEKLY_CAPACITY_HOURS,
+        allocations: draftAllocations,
+        status: existingReviewCompleted ? "reviewed" : "active",
+        reviewedAt: activePlan?.reviewedAt,
+        deleted: false,
+      })
+
+      setPlanSaveModal({
+        open: true,
+        status: "success",
+        title: "Plan saved",
+        description: `Your week for ${format(new Date(`${weekStartISO}T12:00:00`), "MMM d")} is locked in and ready to execute.`,
+      })
+    } catch (error) {
+      setPlanSaveModal({
+        open: true,
+        status: "error",
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Something went wrong while saving your weekly plan.",
+      })
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-base">Capacity &amp; Allocation</CardTitle>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">{planDraft.totalCapacityHours}h capacity</span>
+              <span className="text-muted-foreground">{validation.allocatedHours}h allocated</span>
+              <span className={cn("font-medium", validation.isOverCapacity ? "text-amber-400" : "text-emerald-400")}>
+                {validation.remainingHours}h free
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Label htmlFor="weekly-capacity" className="shrink-0">Weekly hours</Label>
+            <Input id="weekly-capacity" type="number" min={1} max={80} value={draftCapacity} onChange={(e) => setDraftCapacity(e.target.value)} className="w-24" />
+          </div>
+
+          <div className="space-y-2">
+            {draftAllocations.map((allocation, index) => (
+              <div key={`${allocation.projectId || "empty"}-${index}`} className="grid gap-2 rounded-lg border border-border/70 p-3 lg:grid-cols-[1.8fr_0.7fr_0.7fr_2fr_auto]">
+                <div className="space-y-1">
+                  <Label className="text-xs">Project</Label>
+                  <Select value={allocation.projectId || "none"} onValueChange={(value) => updateAllocation(index, { projectId: value === "none" ? "" : value })}>
+                    <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select project</SelectItem>
+                      {[
+                        allocation.projectId ? activeProjects.find((project) => project.id === allocation.projectId) : undefined,
+                        ...projectOptions,
+                      ]
+                        .filter((project, projectIndex, list): project is Project => Boolean(project) && list.findIndex((entry) => entry?.id === project?.id) === projectIndex)
+                        .map((project) => <SelectItem key={project.id} value={project.id}>{project.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Priority</Label>
+                  <Select value={allocation.priority} onValueChange={(value) => updateAllocation(index, { priority: value as ProjectPriority })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{PRIORITY_OPTIONS.map((priority) => <SelectItem key={priority} value={priority}>{priority}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Hours</Label>
+                  <Input type="number" min={1} max={40} value={allocation.hoursAllocated || ""} onChange={(e) => updateAllocation(index, { hoursAllocated: Number(e.target.value) || 0 })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Weekly outcome</Label>
+                  <Input value={allocation.weeklyOutcome} onChange={(e) => updateAllocation(index, { weeklyOutcome: e.target.value })} placeholder="One concrete result for this week" />
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeAllocation(index)} aria-label={`Remove allocation ${index + 1}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={addAllocation} disabled={draftAllocations.length >= MAX_WEEKLY_PLAN_PROJECTS}>
+              <Plus className="mr-2 h-4 w-4" />Add project
+            </Button>
+            <Button type="button" onClick={handleSavePlan}>Save plan</Button>
+          </div>
+
+          {validation.errors.length > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+              <div className="mb-1 flex items-center gap-2 text-sm font-medium text-amber-100">
+                <AlertTriangle className="h-4 w-4" />Fix before saving
+              </div>
+              <div className="space-y-0.5 text-sm text-amber-50">
+                {Array.from(new Set(validation.errors)).map((error) => <p key={error}>{error}</p>)}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={planSaveModal.open} onOpenChange={(open) => setPlanSaveModal((current) => ({ ...current, open }))}>
         <DialogContent className="sm:max-w-md">
@@ -489,11 +510,9 @@ export function CommandCenter() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function PriorityDot({ priority }: { priority: string }) {
   const color = priority === "P1" ? "bg-red-500" : priority === "P2" ? "bg-amber-400" : "bg-slate-500"
