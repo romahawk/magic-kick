@@ -28,6 +28,7 @@ import { getOrCreateDeviceId } from "@/lib/sync/deviceId"
 import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollbackTaskXP } from "@/lib/xp-engine"
 import { levelFromXP } from "@/lib/game-utils"
 import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achievement-engine"
+import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence"
 import {
   seedAchievements,
   seedGoals,
@@ -315,6 +316,7 @@ export interface AppState {
   deleteCategory: (name: string) => void
   setCategoryColor: (name: string, color: string) => void
   toggleTask: (id: string) => void
+  toggleTaskOccurrence: (id: string, dateISO: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
   reorderTasks: (draggedTaskId: string, targetTaskId: string) => void
   moveTaskToLane: (taskId: string, lane: TaskLane, targetTaskId?: string) => void
@@ -721,6 +723,35 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
+      toggleTaskOccurrence: (id, dateISO) => {
+        const ts = now()
+        set((s) => {
+          const task = s.tasks.find((entry) => entry.id === id)
+          if (!task || !isRecurringTask(task)) return {}
+
+          const nextCompletedDates = toggleTaskOccurrenceDate(task.recurrenceCompletedDates, dateISO)
+          return {
+            tasks: s.tasks.map((entry) =>
+              entry.id === id
+                ? {
+                    ...entry,
+                    recurrenceCompletedDates: nextCompletedDates,
+                    clientUpdatedAt: ts,
+                    deleted: false,
+                  }
+                : entry
+            ),
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                tasks: { ...s.sync.pending.tasks, [id]: ts },
+              },
+            },
+          }
+        })
+      },
+
       addTask: (task) => {
         const { timeHHmm, ...taskInput } = task
         const startHHmm = normalizeTimeHHmm(timeHHmm)
@@ -731,7 +762,16 @@ export const useAppStore = create<AppState>()(
         const xpValue = taskInput.xpValue ?? calculateTaskXP(taskInput)
         set((s) => {
           const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
-          const item = touchEntity({ ...taskInput, lane: taskInput.lane ?? "backlog", id, xpValue, order: maxOrder + 1, deleted: false })
+          const item = touchEntity({
+            ...taskInput,
+            lane: taskInput.lane ?? "backlog",
+            repeat: taskInput.repeat ?? "none",
+            recurrenceCompletedDates: taskInput.recurrenceCompletedDates ?? [],
+            id,
+            xpValue,
+            order: maxOrder + 1,
+            deleted: false,
+          })
           const nextTasks = [...s.tasks, item]
           const nextSchedule = [...s.schedule]
           const nextTimeBlocks = [...s.timeBlocks]
@@ -1865,6 +1905,8 @@ export const useAppStore = create<AppState>()(
               lane: "backlog" as TaskLane,
               order: maxOrder + 1,
               dueDate: block.dateISO,
+              repeat: "none",
+              recurrenceCompletedDates: [],
               estimateMin: Math.round(plannedHours * 60),
               completed: false,
               linkedProjectId: block.projectId,
@@ -2119,7 +2161,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 8,
+      version: 9,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -2188,6 +2230,8 @@ export const useAppStore = create<AppState>()(
         const tasks = normalizeCollection(merged.tasks).map((task, index) => ({
           ...task,
           lane: task.lane ?? "backlog",
+          repeat: task.repeat ?? "none",
+          recurrenceCompletedDates: Array.from(new Set(task.recurrenceCompletedDates ?? [])).sort((a, b) => a.localeCompare(b)),
           order: task.order ?? index + 1,
           completedAt:
             task.completed && typeof task.completedAt === "string" && task.completedAt.trim()

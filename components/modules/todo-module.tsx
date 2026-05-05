@@ -5,6 +5,7 @@ import type { ElementType } from "react"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS } from "@/lib/execution-os"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
+import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Archive, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Tags, Trash2, Zap } from "lucide-react"
-import type { Task, TaskCategory, TaskLane } from "@/lib/types"
+import type { Task, TaskCategory, TaskLane, TaskRepeat } from "@/lib/types"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 const TASK_LANES: Array<{ id: TaskLane; title: string; description: string; icon: ElementType }> = [
@@ -80,6 +81,7 @@ export function TodoModule() {
   const [editCategory, setEditCategory] = useState<TaskCategory>("Learning")
   const [editLane, setEditLane] = useState<TaskLane>("backlog")
   const [editDueDate, setEditDueDate] = useState("")
+  const [editRepeat, setEditRepeat] = useState<TaskRepeat>("none")
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
   const [editEstimate, setEditEstimate] = useState("")
@@ -132,6 +134,7 @@ export function TodoModule() {
     setEditCategory(task.category)
     setEditLane(task.lane ?? "backlog")
     setEditDueDate(task.dueDate ?? "")
+    setEditRepeat(task.repeat ?? "none")
     setEditStartTime(taskTimeSlots[task.id]?.startTime ?? "")
     setEditEndTime(taskTimeSlots[task.id]?.endTime ?? "")
     setEditEstimate(task.estimateMin ? String(task.estimateMin) : "")
@@ -166,6 +169,7 @@ export function TodoModule() {
       category: categories.includes(editCategory) ? editCategory : selectedTask.category,
       lane: editLane,
       dueDate: editDueDate || undefined,
+      repeat: editRepeat,
       estimateMin: editEstimate ? Number(editEstimate) : undefined,
       pomodorosPlanned: editPomodoros ? Number(editPomodoros) : undefined,
     }, {
@@ -368,6 +372,15 @@ export function TodoModule() {
                     </Select>
                   </div>
                   <div><Label htmlFor="edit-task-due">Due date</Label><Input id="edit-task-due" type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
+                  <div>
+                    <Label>Repeat</Label>
+                    <Select value={editRepeat} onValueChange={(value) => setEditRepeat(value as TaskRepeat)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TASK_REPEAT_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div><Label htmlFor="edit-task-start">Start time</Label><Input id="edit-task-start" type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} disabled={!editDueDate} /></div>
                     <div><Label htmlFor="edit-task-end">End time</Label><Input id="edit-task-end" type="time" value={editEndTime} onChange={(e) => setEditEndTime(e.target.value)} disabled={!editDueDate} /></div>
@@ -381,6 +394,7 @@ export function TodoModule() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge style={{ backgroundColor: categoryColors[selectedTask.category] ?? "#334155", color: "#ffffff" }}>{selectedTask.category}</Badge>
                 <Badge variant="outline">{TASK_LANE_LABELS[selectedTask.lane ?? "backlog"]}</Badge>
+                {(selectedTask.repeat ?? "none") !== "none" ? <Badge variant="outline">Repeats {selectedTask.repeat}</Badge> : null}
                 <Badge variant="outline" className="gap-1"><Zap className="h-3 w-3" /> {selectedTask.xpValue} XP</Badge>
                 {selectedTask.completed ? <Badge variant="secondary">Completed</Badge> : null}
               </div>
@@ -542,6 +556,7 @@ function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragSta
           {task.category}
         </Badge>
         {showLane ? <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge> : null}
+        {(task.repeat ?? "none") !== "none" ? <Badge variant="outline" className="text-[10px]">Repeats {task.repeat}</Badge> : null}
         {timeSlot ? (
           <Badge variant="outline" className="gap-1 text-[10px] font-normal tabular-nums">
             <Clock className="h-2.5 w-2.5" />{fmtTime(timeSlot.startTime)} – {fmtTime(timeSlot.endTime)}

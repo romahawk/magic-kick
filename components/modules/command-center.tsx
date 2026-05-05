@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { format } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
@@ -77,6 +78,17 @@ export function CommandCenter() {
       ])
     )
   )
+  const [planSaveModal, setPlanSaveModal] = useState<{
+    open: boolean
+    status: "success" | "error"
+    title: string
+    description: string
+  }>({
+    open: false,
+    status: "success",
+    title: "",
+    description: "",
+  })
 
   function updateReview(
     projectId: string,
@@ -231,6 +243,7 @@ export function CommandCenter() {
             existingReviewCompleted={existingReview?.completed}
             saveWeeklyPlan={saveWeeklyPlan}
             weekStartISO={weekStartISO}
+            onPlanSaveResult={setPlanSaveModal}
           />
         </TabsContent>
 
@@ -307,6 +320,29 @@ export function CommandCenter() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={planSaveModal.open} onOpenChange={(open) => setPlanSaveModal((current) => ({ ...current, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {planSaveModal.status === "success" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              )}
+              {planSaveModal.title}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm leading-6">
+              {planSaveModal.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setPlanSaveModal((current) => ({ ...current, open: false }))}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -317,12 +353,21 @@ function PlanTabContent({
   existingReviewCompleted,
   saveWeeklyPlan,
   weekStartISO,
+  onPlanSaveResult,
 }: {
   activePlan: ReturnType<typeof getActiveWeeklyPlan>
   activeProjects: Project[]
   existingReviewCompleted?: boolean
   saveWeeklyPlan: ReturnType<typeof useAppStore.getState>["saveWeeklyPlan"]
   weekStartISO: string
+  onPlanSaveResult: Dispatch<
+    SetStateAction<{
+      open: boolean
+      status: "success" | "error"
+      title: string
+      description: string
+    }>
+  >
 }) {
   const [draftCapacity, setDraftCapacity] = useState(
     String(activePlan?.totalCapacityHours ?? DEFAULT_WEEKLY_CAPACITY_HOURS)
@@ -330,18 +375,6 @@ function PlanTabContent({
   const [draftAllocations, setDraftAllocations] = useState<WeeklyAllocation[]>(
     activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")]
   )
-  const [planSaveModal, setPlanSaveModal] = useState<{
-    open: boolean
-    status: "success" | "error"
-    title: string
-    description: string
-  }>({
-    open: false,
-    status: "success",
-    title: "",
-    description: "",
-  })
-
   const planDraft = {
     id: activePlan?.id ?? weekStartISO,
     weekStartISO,
@@ -369,7 +402,7 @@ function PlanTabContent({
 
   function handleSavePlan() {
     if (!validation.isValid) {
-      setPlanSaveModal({
+      onPlanSaveResult({
         open: true,
         status: "error",
         title: "Plan not saved",
@@ -389,14 +422,14 @@ function PlanTabContent({
         deleted: false,
       })
 
-      setPlanSaveModal({
+      onPlanSaveResult({
         open: true,
         status: "success",
         title: "Plan saved",
         description: `Your week for ${format(new Date(`${weekStartISO}T12:00:00`), "MMM d")} is locked in and ready to execute.`,
       })
     } catch (error) {
-      setPlanSaveModal({
+      onPlanSaveResult({
         open: true,
         status: "error",
         title: "Save failed",
@@ -488,28 +521,6 @@ function PlanTabContent({
         </CardContent>
       </Card>
 
-      <Dialog open={planSaveModal.open} onOpenChange={(open) => setPlanSaveModal((current) => ({ ...current, open }))}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {planSaveModal.status === "success" ? (
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-              )}
-              {planSaveModal.title}
-            </DialogTitle>
-            <DialogDescription className="pt-1 text-sm leading-6">
-              {planSaveModal.description}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" onClick={() => setPlanSaveModal((current) => ({ ...current, open: false }))}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
