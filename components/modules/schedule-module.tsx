@@ -14,8 +14,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2 } from "lucide-react"
-import type { TimeBlock } from "@/lib/types"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock } from "lucide-react"
+import type { Task, TimeBlock } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 // ── Grid constants ──────────────────────────────────────────────────────────
@@ -116,11 +116,14 @@ interface Preview {
 
 export function ScheduleModule() {
   const projects = useAppStore((s) => s.projects).filter((p) => !p.deleted)
+  const tasks = useAppStore((s) => s.tasks).filter((t) => !t.deleted)
+  const scheduleItems = useAppStore((s) => s.schedule)
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const timeBlocks = useAppStore((s) => s.timeBlocks)
   const executionLogs = useAppStore((s) => s.executionLogs)
   const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
   const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
+  const updateTask = useAppStore((s) => s.updateTask)
   const deleteTimeBlock = useAppStore((s) => s.deleteTimeBlock)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
@@ -166,6 +169,46 @@ export function ScheduleModule() {
   // Drag preview (optimistic local state during drag)
   const [preview, setPreview] = useState<Preview | null>(null)
   const dragRef = useRef<DragState | null>(null)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+
+  const taskTimeSlots = useMemo(() => {
+    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }> = {}
+    for (const item of scheduleItems) {
+      if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
+        map[item.linkedTaskId] = {
+          startTime: item.startISO.slice(11, 16),
+          endTime: item.endISO.slice(11, 16),
+          plannedHours: 0,
+          status: "planned",
+        }
+      }
+    }
+    for (const block of timeBlocks) {
+      if (!block.deleted && block.linkedTaskId) {
+        map[block.linkedTaskId] = {
+          startTime: block.startTime,
+          endTime: block.endTime,
+          plannedHours: block.plannedHours,
+          actualHours: block.actualHours,
+          status: block.status,
+        }
+      }
+    }
+    return map
+  }, [scheduleItems, timeBlocks])
+
+  const unscheduledTasks = useMemo(
+    () =>
+      tasks
+        .filter((task) => !task.completed && !taskTimeSlots[task.id])
+        .sort((a, b) => {
+          const aTs = a.dueDate ? new Date(`${a.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
+          const bTs = b.dueDate ? new Date(`${b.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
+          if (aTs !== bTs) return aTs - bTs
+          return (a.order ?? 0) - (b.order ?? 0)
+        }),
+    [tasks, taskTimeSlots]
+  )
 
   // Mouse down on grid background → record position for click-to-create detection
   function gridMouseDown(e: React.MouseEvent<HTMLDivElement>, dayISO: string) {
@@ -174,7 +217,7 @@ export function ScheduleModule() {
   }
 
   function gridMouseUp(e: React.MouseEvent<HTMLDivElement>, dayISO: string) {
-    if (dragRef.current) return
+    if (dragRef.current || draggedTaskId) return
     const startY = Number((e.currentTarget as HTMLElement).dataset.mousedownY ?? 0)
     if (Math.abs(e.clientY - startY) > 8) return
     const y = Math.max(0, e.clientY - e.currentTarget.getBoundingClientRect().top)
@@ -200,6 +243,27 @@ export function ScheduleModule() {
     })
     setCreating(null)
     setNewDesc("")
+  }
+
+  function scheduleTaskFromDrop(taskId: string, dayISO: string, clientY: number, containerTop: number) {
+    const task = tasks.find((entry) => entry.id === taskId)
+    if (!task) return
+    const y = Math.max(0, clientY - containerTop)
+    const startMin = clampMin(yToMin(y))
+    const estimateMin = Math.max(15, task.estimateMin ?? 60)
+    const endMin = clampMin(startMin + estimateMin)
+    const safeEndMin = endMin > startMin ? endMin : Math.min(DAY_END * 60, startMin + 15)
+
+    updateTask(
+      taskId,
+      {
+        dueDate: dayISO,
+      },
+      {
+        startHHmm: toTime(startMin),
+        endHHmm: toTime(safeEndMin),
+      }
+    )
   }
 
   // Block drag start
@@ -320,7 +384,7 @@ export function ScheduleModule() {
 
       <div className="flex flex-1 gap-4 overflow-hidden">
           {/* Calendar grid */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
+          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
             {/* Day header row */}
             <div className="flex border-b bg-muted/30">
               <div className="w-14 shrink-0 border-r" />
@@ -384,6 +448,16 @@ export function ScheduleModule() {
                       style={{ height: GRID_HEIGHT }}
                       onMouseDown={(e) => gridMouseDown(e, day.iso)}
                       onMouseUp={(e) => gridMouseUp(e, day.iso)}
+                      onDragOver={(e) => {
+                        if (!draggedTaskId) return
+                        e.preventDefault()
+                      }}
+                      onDrop={(e) => {
+                        if (!draggedTaskId) return
+                        e.preventDefault()
+                        scheduleTaskFromDrop(draggedTaskId, day.iso, e.clientY, e.currentTarget.getBoundingClientRect().top)
+                        setDraggedTaskId(null)
+                      }}
                     >
                       {/* Hour grid lines */}
                       {HOUR_LABELS.map(({ h }) => (
@@ -484,61 +558,62 @@ export function ScheduleModule() {
                 })}
               </div>
             </div>
-          </div>
 
-          {/* Right sidebar: create panel / edit panel / allocation status */}
-          <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto">
-            {/* Create panel */}
             {creating && (
-              <div className="rounded-xl border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-semibold">New block</p>
-                  <button onClick={() => setCreating(null)} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Description</Label>
-                    <Input
-                      autoFocus
-                      value={newDesc}
-                      onChange={(e) => setNewDesc(e.target.value)}
-                      placeholder="What gets done?"
-                      onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                    />
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-background/20">
+                <div className="pointer-events-auto w-full max-w-sm rounded-xl border bg-card p-4 shadow-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-semibold">New block</p>
+                    <button onClick={() => setCreating(null)} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Project <span className="text-muted-foreground">(optional)</span></Label>
-                    <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="No project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No project</SelectItem>
-                        {activeProjects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Start</Label>
-                      <Input type="time" value={creating.startTime} onChange={(e) => setCreating((c) => c && ({ ...c, startTime: e.target.value }))} />
+                      <Label className="text-xs">Description</Label>
+                      <Input
+                        autoFocus
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                        placeholder="What gets done?"
+                        onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                      />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">End</Label>
-                      <Input type="time" value={creating.endTime} onChange={(e) => setCreating((c) => c && ({ ...c, endTime: e.target.value }))} />
+                      <Label className="text-xs">Project <span className="text-muted-foreground">(optional)</span></Label>
+                      <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="No project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No project</SelectItem>
+                          {activeProjects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Start</Label>
+                        <Input type="time" value={creating.startTime} onChange={(e) => setCreating((c) => c && ({ ...c, startTime: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">End</Label>
+                        <Input type="time" value={creating.endTime} onChange={(e) => setCreating((c) => c && ({ ...c, endTime: e.target.value }))} />
+                      </div>
+                    </div>
+                    <Button className="w-full" onClick={handleCreate} disabled={!newDesc.trim()}>
+                      Add block
+                    </Button>
                   </div>
-                  <Button className="w-full" onClick={handleCreate} disabled={!newDesc.trim()}>
-                    Add block
-                  </Button>
                 </div>
               </div>
             )}
+          </div>
 
+          {/* Right sidebar: edit panel / allocation status / unscheduled tasks */}
+          <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
             {/* Edit panel */}
             {editBlock && (
               <EditPanel
@@ -580,6 +655,35 @@ export function ScheduleModule() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-xl border bg-card p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold">Unscheduled tasks</p>
+                  <p className="text-xs text-muted-foreground">Drag to a day and time slot on the calendar.</p>
+                </div>
+                <Badge variant="secondary" className="text-[10px]">
+                  {unscheduledTasks.length}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {unscheduledTasks.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
+                    All open tasks already have an assigned time slot.
+                  </div>
+                ) : (
+                  unscheduledTasks.map((task) => (
+                    <UnscheduledTaskCard
+                      key={task.id}
+                      task={task}
+                      isDragging={draggedTaskId === task.id}
+                      onDragStart={() => setDraggedTaskId(task.id)}
+                      onDragEnd={() => setDraggedTaskId(null)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
     </div>
@@ -587,6 +691,54 @@ export function ScheduleModule() {
 }
 
 // ── Edit panel ────────────────────────────────────────────────────────────────
+function UnscheduledTaskCard({
+  task,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+}: {
+  task: Task
+  isDragging: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
+}) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "flex w-full flex-col gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 text-left transition-colors hover:bg-secondary/35",
+        isDragging && "opacity-60"
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <ListTodo className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{task.title}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <Badge variant="secondary" className="text-[10px]">
+              {task.category}
+            </Badge>
+            {task.dueDate ? (
+              <span className="text-[10px] text-muted-foreground">{task.dueDate}</span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">No date</span>
+            )}
+            {task.estimateMin ? (
+              <Badge variant="outline" className="gap-1 text-[10px]">
+                <Clock className="h-2.5 w-2.5" />
+                {task.estimateMin}m
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 interface EditPanelProps {
   block: TimeBlock
   project: { id: string; title: string; color: string } | undefined
