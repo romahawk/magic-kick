@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
@@ -19,6 +19,14 @@ import type { ProjectPriority, WeeklyAllocation } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
@@ -60,6 +68,17 @@ export function CommandCenter() {
   const [draftAllocations, setDraftAllocations] = useState<WeeklyAllocation[]>(
     activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")]
   )
+  const [planSaveModal, setPlanSaveModal] = useState<{
+    open: boolean
+    status: "success" | "error"
+    title: string
+    description: string
+  }>({
+    open: false,
+    status: "success",
+    title: "",
+    description: "",
+  })
 
   const planDraft = {
     id: activePlan?.id ?? weekStartISO,
@@ -73,6 +92,11 @@ export function CommandCenter() {
   const validation = validateWeeklyPlan(planDraft, activeProjects)
   const projectOptions = activeProjects.filter((p) => !draftAllocations.some((a) => a.projectId === p.id))
 
+  useEffect(() => {
+    setDraftCapacity(String(activePlan?.totalCapacityHours ?? DEFAULT_WEEKLY_CAPACITY_HOURS))
+    setDraftAllocations(activePlan?.allocations.length ? activePlan.allocations : [emptyAllocation("P1")])
+  }, [activePlan?.id, activePlan?.totalCapacityHours, activePlan?.allocations])
+
   function updateAllocation(index: number, updates: Partial<WeeklyAllocation>) {
     setDraftAllocations((cur) => cur.map((a, i) => (i === index ? { ...a, ...updates } : a)))
   }
@@ -84,16 +108,41 @@ export function CommandCenter() {
     setDraftAllocations((cur) => cur.filter((_, i) => i !== index))
   }
   function handleSavePlan() {
-    if (!validation.isValid) return
-    saveWeeklyPlan({
-      id: activePlan?.id ?? weekStartISO,
-      weekStartISO,
-      totalCapacityHours: Number(draftCapacity) || DEFAULT_WEEKLY_CAPACITY_HOURS,
-      allocations: draftAllocations,
-      status: existingReview?.completed ? "reviewed" : "active",
-      reviewedAt: activePlan?.reviewedAt,
-      deleted: false,
-    })
+    if (!validation.isValid) {
+      setPlanSaveModal({
+        open: true,
+        status: "error",
+        title: "Plan not saved",
+        description: Array.from(new Set(validation.errors)).join(" "),
+      })
+      return
+    }
+
+    try {
+      saveWeeklyPlan({
+        id: activePlan?.id ?? weekStartISO,
+        weekStartISO,
+        totalCapacityHours: Number(draftCapacity) || DEFAULT_WEEKLY_CAPACITY_HOURS,
+        allocations: draftAllocations,
+        status: existingReview?.completed ? "reviewed" : "active",
+        reviewedAt: activePlan?.reviewedAt,
+        deleted: false,
+      })
+
+      setPlanSaveModal({
+        open: true,
+        status: "success",
+        title: "Plan saved",
+        description: `Your week for ${format(new Date(`${weekStartISO}T12:00:00`), "MMM d")} is locked in and ready to execute.`,
+      })
+    } catch (error) {
+      setPlanSaveModal({
+        open: true,
+        status: "error",
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Something went wrong while saving your weekly plan.",
+      })
+    }
   }
 
   // ── Review tab state ─────────────────────────────────────────────────────
@@ -326,7 +375,7 @@ export function CommandCenter() {
                 <Button type="button" variant="outline" onClick={addAllocation} disabled={draftAllocations.length >= MAX_WEEKLY_PLAN_PROJECTS}>
                   <Plus className="mr-2 h-4 w-4" />Add project
                 </Button>
-                <Button type="button" onClick={handleSavePlan} disabled={!validation.isValid}>Save plan</Button>
+                <Button type="button" onClick={handleSavePlan}>Save plan</Button>
               </div>
 
               {validation.errors.length > 0 && (
@@ -417,6 +466,29 @@ export function CommandCenter() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={planSaveModal.open} onOpenChange={(open) => setPlanSaveModal((current) => ({ ...current, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {planSaveModal.status === "success" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
+              )}
+              {planSaveModal.title}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm leading-6">
+              {planSaveModal.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setPlanSaveModal((current) => ({ ...current, open: false }))}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -72,6 +72,10 @@ function sortMilestonesByDay(milestones: ProjectMilestone[]) {
   })
 }
 
+function isCompletedInVisibleWeek(completedAt: string | undefined, weekDateSet: Set<string>) {
+  return Boolean(completedAt && weekDateSet.has(completedAt))
+}
+
 const STATUS_SECTIONS: Array<{ id: ProjectStatus; label: string; description: string }> = [
   { id: "active", label: "Active", description: "Counts toward capacity and cognitive load." },
   { id: "paused", label: "Paused", description: "Temporarily inactive but still visible." },
@@ -867,6 +871,8 @@ function WeeklyProjectGrid({
   } | null>>
   onSaveSlotComposer: (weekDateISO: string) => void
 }) {
+  const weekDateSet = new Set(weekDays.map((day) => day.iso))
+
   return (
     <>
       <div className="mb-4 grid grid-cols-[220px_1fr] gap-3 xl:grid-cols-[260px_1fr]">
@@ -894,7 +900,6 @@ function WeeklyProjectGrid({
         const openMilestones = sortedMilestones.filter((milestone) => !milestone.completed)
         const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
         const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
-        const openProjectTasks = projectTasks.filter((task) => !task.completed)
         const completedTasks = projectTasks.filter((t) => t.completed).length
         const completedMilestoneCount = completedMilestones.length
         const totalMilestones = project.milestones.length
@@ -954,8 +959,20 @@ function WeeklyProjectGrid({
             </div>
             <div className="grid grid-cols-7 gap-1">
               {weekDays.map((day, i) => {
-                const dayMilestones = openMilestones.filter((m) => m.dayIndex === i)
-                const dayTasks = openProjectTasks.filter((task) => task.dueDate === day.iso)
+                const dayMilestones = sortedMilestones
+                  .filter(
+                    (milestone) =>
+                      milestone.dayIndex === i &&
+                      (!milestone.completed || isCompletedInVisibleWeek(milestone.completedAt, weekDateSet))
+                  )
+                  .sort((a, b) => Number(a.completed) - Number(b.completed))
+                const dayTasks = projectTasks
+                  .filter(
+                    (task) =>
+                      task.dueDate === day.iso &&
+                      (!task.completed || isCompletedInVisibleWeek(task.completedAt, weekDateSet))
+                  )
+                  .sort((a, b) => Number(a.completed) - Number(b.completed))
                 const isComposerOpen = slotComposer?.projectId === project.id && slotComposer.dayIndex === i
                 return (
                   <div
@@ -986,12 +1003,21 @@ function WeeklyProjectGrid({
                             }}
                             className={cn(
                               "flex items-center gap-1 rounded px-1 py-0.5 text-left transition-colors",
-                              milestone.completed ? "bg-primary/20" : "hover:bg-primary/10"
+                              milestone.completed
+                                ? "bg-primary/20 opacity-75 hover:bg-primary/25"
+                                : "hover:bg-primary/10"
                             )}
                             aria-label={`Toggle milestone: ${milestone.title}`}
                           >
                             <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", milestone.completed ? "text-primary" : "text-muted-foreground")} />
-                            <span className="line-clamp-1 text-[9px] leading-tight text-muted-foreground">{milestone.title}</span>
+                            <span
+                              className={cn(
+                                "line-clamp-1 text-[9px] leading-tight text-muted-foreground",
+                                milestone.completed && "line-through"
+                              )}
+                            >
+                              {milestone.title}
+                            </span>
                           </button>
                         ))}
                         {dayTasks.map((task) => (
@@ -1001,11 +1027,23 @@ function WeeklyProjectGrid({
                               event.stopPropagation()
                               onToggleTask(task.id)
                             }}
-                            className="flex items-center gap-1 rounded border border-emerald-500/20 bg-emerald-500/10 px-1 py-0.5 text-left transition-colors hover:bg-emerald-500/15"
+                            className={cn(
+                              "flex items-center gap-1 rounded border px-1 py-0.5 text-left transition-colors",
+                              task.completed
+                                ? "border-emerald-500/30 bg-emerald-500/20 opacity-75 hover:bg-emerald-500/25"
+                                : "border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/15"
+                            )}
                             aria-label={`Toggle task: ${task.title}`}
                           >
                             <ListTodo className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
-                            <span className="line-clamp-1 text-[9px] leading-tight text-emerald-100">{task.title}</span>
+                            <span
+                              className={cn(
+                                "line-clamp-1 text-[9px] leading-tight text-emerald-100",
+                                task.completed && "line-through"
+                              )}
+                            >
+                              {task.title}
+                            </span>
                           </button>
                         ))}
                       </div>
