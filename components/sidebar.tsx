@@ -23,13 +23,13 @@ import {
 
 const NAV_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
   { id: "command-center", label: "Command Center", icon: LayoutDashboard },
+  { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "goals", label: "Goals", icon: Target },
   { id: "todo", label: "ToDo", icon: CheckSquare },
   { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "achievements", label: "Achievements", icon: Trophy },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "resources", label: "Resources", icon: BookOpen },
   { id: "journal", label: "Journal", icon: BookHeart },
+  { id: "achievements", label: "Achievements", icon: Trophy },
 ]
 
 export function Sidebar() {

@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus } from "lucide-react"
-import type { TaskCategory } from "@/lib/types"
+import type { TaskCategory, TaskRepeat } from "@/lib/types"
+import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
@@ -26,6 +27,7 @@ export function QuickAddDialog() {
   const [taskCategory, setTaskCategory] = useState<TaskCategory>("Learning")
   const [taskDay, setTaskDay] = useState("")
   const [taskTime, setTaskTime] = useState("")
+  const [taskRepeat, setTaskRepeat] = useState<TaskRepeat>("none")
   const [goalTitle, setGoalTitle] = useState("")
   const [journalHighlights, setJournalHighlights] = useState("")
   const activeTaskCategory = useMemo(
@@ -41,11 +43,13 @@ export function QuickAddDialog() {
       category: activeTaskCategory,
       completed: false,
       dueDate: taskDay || undefined,
+      repeat: taskRepeat,
       timeHHmm: taskDay ? taskTime || undefined : undefined,
     })
     setTaskTitle("")
     setTaskDay("")
     setTaskTime("")
+    setTaskRepeat("none")
     setOpen(false)
   }
 
@@ -113,6 +117,19 @@ export function QuickAddDialog() {
                   disabled={!taskDay}
                 />
               </div>
+            </div>
+            <div>
+              <Label>Repeat</Label>
+              <Select value={taskRepeat} onValueChange={(value) => setTaskRepeat(value as TaskRepeat)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TASK_REPEAT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={handleAddTask}>Add Task</Button>
           </TabsContent>
