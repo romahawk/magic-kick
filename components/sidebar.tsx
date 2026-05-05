@@ -37,12 +37,10 @@ export function Sidebar() {
   const setActiveModule = useAppStore((s) => s.setActiveModule)
   const profile = useAppStore((s) => s.profile)
   const xpInfo = levelFromXP(profile.xpTotal)
-  const [collapsed, setCollapsed] = useState(false)
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("magic-kick-sidebar-collapsed")
-    if (stored === "true") setCollapsed(true)
-  }, [])
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false
+    return window.localStorage.getItem("magic-kick-sidebar-collapsed") === "true"
+  })
 
   useEffect(() => {
     window.localStorage.setItem("magic-kick-sidebar-collapsed", String(collapsed))
