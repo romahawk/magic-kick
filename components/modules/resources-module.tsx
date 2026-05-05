@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, ExternalLink, GripVertical, Search, Plus, Tag, Trash2, Pencil } from "lucide-react"
+import { BookOpen, ExternalLink, GripVertical, Search, Plus, Tag, Trash2, Pencil, ArrowUp, ArrowDown } from "lucide-react"
 
 export function ResourcesModule() {
   const allResources = useAppStore((s) => s.resources)
@@ -168,9 +168,19 @@ export function ResourcesModule() {
     setEditingResourceId(null)
   }
 
+  function moveLink<T>(links: T[], index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= links.length) return links
+    const next = [...links]
+    const [item] = next.splice(index, 1)
+    next.splice(targetIndex, 0, item)
+    return next
+  }
+
   function renderEditableLinks(
     links: Array<{ label: string; url: string }>,
-    onRemove: (index: number) => void
+    onRemove: (index: number) => void,
+    onReorder: (index: number, direction: "up" | "down") => void
   ) {
     if (links.length === 0) return null
 
@@ -184,6 +194,30 @@ export function ResourcesModule() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium leading-5">{link.label}</p>
               <p className="break-all text-xs leading-5 text-muted-foreground">{link.url}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mt-0.5 h-7 w-7 shrink-0 text-muted-foreground"
+                onClick={() => onReorder(index, "up")}
+                disabled={index === 0}
+                aria-label={`Move ${link.label} up`}
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mt-0.5 h-7 w-7 shrink-0 text-muted-foreground"
+                onClick={() => onReorder(index, "down")}
+                disabled={index === links.length - 1}
+                aria-label={`Move ${link.label} down`}
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+              </Button>
             </div>
             <Button
               type="button"
@@ -240,7 +274,11 @@ export function ResourcesModule() {
                     Add
                   </Button>
                 </div>
-                {renderEditableLinks(newLinks, (index) => setNewLinks((prev) => prev.filter((_, i) => i !== index)))}
+                {renderEditableLinks(
+                  newLinks,
+                  (index) => setNewLinks((prev) => prev.filter((_, i) => i !== index)),
+                  (index, direction) => setNewLinks((prev) => moveLink(prev, index, direction))
+                )}
               </div>
               <div>
                 <Label htmlFor="res-cat">Category</Label>
@@ -454,7 +492,11 @@ export function ResourcesModule() {
                   Add
                 </Button>
               </div>
-              {renderEditableLinks(editLinks, (index) => setEditLinks((prev) => prev.filter((_, i) => i !== index)))}
+              {renderEditableLinks(
+                editLinks,
+                (index) => setEditLinks((prev) => prev.filter((_, i) => i !== index)),
+                (index, direction) => setEditLinks((prev) => moveLink(prev, index, direction))
+              )}
             </div>
             <div>
               <Label htmlFor="edit-res-cat">Category</Label>
