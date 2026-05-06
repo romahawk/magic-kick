@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock } from "lucide-react"
 import type { Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 
 const HOUR_PX = 64
 const DAY_START = 6
@@ -604,7 +605,11 @@ export function ScheduleModule() {
                                 setCreating(null)
                               }}
                             >
-                              <p className="truncate font-medium leading-tight">{block.taskDescription}</p>
+                              <TruncatedTooltip
+                                as="p"
+                                content={block.taskDescription}
+                                className="truncate font-medium leading-tight"
+                              />
                               <p className="truncate opacity-75">
                                 {displayStart}–{displayEnd}
                               </p>
@@ -640,7 +645,11 @@ export function ScheduleModule() {
                                 ...style,
                               }}
                             >
-                              <p className="truncate font-medium leading-tight">{block.taskDescription}</p>
+                              <TruncatedTooltip
+                                as="p"
+                                content={block.taskDescription}
+                                className="truncate font-medium leading-tight"
+                              />
                               <p className="truncate opacity-75">
                                 {preview.startTime}–{preview.endTime}
                               </p>
@@ -833,7 +842,7 @@ function UnscheduledTaskCard({
       <div className="flex items-start gap-2">
         <ListTodo className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{task.title}</p>
+          <TruncatedTooltip as="p" content={task.title} className="truncate text-sm font-medium" />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary" className="text-[10px]">
               {task.category}
@@ -916,7 +925,11 @@ function EditPanel({
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#94a3b8" }} />
-          <p className="truncate text-sm font-semibold">{project?.title ?? "No project"}</p>
+          <TruncatedTooltip
+            as="p"
+            content={project?.title ?? "No project"}
+            className="truncate text-sm font-semibold"
+          />
         </div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />

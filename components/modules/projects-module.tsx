@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle, ListTodo } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task, TaskCategory } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
@@ -910,7 +911,11 @@ function WeeklyProjectGrid({
           <div key={project.id} className="mb-4 grid grid-cols-[220px_1fr] gap-3 xl:grid-cols-[260px_1fr]">
             <div className="flex min-w-0 flex-col justify-center rounded-md border border-border/50 bg-background/30 p-2">
               <div className="flex items-start gap-1">
-                <p className="min-w-0 flex-1 text-sm font-medium truncate">{project.title}</p>
+                <TruncatedTooltip
+                  as="p"
+                  content={project.title}
+                  className="min-w-0 flex-1 truncate text-sm font-medium"
+                />
                 <Button
                   type="button"
                   variant={focusedProjectId === project.id ? "default" : "ghost"}
@@ -1010,14 +1015,13 @@ function WeeklyProjectGrid({
                             aria-label={`Toggle milestone: ${milestone.title}`}
                           >
                             <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", milestone.completed ? "text-primary" : "text-muted-foreground")} />
-                            <span
+                            <TruncatedTooltip
+                              content={milestone.title}
                               className={cn(
                                 "line-clamp-1 text-[9px] leading-tight text-muted-foreground",
                                 milestone.completed && "line-through"
                               )}
-                            >
-                              {milestone.title}
-                            </span>
+                            />
                           </button>
                         ))}
                         {dayTasks.map((task) => (
@@ -1036,14 +1040,13 @@ function WeeklyProjectGrid({
                             aria-label={`Toggle task: ${task.title}`}
                           >
                             <ListTodo className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
-                            <span
+                            <TruncatedTooltip
+                              content={task.title}
                               className={cn(
                                 "line-clamp-1 text-[9px] leading-tight text-emerald-100",
                                 task.completed && "line-through"
                               )}
-                            >
-                              {task.title}
-                            </span>
+                            />
                           </button>
                         ))}
                       </div>
@@ -1328,7 +1331,7 @@ function ProjectDetailsGrid({
                       ) : (
                         <>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm">{m.title}</p>
+                            <TruncatedTooltip as="p" content={m.title} className="truncate text-sm" />
                             <div className="mt-1 flex items-center gap-2">
                               <Badge variant="outline" className="text-[10px]">
                                 {DAY_LABELS[m.dayIndex]}
@@ -1401,7 +1404,11 @@ function ProjectDetailsGrid({
                               ) : (
                                 <>
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm line-through text-muted-foreground">{m.title}</p>
+                                    <TruncatedTooltip
+                                      as="p"
+                                      content={m.title}
+                                      className="truncate text-sm line-through text-muted-foreground"
+                                    />
                                     <div className="mt-1 flex items-center gap-2">
                                       <Badge variant="outline" className="text-[10px]">
                                         {DAY_LABELS[m.dayIndex]}
