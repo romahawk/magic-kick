@@ -6,6 +6,9 @@ import { addDays, format, isAfter, isBefore, parseISO, startOfWeek } from "date-
 import { useAppStore } from "@/lib/store"
 import { calculateCognitiveLoad, getProjectStatus, hasDefinedWeeklyOutcome, selectActiveProjects, selectActiveProjectsMissingWeeklyOutcome } from "@/lib/execution-os"
 import { getWeekDays } from "@/lib/game-utils"
+import { buildVelocitySnapshots, calcCompletionProbability } from "@/lib/ai/predictor"
+import { detectRiskyProjects } from "@/lib/ai/risk"
+import { ProbabilityBadge, PredictionDashboard } from "@/components/ai/PredictionDashboard"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -111,7 +114,14 @@ export function ProjectsModule() {
   const tasks = allTasks.filter((t) => !t.deleted)
   const activeProjects = selectActiveProjects(projects)
   const activeProjectsMissingWeeklyOutcome = selectActiveProjectsMissingWeeklyOutcome(projects)
+  const executionLogs = useAppStore((s) => s.executionLogs)
   const load = calculateCognitiveLoad({ projects, tasks, config: systemConfig })
+
+  const predictions = activeProjects
+    .map((p) => calcCompletionProbability(p, buildVelocitySnapshots(executionLogs, p.id)))
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+  const predMap = new Map(predictions.map((p) => [p.projectId, p]))
+  const riskyProjects = detectRiskyProjects(activeProjects, predictions)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -648,6 +658,14 @@ export function ProjectsModule() {
           ) : null}
         </div>
       ) : null}
+      {predictions.length > 0 && (
+        <PredictionDashboard
+          projects={activeProjects}
+          predictions={predictions}
+          riskyProjects={riskyProjects}
+        />
+      )}
+
       {activeProjectsMissingWeeklyOutcome.length > 0 ? (
         <Card className="border-sky-500/30 bg-sky-500/10">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -937,6 +955,9 @@ function WeeklyProjectGrid({
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
+                {predMap.get(project.id) && (
+                  <ProbabilityBadge probability={predMap.get(project.id)!.completionProbability} />
+                )}
                 <div className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">
                   <span>Complete</span>
                   <Switch
