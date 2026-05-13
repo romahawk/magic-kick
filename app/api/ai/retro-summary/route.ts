@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { isAiEnabled } from "@/lib/ai/flags"
 import { verifyFirebaseToken } from "@/lib/ai/auth"
-import { callClaude } from "@/lib/ai/service"
+import { callClaude, parseJsonResponse } from "@/lib/ai/service"
 import type { ExecutionLog, JournalEntry, Task, WeeklyPlan } from "@/lib/types"
 
 const SYSTEM_PROMPT = `You are a retrospective coach for a solo builder.
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       },
     ])
 
-    const parsed = JSON.parse(raw)
+    const parsed = parseJsonResponse(raw)
     return NextResponse.json({ ok: true, data: parsed })
   } catch (err) {
     console.error("[/api/ai/retro-summary]", err)
