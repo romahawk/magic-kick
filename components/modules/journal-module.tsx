@@ -14,7 +14,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookHeart, Plus, Smile, Flame, Calendar } from "lucide-react"
+import { BookHeart, Plus, Smile, Flame, Calendar, Sparkles, Download } from "lucide-react"
+import { auth } from "@/lib/firebase/client"
+import { isAiEnabled } from "@/lib/ai/flags"
+import { analyzeRetroPatterns } from "@/lib/ai/patterns"
+import { AiFallback } from "@/components/ai/AiErrorBoundary"
 
 const MOOD_LABELS = ["", "Rough", "Meh", "Okay", "Good", "Amazing"]
 const MOOD_COLORS = ["", "text-destructive", "text-chart-4", "text-muted-foreground", "text-chart-2", "text-primary"]
@@ -31,6 +35,8 @@ export function JournalModule() {
   const projects = allProjects.filter((project) => !project.deleted)
   const journal = allJournal.filter((j) => !j.deleted)
   const [open, setOpen] = useState(false)
+  const [aiDraftLoading, setAiDraftLoading] = useState(false)
+  const [aiDraftError, setAiDraftError] = useState(false)
 
   const [entryType, setEntryType] = useState<"daily" | "weekly">("daily")
   const [mood, setMood] = useState(3)
@@ -44,6 +50,70 @@ export function JournalModule() {
   const todayEntry = journal.find((j) => isToday(parseISO(j.dateISO)) && j.type === "daily")
   const weeklyRetrospective = buildCurrentWeekRetrospective(tasks, goals, projects)
   const monthlyRetrospective = buildCurrentMonthRetrospective(tasks, goals, projects)
+  const retroPatterns = analyzeRetroPatterns(journal)
+
+  function handleAiDraft() {
+    setAiDraftLoading(true)
+    setAiDraftError(false)
+    const completedTasks = tasks.filter((t) => t.completed)
+    auth?.currentUser?.getIdToken().then((token) => {
+      fetch("/api/ai/retro-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ completedTasks, journalEntries: journal.slice(-5) }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.ok) {
+            const d = res.data
+            if (!highlights && d.wins?.[0]) setHighlights(d.wins.join("\n"))
+            if (!challenges && d.friction?.[0]) setChallenges(d.friction.join("\n"))
+            if (!nextSteps && d.nextWeekIntentions?.[0]) setNextSteps(d.nextWeekIntentions.join("\n"))
+            setOpen(true)
+          } else {
+            setAiDraftError(true)
+          }
+        })
+        .catch(() => setAiDraftError(true))
+        .finally(() => setAiDraftLoading(false))
+    }).catch(() => { setAiDraftLoading(false); setAiDraftError(true) })
+  }
+
+  function handleExportMarkdown() {
+    const weekOf = format(new Date(), "yyyy-'W'II")
+    const patterns = retroPatterns
+    const lines = [
+      `## Week of ${format(new Date(), "MMM d, yyyy")}`,
+      "",
+      "### Wins",
+      weeklyRetrospective.completedTasks.slice(0, 5).map((t) => `- ${t.title}`).join("\n") || "- None logged yet",
+      "",
+      "### Friction",
+      weeklyEntries.slice(-1)[0]?.challenges || "_No weekly entry yet_",
+      "",
+      "### Next Week",
+      weeklyEntries.slice(-1)[0]?.nextSteps || "_No next steps logged_",
+      "",
+      ...(patterns
+        ? [
+            "### AI Patterns",
+            `**Momentum:** ${patterns.momentumWins.join(", ")}`,
+            `**Friction themes:** ${patterns.frictionThemes.join(", ")}`,
+            `**Trend:** ${patterns.trendDirection}`,
+          ]
+        : []),
+    ].join("\n")
+
+    navigator.clipboard.writeText(lines).catch(() => {
+      const blob = new Blob([lines], { type: "text/markdown" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `retro-${weekOf}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+  }
 
   function handleSubmit() {
     if (!highlights.trim()) return
@@ -174,6 +244,19 @@ export function JournalModule() {
         </TabsContent>
 
         <TabsContent value="weekly" className="mt-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            {isAiEnabled() && (
+              <Button variant="outline" size="sm" disabled={aiDraftLoading} onClick={handleAiDraft}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {aiDraftLoading ? "Drafting…" : "AI Draft"}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={handleExportMarkdown}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Export Markdown
+            </Button>
+            {aiDraftError && <AiFallback />}
+          </div>
           <div className="grid gap-3 lg:grid-cols-2">
             <RetrospectiveCard title="This Week" summary={weeklyRetrospective} emptyLabel="No completed work yet this week." />
             <RetrospectiveCard title="This Month" summary={monthlyRetrospective} emptyLabel="No completed work yet this month." />
