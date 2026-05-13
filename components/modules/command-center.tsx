@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { format } from "date-fns"
 import { useAppStore } from "@/lib/store"
@@ -37,6 +37,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { AlertTriangle, CheckCircle2, Plus, Target, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { auth } from "@/lib/firebase/client"
+import { isAiEnabled } from "@/lib/ai/flags"
+import { detectAnomalies } from "@/lib/ai/insights"
+import { InsightList } from "@/components/ai/InsightCard"
+import { CoachingBanner, CoachingBannerSkeleton } from "@/components/ai/CoachingBanner"
+import type { CoachingMessage, Insight } from "@/lib/types"
 
 const PRIORITY_OPTIONS: ProjectPriority[] = ["P1", "P2", "P3"]
 
@@ -50,6 +56,18 @@ export function CommandCenter() {
   const saveWeeklyPlan = useAppStore((s) => s.saveWeeklyPlan)
   const saveWeeklyReview = useAppStore((s) => s.saveWeeklyReview)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
+  const insights = useAppStore((s) => s.insights)
+  const insightsLoading = useAppStore((s) => s.insightsLoading)
+  const insightsFetchedWeek = useAppStore((s) => s.insightsFetchedWeek)
+  const setInsights = useAppStore((s) => s.setInsights)
+  const setInsightsLoading = useAppStore((s) => s.setInsightsLoading)
+  const dismissInsight = useAppStore((s) => s.dismissInsight)
+  const coaching = useAppStore((s) => s.coaching)
+  const coachingLoading = useAppStore((s) => s.coachingLoading)
+  const coachingDismissedDate = useAppStore((s) => s.coachingDismissedDate)
+  const setCoaching = useAppStore((s) => s.setCoaching)
+  const setCoachingLoading = useAppStore((s) => s.setCoachingLoading)
+  const dismissCoaching = useAppStore((s) => s.dismissCoaching)
 
   const projects = allProjects.filter((p) => !p.deleted)
   const activeProjects = projects.filter((p) => (p.status ?? "active") === "active")
@@ -89,6 +107,66 @@ export function CommandCenter() {
     title: "",
     description: "",
   })
+
+  const todayDateISO = new Date().toISOString().slice(0, 10)
+  const coachingDismissedToday = coachingDismissedDate === todayDateISO
+  const coachingMessage = coachingDismissedToday ? null : coaching
+
+  useEffect(() => {
+    if (!isAiEnabled() || insightsFetchedWeek === weekStartISO) return
+    const localInsights = detectAnomalies({ projects: allProjects, tasks: useAppStore.getState().tasks, config: profile.systemConfig })
+    if (localInsights.length > 0) {
+      setInsights(localInsights, weekStartISO)
+      return
+    }
+    if (!activePlan) return
+    setInsightsLoading(true)
+    auth?.currentUser?.getIdToken().then((token) => {
+      fetch("/api/ai/weekly-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ weeklyPlan: activePlan, executionLogs }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.ok) {
+            const remoteInsights: Insight[] = [
+              { id: "ai-summary", type: "summary", title: "Weekly summary", body: res.data.summary, createdAt: Date.now() },
+              ...res.data.warnings.map((w: string, i: number) => ({ id: `ai-warn-${i}`, type: "warning" as const, title: "Heads up", body: w, createdAt: Date.now() })),
+              ...res.data.suggestions.map((s: string, i: number) => ({ id: `ai-sug-${i}`, type: "suggestion" as const, title: "Suggestion", body: s, createdAt: Date.now() })),
+            ]
+            setInsights(remoteInsights, weekStartISO)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setInsightsLoading(false))
+    }).catch(() => setInsightsLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStartISO, insightsFetchedWeek])
+
+  useEffect(() => {
+    if (!isAiEnabled() || coachingDismissedToday || coaching || coachingLoading) return
+    const dow = new Date().getDay()
+    if (dow === 0 || dow === 6) return
+    setCoachingLoading(true)
+    auth?.currentUser?.getIdToken().then((token) => {
+      fetch("/api/ai/coaching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tasks: useAppStore.getState().tasks }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.ok) {
+            const msg: CoachingMessage = { ...res.data, fetchedDateISO: todayDateISO }
+            setCoaching(msg)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setCoachingLoading(false))
+    }).catch(() => setCoachingLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function updateReview(
     projectId: string,
@@ -168,6 +246,9 @@ export function CommandCenter() {
             </div>
           </div>
 
+          {coachingLoading && <CoachingBannerSkeleton />}
+          {coachingMessage && <CoachingBanner message={coachingMessage} onDismiss={dismissCoaching} />}
+
           {!activePlan ? (
             <Card className="border-dashed">
               <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -233,6 +314,8 @@ export function CommandCenter() {
               </div>
             </div>
           )}
+
+          <InsightList insights={insights} loading={insightsLoading} onDismiss={dismissInsight} />
         </TabsContent>
 
         <TabsContent value="plan" className="mt-4">
