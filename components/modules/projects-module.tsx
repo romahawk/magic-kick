@@ -7,6 +7,7 @@ import { useAppStore } from "@/lib/store"
 import { calculateCognitiveLoad, getProjectStatus, hasDefinedWeeklyOutcome, selectActiveProjects, selectActiveProjectsMissingWeeklyOutcome } from "@/lib/execution-os"
 import { getWeekDays } from "@/lib/game-utils"
 import { buildVelocitySnapshots, calcCompletionProbability } from "@/lib/ai/predictor"
+import type { ProjectPrediction } from "@/lib/ai/predictor"
 import { detectRiskyProjects } from "@/lib/ai/risk"
 import { ProbabilityBadge, PredictionDashboard } from "@/components/ai/PredictionDashboard"
 import { cn } from "@/lib/utils"
@@ -719,6 +720,7 @@ export function ProjectsModule() {
                         tasks={tasks}
                         taskCategories={categories}
                         weekDays={weekDays}
+                        predMap={predMap}
                         onEdit={openEditDialog}
                         focusedProjectId={focusedProjectId}
                         onSetFocusedProject={setFocusedProject}
@@ -747,6 +749,7 @@ export function ProjectsModule() {
                 tasks={tasks}
                 taskCategories={categories}
                 weekDays={weekDays}
+                predMap={predMap}
                 onEdit={openEditDialog}
                 focusedProjectId={focusedProjectId}
                 onSetFocusedProject={setFocusedProject}
@@ -846,6 +849,7 @@ function WeeklyProjectGrid({
   tasks,
   taskCategories,
   weekDays,
+  predMap,
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
@@ -864,6 +868,7 @@ function WeeklyProjectGrid({
   tasks: Task[]
   taskCategories: string[]
   weekDays: ReturnType<typeof getWeekDays>
+  predMap: Map<string, ProjectPrediction>
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void

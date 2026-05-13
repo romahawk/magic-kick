@@ -28,7 +28,7 @@ export function getCoachingContext(
     (t) => !t.completed && t.dueDate === todayISO
   ).length
 
-  const totalThisWeek = activeTasks.filter((t) => t.dueDate?.slice(0, 10) >= todayISO.slice(0, 7)).length
+  const totalThisWeek = activeTasks.filter((t) => !!t.dueDate && t.dueDate.slice(0, 10) >= todayISO.slice(0, 7)).length
   const doneThisWeek = activeTasks.filter((t) => t.completed && t.completedAt?.slice(0, 7) === todayISO.slice(0, 7)).length
   const weekProgressPct = totalThisWeek > 0 ? Math.round((doneThisWeek / totalThisWeek) * 100) : 0
 

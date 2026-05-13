@@ -45,7 +45,7 @@ export async function callClaude(
   }
 
   if (process.env.NODE_ENV === "development") {
-    const usage = response.usage as Record<string, number>
+    const usage = response.usage as unknown as Record<string, number>
     const hit = usage.cache_read_input_tokens ?? 0
     const created = usage.cache_creation_input_tokens ?? 0
     console.log(`[AI] model=${model} cache_hit=${hit} cache_created=${created}`)
