@@ -157,6 +157,65 @@ Behavior rules:
 5. Move Command Center and Projects onto the selector layer first.
 6. Add `Settings -> System Rules` later as a thin editor for `profile.systemConfig`.
 
+## AI Layer
+
+The AI layer sits on top of the Execution OS selectors and never writes directly to the Zustand store or Firestore. All AI calls are server-side.
+
+### Module layout
+
+```text
+lib/ai/
+  client.ts   — Anthropic SDK singleton (reads ANTHROPIC_API_KEY)
+  flags.ts    — isAiEnabled() gate (reads AI_FEATURES_ENABLED)
+  auth.ts     — verifyFirebaseToken() helper for API routes
+  service.ts  — callClaude(systemPrompt, messages, options)
+
+app/api/ai/
+  ping/route.ts           — health check (GET)
+  weekly-summary/route.ts — weekly execution summary (POST) [Phase 1]
+  schedule-suggest/route.ts — scheduling suggestions (POST)  [Phase 2]
+  coaching/route.ts       — daily coaching message (POST)    [Phase 3]
+  retro-summary/route.ts  — retrospective draft (POST)       [Phase 5]
+
+components/ai/
+  AiErrorBoundary.tsx — class boundary + AiFallback for async AI sections
+```
+
+### Request flow
+
+```text
+Browser (React component)
+  -> fetch /api/ai/<endpoint>  (Authorization: Bearer <Firebase ID token>)
+  -> route.ts: isAiEnabled() check → verifyFirebaseToken() → business logic
+  -> callClaude(systemPrompt, messages)
+  -> Anthropic API (claude-sonnet-4-6, prompt caching enabled)
+  <- { ok: true, data: {...} } | { ok: false, error: "..." }
+  <- AiErrorBoundary / AiFallback on failure
+```
+
+### Prompt caching
+
+Every `callClaude` call sets `cache_control: { type: "ephemeral" }` on the system prompt block. This caches the system prompt for 5 minutes across requests with the same prompt, reducing latency and token cost for repeated calls (e.g. weekly summary fetched multiple times in a session).
+
+In development, cache hit/miss counts are logged to the console:
+```
+[AI] model=claude-sonnet-4-6 cache_hit=1024 cache_created=0
+```
+
+### Environment variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Server-side only. Never use `NEXT_PUBLIC_` prefix. |
+| `AI_FEATURES_ENABLED` | No | Defaults to `true`. Set to `"false"` to disable all `/api/ai/*` routes without a deploy. |
+
+### Error handling
+
+- API routes return `{ ok: false, error: string }` with appropriate HTTP status codes (401, 503, 500).
+- UI sections wrap AI content in `<AiErrorBoundary>` which renders `<AiFallback>` on React errors.
+- Async HTTP errors (e.g. 500 from a route) should be caught by the caller and trigger `<AiFallback>` directly.
+- `callClaude` retries once automatically on Anthropic 529 (overloaded) errors.
+
 ## Future Extension Compatibility
 
 The current app remains single-user under `users/{uid}`. Future SaaS evolution should introduce a workspace layer, but the new rule engine is portable:
