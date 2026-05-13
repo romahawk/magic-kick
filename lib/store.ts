@@ -3,8 +3,10 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type {
   Achievement,
+  CoachingMessage,
   ExecutionLog,
   Goal,
+  Insight,
   JournalEntry,
   ModuleId,
   Profile,
@@ -371,6 +373,22 @@ export interface AppState {
   isDemoMode: boolean
   activateDemoMode: () => void
   exitDemoMode: () => void
+
+  // AI — Phase 1: Insights
+  insights: Insight[]
+  insightsLoading: boolean
+  insightsFetchedWeek: string | null
+  setInsights: (insights: Insight[], week: string) => void
+  setInsightsLoading: (loading: boolean) => void
+  dismissInsight: (id: string) => void
+
+  // AI — Phase 3: Coaching
+  coaching: CoachingMessage | null
+  coachingLoading: boolean
+  coachingDismissedDate: string | null
+  setCoaching: (message: CoachingMessage | null) => void
+  setCoachingLoading: (loading: boolean) => void
+  dismissCoaching: () => void
 }
 
 const initialData = createInitialData()
@@ -382,6 +400,14 @@ export const useAppStore = create<AppState>()(
       activeModule: "command-center",
       sync: createInitialSyncState(),
       isDemoMode: false,
+
+      // AI initial state
+      insights: [],
+      insightsLoading: false,
+      insightsFetchedWeek: null,
+      coaching: null,
+      coachingLoading: false,
+      coachingDismissedDate: null,
 
       setActiveModule: (m) => set({ activeModule: m }),
 
@@ -2082,6 +2108,14 @@ export const useAppStore = create<AppState>()(
           },
         }))
       },
+
+      // AI actions
+      setInsights: (insights, week) => set({ insights, insightsFetchedWeek: week }),
+      setInsightsLoading: (loading) => set({ insightsLoading: loading }),
+      dismissInsight: (id) => set((s) => ({ insights: s.insights.filter((i) => i.id !== id) })),
+      setCoaching: (coaching) => set({ coaching }),
+      setCoachingLoading: (loading) => set({ coachingLoading: loading }),
+      dismissCoaching: () => set({ coachingDismissedDate: new Date().toISOString().slice(0, 10) }),
 
       setSyncStatus: (status, error = null) =>
         set((s) => ({

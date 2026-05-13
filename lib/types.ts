@@ -244,3 +244,33 @@ export type ModuleId =
   | "schedule"
   | "resources"
   | "journal"
+
+export interface Insight {
+  id: string
+  type: "summary" | "warning" | "suggestion"
+  title: string
+  body: string
+  createdAt: number
+}
+
+export interface CoachingMessage {
+  tone: "encourage" | "correct"
+  headline: string
+  detail: string
+  fetchedDateISO: string
+}
+
+export interface VelocitySnapshot {
+  weekStartISO: string
+  tasksCompleted: number
+  hoursLogged: number
+}
+
+export interface ScheduleSuggestion {
+  taskId: string
+  taskTitle: string
+  dayOfWeek: number
+  startTime: string
+  duration: number
+  reasoning: string
+}
