@@ -46,14 +46,17 @@ service cloud.firestore {
 
       match /{collectionId}/{docId} {
         allow read: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal",
+                           "weeklyPlans", "timeBlocks", "executionLogs", "weeklyReviews"];
 
         allow create, update: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"] &&
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal",
+                           "weeklyPlans", "timeBlocks", "executionLogs", "weeklyReviews"] &&
           hasSyncFields(request.resource.data);
 
         allow delete: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal",
+                           "weeklyPlans", "timeBlocks", "executionLogs", "weeklyReviews"];
       }
     }
 
