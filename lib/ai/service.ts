@@ -55,3 +55,12 @@ export async function callClaude(
   if (block.type !== "text") throw new Error("Unexpected non-text response from Claude")
   return block.text
 }
+
+export function parseJsonResponse<T>(raw: string): T {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim()
+  return JSON.parse(cleaned) as T
+}

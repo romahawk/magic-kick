@@ -543,7 +543,7 @@ export function ScheduleModule() {
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
           <div className="flex flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex min-h-full min-w-full flex-col">
-              <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+              <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85">
                 <div className="w-14 shrink-0 border-r" />
                 {visibleDays.map((day) => {
                   const isToday = day.iso === nowDayISO
@@ -622,7 +622,7 @@ export function ScheduleModule() {
 
                         {hoverSlot?.dateISO === day.iso ? (
                           <div
-                            className="pointer-events-none absolute inset-x-1 z-[9] rounded-md border border-primary/70 bg-primary/5"
+                            className="pointer-events-none absolute inset-x-1 z-9 rounded-md border border-primary/70 bg-primary/5"
                             style={{
                               top: toY(hoverSlot.startTime),
                               height: blockH(hoverSlot.startTime, hoverSlot.endTime),

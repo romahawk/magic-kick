@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { isAiEnabled } from "@/lib/ai/flags"
 import { verifyFirebaseToken } from "@/lib/ai/auth"
-import { callClaude } from "@/lib/ai/service"
+import { callClaude, parseJsonResponse } from "@/lib/ai/service"
 import type { Task } from "@/lib/types"
 import { getCoachingContext } from "@/lib/ai/coaching"
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       },
     ])
 
-    const parsed = JSON.parse(raw)
+    const parsed = parseJsonResponse(raw)
     return NextResponse.json({ ok: true, data: parsed })
   } catch (err) {
     console.error("[/api/ai/coaching]", err)

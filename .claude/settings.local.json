@@ -4,7 +4,15 @@
       "Bash(npx next *)",
       "Bash(git commit -m ' *)",
       "Bash(git remote *)",
-      "Bash(grep -n \"linkedTaskId\\\\|isNew\\\\|block-\\\\${id}\" lib/store.ts)"
+      "Bash(grep -n \"linkedTaskId\\\\|isNew\\\\|block-\\\\${id}\" lib/store.ts)",
+      "Bash(gh --version)",
+      "Bash(gh repo *)",
+      "Bash(dir \"D:\\\\MazurykOS\\\\01_Projects\\\\IT-Projects-dev\\\\magic-kick\" /b)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Items in project: {len\\(d[\\\\\"items\\\\\"]\\)}'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('deps:', list\\(d.get\\('dependencies',{}\\).keys\\(\\)\\)\\); print\\('devdeps:', list\\(d.get\\('devDependencies',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(npm list *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('compilerOptions',{}\\).get\\('paths',{}\\)\\)\")"
     ]
   }
 }
