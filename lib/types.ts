@@ -1,6 +1,6 @@
 export type TaskCategory = string
 export type TaskLane = "daily-focus" | "backlog" | "parking-lot"
-export type TaskRepeat = "none" | "daily" | "weekly" | "monthly"
+export type TaskRepeat = "none" | "daily" | "weekly" | "monthly" | "custom"
 
 export interface SyncFields {
   deleted?: boolean
@@ -17,6 +17,7 @@ export interface Task extends SyncFields {
   order?: number
   dueDate?: string
   repeat?: TaskRepeat
+  recurrenceDays?: number[]
   recurrenceCompletedDates?: string[]
   estimateMin?: number
   pomodorosPlanned?: number
@@ -183,6 +184,7 @@ export interface Resource extends SyncFields {
   }>
   description: string
   tags: string[]
+  color?: string
 }
 
 export interface JournalEntry extends SyncFields {
