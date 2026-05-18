@@ -183,6 +183,7 @@ export interface Resource extends SyncFields {
   }>
   description: string
   tags: string[]
+  color?: string
 }
 
 export interface JournalEntry extends SyncFields {

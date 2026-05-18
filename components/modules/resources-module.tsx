@@ -3,14 +3,58 @@
 import { useState, useMemo } from "react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BookOpen, ExternalLink, GripVertical, Search, Plus, Tag, Trash2, Pencil, ArrowUp, ArrowDown } from "lucide-react"
+import {
+  BookOpen, Check, ChevronDown, ChevronRight, ExternalLink, GripVertical,
+  Search, Plus, Tag, Trash2, Pencil, X,
+} from "lucide-react"
+
+const CARD_COLORS = [
+  { value: "", label: "Default" },
+  { value: "#15253a", label: "Navy" },
+  { value: "#152a1e", label: "Forest" },
+  { value: "#2a152e", label: "Plum" },
+  { value: "#2e1515", label: "Rust" },
+  { value: "#2a2010", label: "Amber" },
+  { value: "#102528", label: "Teal" },
+  { value: "#1e1e1e", label: "Graphite" },
+]
+
+type LinkEntry = { label: string; url: string }
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {CARD_COLORS.map((c) => (
+        <button
+          key={c.value}
+          type="button"
+          title={c.label}
+          onClick={() => onChange(c.value)}
+          className={cn(
+            "relative flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all",
+            value === c.value ? "scale-110 border-primary" : "border-border hover:border-muted-foreground"
+          )}
+          style={{
+            background: c.value || undefined,
+            backgroundImage: c.value
+              ? undefined
+              : "repeating-linear-gradient(45deg,#555 0,#555 2px,transparent 0,transparent 50%)",
+            backgroundSize: c.value ? undefined : "8px 8px",
+          }}
+        >
+          {value === c.value && <Check className="h-3 w-3 text-white drop-shadow" />}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function ResourcesModule() {
   const allResources = useAppStore((s) => s.resources)
@@ -22,19 +66,24 @@ export function ResourcesModule() {
     () => allResources.filter((r) => !r.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allResources]
   )
+
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterTag, setFilterTag] = useState<string>("all")
   const [open, setOpen] = useState(false)
   const [draggedResourceId, setDraggedResourceId] = useState<string | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [dragLinkIdx, setDragLinkIdx] = useState<number | null>(null)
 
   const [newTitle, setNewTitle] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
   const [newLinkUrl, setNewLinkUrl] = useState("")
-  const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
+  const [newLinks, setNewLinks] = useState<LinkEntry[]>([])
   const [newCategory, setNewCategory] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [newTags, setNewTags] = useState("")
+  const [newColor, setNewColor] = useState("")
+
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editCategory, setEditCategory] = useState("")
@@ -42,7 +91,8 @@ export function ResourcesModule() {
   const [editTags, setEditTags] = useState("")
   const [editLinkLabel, setEditLinkLabel] = useState("")
   const [editLinkUrl, setEditLinkUrl] = useState("")
-  const [editLinks, setEditLinks] = useState<Array<{ label: string; url: string }>>([])
+  const [editLinks, setEditLinks] = useState<LinkEntry[]>([])
+  const [editColor, setEditColor] = useState("")
 
   const categories = useMemo(
     () => Array.from(new Set(resources.map((r) => r.category))),
@@ -82,13 +132,12 @@ export function ResourcesModule() {
   function addStagedLink() {
     const url = normalizeUrl(newLinkUrl)
     if (!url) return
-    const label = newLinkLabel.trim() || "Link"
-    setNewLinks((prev) => [...prev, { label, url }])
+    setNewLinks((prev) => [...prev, { label: newLinkLabel.trim() || "Link", url }])
     setNewLinkLabel("")
     setNewLinkUrl("")
   }
 
-  function getResourceLinks(resource: { url?: string; links?: Array<{ label: string; url: string }> }) {
+  function getResourceLinks(resource: { url?: string; links?: LinkEntry[] }) {
     if (resource.links && resource.links.length > 0) return resource.links
     if (resource.url) return [{ label: "Link", url: resource.url }]
     return []
@@ -111,6 +160,7 @@ export function ResourcesModule() {
       links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
       description: newDescription,
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
+      color: newColor || undefined,
     })
     setNewTitle("")
     setNewLinkLabel("")
@@ -119,6 +169,7 @@ export function ResourcesModule() {
     setNewCategory("")
     setNewDescription("")
     setNewTags("")
+    setNewColor("")
     setOpen(false)
   }
 
@@ -133,13 +184,13 @@ export function ResourcesModule() {
     setEditLinks(getResourceLinks(resource))
     setEditLinkLabel("")
     setEditLinkUrl("")
+    setEditColor(resource.color || "")
   }
 
   function addEditLink() {
     const url = normalizeUrl(editLinkUrl)
     if (!url) return
-    const label = editLinkLabel.trim() || "Link"
-    setEditLinks((prev) => [...prev, { label, url }])
+    setEditLinks((prev) => [...prev, { label: editLinkLabel.trim() || "Link", url }])
     setEditLinkLabel("")
     setEditLinkUrl("")
   }
@@ -158,66 +209,51 @@ export function ResourcesModule() {
       title: editTitle.trim(),
       category: editCategory.trim() || "General",
       description: editDescription.trim(),
-      tags: editTags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
+      tags: editTags.split(",").map((tag) => tag.trim()).filter(Boolean),
       url: normalizedLinks[0]?.url,
       links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
+      color: editColor || undefined,
     })
     setEditingResourceId(null)
   }
 
-  function moveLink<T>(links: T[], index: number, direction: "up" | "down") {
-    const targetIndex = direction === "up" ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= links.length) return links
+  function reorderLinks(links: LinkEntry[], fromIdx: number, toIdx: number): LinkEntry[] {
     const next = [...links]
-    const [item] = next.splice(index, 1)
-    next.splice(targetIndex, 0, item)
+    const [item] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, item)
     return next
   }
 
   function renderEditableLinks(
-    links: Array<{ label: string; url: string }>,
+    links: LinkEntry[],
     onRemove: (index: number) => void,
-    onReorder: (index: number, direction: "up" | "down") => void
+    onReorder: (from: number, to: number) => void
   ) {
     if (links.length === 0) return null
-
     return (
       <div className="mt-3 flex max-h-56 flex-col gap-2 overflow-y-auto pr-1">
         {links.map((link, index) => (
           <div
             key={`${link.url}-${index}`}
-            className="flex items-start gap-3 rounded-lg border border-border/80 bg-secondary/20 px-3 py-2"
+            draggable
+            onDragStart={() => setDragLinkIdx(index)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragLinkIdx === null || dragLinkIdx === index) return
+              onReorder(dragLinkIdx, index)
+              setDragLinkIdx(null)
+            }}
+            onDragEnd={() => setDragLinkIdx(null)}
+            className={cn(
+              "flex items-start gap-3 rounded-lg border border-border/80 bg-secondary/20 px-3 py-2 cursor-grab active:cursor-grabbing",
+              dragLinkIdx === index && "opacity-50"
+            )}
           >
+            <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium leading-5">{link.label}</p>
               <p className="break-all text-xs leading-5 text-muted-foreground">{link.url}</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="mt-0.5 h-7 w-7 shrink-0 text-muted-foreground"
-                onClick={() => onReorder(index, "up")}
-                disabled={index === 0}
-                aria-label={`Move ${link.label} up`}
-              >
-                <ArrowUp className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="mt-0.5 h-7 w-7 shrink-0 text-muted-foreground"
-                onClick={() => onReorder(index, "down")}
-                disabled={index === links.length - 1}
-                aria-label={`Move ${link.label} down`}
-              >
-                <ArrowDown className="h-3.5 w-3.5" />
-              </Button>
             </div>
             <Button
               type="button"
@@ -227,12 +263,21 @@ export function ResourcesModule() {
               onClick={() => onRemove(index)}
               aria-label={`Remove ${link.label} link`}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </div>
         ))}
       </div>
     )
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   return (
@@ -260,24 +305,14 @@ export function ResourcesModule() {
               <div>
                 <Label>Links (optional)</Label>
                 <div className="mt-1 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
-                  <Input
-                    value={newLinkLabel}
-                    onChange={(e) => setNewLinkLabel(e.target.value)}
-                    placeholder="Label (e.g. Trello)"
-                  />
-                  <Input
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://..."
-                  />
-                  <Button type="button" variant="secondary" onClick={addStagedLink}>
-                    Add
-                  </Button>
+                  <Input value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} placeholder="Label (e.g. Trello)" />
+                  <Input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." />
+                  <Button type="button" variant="secondary" onClick={addStagedLink}>Add</Button>
                 </div>
                 {renderEditableLinks(
                   newLinks,
                   (index) => setNewLinks((prev) => prev.filter((_, i) => i !== index)),
-                  (index, direction) => setNewLinks((prev) => moveLink(prev, index, direction))
+                  (from, to) => setNewLinks((prev) => reorderLinks(prev, from, to))
                 )}
               </div>
               <div>
@@ -286,21 +321,17 @@ export function ResourcesModule() {
               </div>
               <div>
                 <Label htmlFor="res-desc">Description</Label>
-                <Textarea
-                  id="res-desc"
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Short description"
-                  className="mt-1 min-h-24 resize-y"
-                />
+                <Textarea id="res-desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Short description" className="mt-1 min-h-24 resize-y" />
               </div>
               <div>
                 <Label htmlFor="res-tags">Tags (comma-separated)</Label>
                 <Input id="res-tags" value={newTags} onChange={(e) => setNewTags(e.target.value)} placeholder="web-dev, free, algorithms" className="mt-1" />
               </div>
-              <Button onClick={handleAdd} className="w-full">
-                Add Resource
-              </Button>
+              <div>
+                <Label>Card color</Label>
+                <div className="mt-2"><ColorPicker value={newColor} onChange={setNewColor} /></div>
+              </div>
+              <Button onClick={handleAdd} className="w-full">Add Resource</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -379,61 +410,75 @@ export function ResourcesModule() {
           <div key={category}>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">{category} ({items.length})</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((resource) => (
-                <Card
-                  key={resource.id}
-                  className={cn(
-                    "transition-colors hover:bg-secondary/30",
-                    "cursor-grab active:cursor-grabbing",
-                    draggedResourceId === resource.id && "opacity-60"
-                  )}
-                  draggable
-                  onDragStart={() => setDraggedResourceId(resource.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    if (!draggedResourceId || draggedResourceId === resource.id) return
-                    reorderResources(draggedResourceId, resource.id)
-                    setDraggedResourceId(null)
-                  }}
-                  onDragEnd={() => setDraggedResourceId(null)}
-                >
-                  <CardContent className="p-4">
-                    {(() => {
-                      const links = getResourceLinks(resource)
-                      return (
-                        <>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <p className="min-w-0 truncate text-sm font-medium">{resource.title}</p>
-                              </div>
-                              <p className="mt-0.5 text-xs text-muted-foreground">{resource.description}</p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => openEdit(resource.id)}
-                                aria-label={`Edit ${resource.title}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => deleteResource(resource.id)}
-                                aria-label={`Delete ${resource.title}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
+              {items.map((resource) => {
+                const isExpanded = expandedIds.has(resource.id)
+                const links = getResourceLinks(resource)
+                return (
+                  <Card
+                    key={resource.id}
+                    className={cn(
+                      "transition-colors",
+                      "cursor-grab active:cursor-grabbing",
+                      draggedResourceId === resource.id && "opacity-60"
+                    )}
+                    style={resource.color ? { backgroundColor: resource.color } : undefined}
+                    draggable
+                    onDragStart={() => setDraggedResourceId(resource.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (!draggedResourceId || draggedResourceId === resource.id) return
+                      reorderResources(draggedResourceId, resource.id)
+                      setDraggedResourceId(null)
+                    }}
+                    onDragEnd={() => setDraggedResourceId(null)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-1 text-left"
+                          onClick={() => toggleExpanded(resource.id)}
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          }
+                          <span className="min-w-0 truncate text-sm font-medium">{resource.title}</span>
+                          {!isExpanded && links.length > 0 && (
+                            <span className="ml-1 shrink-0 text-xs text-muted-foreground">({links.length})</span>
+                          )}
+                        </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => { e.stopPropagation(); openEdit(resource.id) }}
+                            aria-label={`Edit ${resource.title}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); deleteResource(resource.id) }}
+                            aria-label={`Delete ${resource.title}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="mt-2">
+                          {resource.description && (
+                            <p className="text-xs text-muted-foreground">{resource.description}</p>
+                          )}
                           {links.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {links.map((link, index) => (
@@ -450,21 +495,24 @@ export function ResourcesModule() {
                               ))}
                             </div>
                           )}
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {resource.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                            ))}
-                          </div>
-                        </>
-                      )
-                    })()}
-                  </CardContent>
-                </Card>
-              ))}
+                          {resource.tags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {resource.tags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         ))
       )}
+
       <Dialog open={Boolean(editingResourceId)} onOpenChange={(open) => !open && setEditingResourceId(null)}>
         <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="border-b px-6 pt-6 pb-4">
@@ -478,24 +526,14 @@ export function ResourcesModule() {
             <div>
               <Label>Links (optional)</Label>
               <div className="mt-1 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
-                <Input
-                  value={editLinkLabel}
-                  onChange={(e) => setEditLinkLabel(e.target.value)}
-                  placeholder="Label (e.g. Trello)"
-                />
-                <Input
-                  value={editLinkUrl}
-                  onChange={(e) => setEditLinkUrl(e.target.value)}
-                  placeholder="https://..."
-                />
-                <Button type="button" variant="secondary" onClick={addEditLink}>
-                  Add
-                </Button>
+                <Input value={editLinkLabel} onChange={(e) => setEditLinkLabel(e.target.value)} placeholder="Label (e.g. Trello)" />
+                <Input value={editLinkUrl} onChange={(e) => setEditLinkUrl(e.target.value)} placeholder="https://..." />
+                <Button type="button" variant="secondary" onClick={addEditLink}>Add</Button>
               </div>
               {renderEditableLinks(
                 editLinks,
                 (index) => setEditLinks((prev) => prev.filter((_, i) => i !== index)),
-                (index, direction) => setEditLinks((prev) => moveLink(prev, index, direction))
+                (from, to) => setEditLinks((prev) => reorderLinks(prev, from, to))
               )}
             </div>
             <div>
@@ -504,20 +542,17 @@ export function ResourcesModule() {
             </div>
             <div>
               <Label htmlFor="edit-res-desc">Description</Label>
-              <Textarea
-                id="edit-res-desc"
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                className="mt-1 min-h-24 resize-y"
-              />
+              <Textarea id="edit-res-desc" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="mt-1 min-h-24 resize-y" />
             </div>
             <div>
               <Label htmlFor="edit-res-tags">Tags (comma-separated)</Label>
               <Input id="edit-res-tags" value={editTags} onChange={(e) => setEditTags(e.target.value)} className="mt-1" />
             </div>
-            <Button onClick={handleSaveEdit} className="w-full">
-              Save Changes
-            </Button>
+            <div>
+              <Label>Card color</Label>
+              <div className="mt-2"><ColorPicker value={editColor} onChange={setEditColor} /></div>
+            </div>
+            <Button onClick={handleSaveEdit} className="w-full">Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
