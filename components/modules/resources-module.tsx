@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import {
   BookOpen, Check, ChevronDown, ChevronRight, ExternalLink, GripVertical,
   Search, Plus, Tag, Trash2, Pencil, X,
@@ -74,6 +75,8 @@ export function ResourcesModule() {
   const [draggedResourceId, setDraggedResourceId] = useState<string | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [dragLinkIdx, setDragLinkIdx] = useState<number | null>(null)
+  const [cardLinkDrag, setCardLinkDrag] = useState<{ resourceId: string; fromIdx: number } | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const [newTitle, setNewTitle] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
@@ -417,7 +420,7 @@ export function ResourcesModule() {
                   <Card
                     key={resource.id}
                     className={cn(
-                      "transition-colors",
+                      "group transition-colors",
                       "cursor-grab active:cursor-grabbing",
                       draggedResourceId === resource.id && "opacity-60"
                     )}
@@ -450,7 +453,7 @@ export function ResourcesModule() {
                             <span className="ml-1 shrink-0 text-xs text-muted-foreground">({links.length})</span>
                           )}
                         </button>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-1 opacity-40 transition-opacity group-hover:opacity-100">
                           <Button
                             type="button"
                             variant="ghost"
@@ -466,7 +469,7 @@ export function ResourcesModule() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); deleteResource(resource.id) }}
+                            onClick={(e) => { e.stopPropagation(); setPendingDeleteId(resource.id) }}
                             aria-label={`Delete ${resource.title}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -482,16 +485,40 @@ export function ResourcesModule() {
                           {links.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {links.map((link, index) => (
-                                <a
+                                <div
                                   key={`${resource.id}-${link.url}-${index}`}
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.stopPropagation()
+                                    setCardLinkDrag({ resourceId: resource.id, fromIdx: index })
+                                  }}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    if (!cardLinkDrag || cardLinkDrag.resourceId !== resource.id || cardLinkDrag.fromIdx === index) return
+                                    const newLinks = reorderLinks(links, cardLinkDrag.fromIdx, index)
+                                    updateResource(resource.id, { links: newLinks, url: newLinks[0]?.url })
+                                    setCardLinkDrag(null)
+                                  }}
+                                  onDragEnd={() => setCardLinkDrag(null)}
+                                  className={cn(
+                                    "group/pill inline-flex cursor-grab items-center gap-1 rounded-md border border-border px-2 py-1 active:cursor-grabbing",
+                                    cardLinkDrag?.resourceId === resource.id && cardLinkDrag.fromIdx === index && "opacity-40"
+                                  )}
                                 >
-                                  <span>{link.label || "Link"}</span>
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
+                                  <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/pill:opacity-60" />
+                                  <a
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <span>{link.label || "Link"}</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </div>
                               ))}
                             </div>
                           )}
@@ -512,6 +539,28 @@ export function ResourcesModule() {
           </div>
         ))
       )}
+
+      <AlertDialog open={Boolean(pendingDeleteId)} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete resource?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteId && resources.find((r) => r.id === pendingDeleteId)?.title
+                ? `"${resources.find((r) => r.id === pendingDeleteId)!.title}" will be permanently removed.`
+                : "This resource will be permanently removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { deleteResource(pendingDeleteId!); setPendingDeleteId(null) }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={Boolean(editingResourceId)} onOpenChange={(open) => !open && setEditingResourceId(null)}>
         <DialogContent className="max-h-[85vh] overflow-hidden p-0 sm:max-w-2xl">
