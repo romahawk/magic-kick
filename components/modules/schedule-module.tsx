@@ -684,7 +684,7 @@ export function ScheduleModule() {
                               {block.status === "done" && block.actualHours != null && block.actualHours > block.plannedHours ? (
                                 <p className="mt-0.5 text-[10px] font-semibold text-amber-400">{fmtOverrun(block.actualHours - block.plannedHours)} over</p>
                               ) : null}
-                              {block.status === "done" ? <CheckCircle2 className="absolute right-1 top-1 h-3 w-3" /> : null}
+                              {block.status === "done" ? <CheckCircle2 className="absolute right-1 top-1 h-3 w-3 text-green-500" /> : null}
                               <div
                                 className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
                                 onMouseDown={(e) => {
@@ -1095,7 +1095,7 @@ function EditPanel({
               </div>
             </div>
             <Button className="w-full" variant="outline" onClick={() => onUpdateTimeBlock({ status: "done", actualHours: block.actualHours ?? block.plannedHours })}>
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-green-500" />
               Done
             </Button>
           </>
