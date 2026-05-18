@@ -6,17 +6,37 @@ export const TASK_REPEAT_OPTIONS: Array<{ value: TaskRepeat; label: string }> = 
   { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
   { value: "monthly", label: "Monthly" },
+  { value: "custom", label: "Custom days…" },
 ]
+
+export const WEEK_DAYS: Array<{ value: number; short: string }> = [
+  { value: 1, short: "Mo" },
+  { value: 2, short: "Tu" },
+  { value: 3, short: "We" },
+  { value: 4, short: "Th" },
+  { value: 5, short: "Fr" },
+  { value: 6, short: "Sa" },
+  { value: 0, short: "Su" },
+]
+
+export function formatRecurrenceDays(days: number[] | undefined): string {
+  if (!days || days.length === 0) return "—"
+  const order = [1, 2, 3, 4, 5, 6, 0]
+  const sorted = [...days].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+  return sorted.map((d) => WEEK_DAYS.find((w) => w.value === d)?.short ?? "").filter(Boolean).join(" ")
+}
 
 function toDate(dateISO: string) {
   return parseISO(`${dateISO}T00:00:00`)
 }
 
-export function isRecurringTask(task: Pick<Task, "repeat" | "dueDate">) {
-  return Boolean(task.dueDate && task.repeat && task.repeat !== "none")
+export function isRecurringTask(task: Pick<Task, "repeat" | "dueDate" | "recurrenceDays">) {
+  if (!task.dueDate || !task.repeat || task.repeat === "none") return false
+  if (task.repeat === "custom") return Boolean(task.recurrenceDays?.length)
+  return true
 }
 
-export function taskRepeatsOnDate(task: Pick<Task, "dueDate" | "repeat">, dateISO: string) {
+export function taskRepeatsOnDate(task: Pick<Task, "dueDate" | "repeat" | "recurrenceDays">, dateISO: string) {
   if (!task.dueDate) return false
 
   const anchor = toDate(task.dueDate)
@@ -30,13 +50,16 @@ export function taskRepeatsOnDate(task: Pick<Task, "dueDate" | "repeat">, dateIS
       return differenceInCalendarDays(target, anchor) % 7 === 0
     case "monthly":
       return anchor.getDate() === target.getDate()
+    case "custom":
+      if (!task.recurrenceDays || task.recurrenceDays.length === 0) return false
+      return task.recurrenceDays.includes(target.getDay())
     case "none":
     default:
       return format(anchor, "yyyy-MM-dd") === dateISO
   }
 }
 
-export function getTaskOccurrencesForDates(task: Pick<Task, "dueDate" | "repeat">, dateISOs: string[]) {
+export function getTaskOccurrencesForDates(task: Pick<Task, "dueDate" | "repeat" | "recurrenceDays">, dateISOs: string[]) {
   return dateISOs.filter((dateISO) => taskRepeatsOnDate(task, dateISO))
 }
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, selectTimeBlocksForDates } from "@/lib/weekly-plan"
-import { TASK_REPEAT_OPTIONS, isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
+import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -614,7 +614,11 @@ export function ScheduleModule() {
                                 {displayStart}–{displayEnd}
                               </p>
                               {block.repeat && block.repeat !== "none" ? (
-                                <p className="mt-0.5 text-[10px] opacity-75">Repeats {block.repeat}</p>
+                                <p className="mt-0.5 text-[10px] opacity-75">
+                                  {block.repeat === "custom"
+                                    ? `${formatRecurrenceDays(tasks.find((t) => t.id === block.linkedTaskId)?.recurrenceDays)}`
+                                    : `Repeats ${block.repeat}`}
+                                </p>
                               ) : null}
                               {block.status === "done" && block.actualHours != null && block.actualHours > block.plannedHours ? (
                                 <p className="mt-0.5 text-[10px] font-semibold text-amber-400">{fmtOverrun(block.actualHours - block.plannedHours)} over</p>
@@ -984,6 +988,34 @@ function EditPanel({
                 ))}
               </SelectContent>
             </Select>
+            {repeatValue === "custom" && (
+              <div className="flex gap-1 pt-0.5">
+                {WEEK_DAYS.map((day) => {
+                  const active = linkedTask.recurrenceDays?.includes(day.value) ?? false
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => {
+                        const current = linkedTask.recurrenceDays ?? []
+                        const next = active
+                          ? current.filter((d) => d !== day.value)
+                          : [...current, day.value]
+                        onUpdateTask({ recurrenceDays: next })
+                      }}
+                      className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded text-[11px] font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                      )}
+                    >
+                      {day.short}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         ) : null}
 
