@@ -734,7 +734,6 @@ export function ProjectsModule() {
                 onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                 onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                 onDelete={deleteProject}
-                onToggleMilestone={toggleMilestone}
                 onToggleTask={toggleTask}
                 slotComposer={slotComposer}
                 onOpenSlotComposer={openSlotComposer}
@@ -802,7 +801,6 @@ export function ProjectsModule() {
             onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
             editingMilestone={editingMilestone}
             editingMilestoneTitle={editingMilestoneTitle}
-            editingMilestoneDayIndex={editingMilestoneDayIndex}
             getMilestoneDraft={getMilestoneDraft}
             updateMilestoneDraft={updateMilestoneDraft}
             handleAddMilestone={handleAddMilestone}
@@ -811,7 +809,6 @@ export function ProjectsModule() {
             saveMilestoneEdit={saveMilestoneEdit}
             cancelMilestoneEdit={cancelMilestoneEdit}
             setEditingMilestoneTitle={setEditingMilestoneTitle}
-            setEditingMilestoneDayIndex={setEditingMilestoneDayIndex}
             deleteMilestone={deleteMilestone}
           />
         )
