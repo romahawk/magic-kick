@@ -10,10 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock } from "lucide-react"
-import type { Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock, Sparkles } from "lucide-react"
+import type { ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
+import { auth } from "@/lib/firebase/client"
+import { isAiEnabled } from "@/lib/ai/flags"
+import { detectConflicts, dayIndexToISO } from "@/lib/ai/conflict"
+import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel"
 
 const HOUR_PX = 64
 const DAY_START = 6
@@ -150,6 +154,9 @@ export function ScheduleModule() {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [nowY, setNowY] = useState<number | null>(null)
   const [nowDayISO, setNowDayISO] = useState(todayISO())
+  const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([])
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(new Set())
 
   const dragRef = useRef<DragState | null>(null)
 
@@ -454,6 +461,30 @@ export function ScheduleModule() {
           <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? 7 : 1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {isAiEnabled() && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={suggestLoading}
+              onClick={() => {
+                setSuggestLoading(true)
+                auth?.currentUser?.getIdToken().then((token) => {
+                  fetch("/api/ai/schedule-suggest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ tasks, projects, existingBlocks: timeBlocks }),
+                  })
+                    .then((r) => r.json())
+                    .then((res) => { if (res.ok) setSuggestions(res.data.suggestions ?? []) })
+                    .catch(() => {})
+                    .finally(() => setSuggestLoading(false))
+                }).catch(() => setSuggestLoading(false))
+              }}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              {suggestLoading ? "Thinking…" : "AI Suggest"}
+            </Button>
+          )}
           <div className="flex rounded-md border text-sm">
             <button
               className={cn("px-3 py-1.5 transition-colors", view === "week" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
@@ -474,11 +505,45 @@ export function ScheduleModule() {
         </div>
       </div>
 
+      {suggestions.length > 0 && (
+        <ScheduleSuggestionPanel
+          suggestions={suggestions.filter((s) => !rejectedTaskIds.has(s.taskId))}
+          conflictingTaskIds={
+            new Set(
+              detectConflicts(
+                suggestions.filter((s) => !rejectedTaskIds.has(s.taskId)),
+                timeBlocks,
+                weekStartISO
+              ).map((c) => c.suggestion.taskId)
+            )
+          }
+          onAccept={(s) => {
+            const dateISO = dayIndexToISO(weekStartISO, s.dayOfWeek)
+            saveTimeBlock({
+              weekPlanId: activePlan?.id ?? "",
+              dateISO,
+              startTime: s.startTime,
+              endTime: (() => {
+                const [h, m] = s.startTime.split(":").map(Number)
+                const end = h * 60 + m + s.duration
+                return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`
+              })(),
+              taskDescription: s.taskTitle,
+              linkedTaskId: s.taskId,
+              status: "planned",
+            })
+            setSuggestions((prev) => prev.filter((x) => x.taskId !== s.taskId))
+          }}
+          onReject={(taskId) => setRejectedTaskIds((prev) => new Set([...prev, taskId]))}
+          onClose={() => { setSuggestions([]); setRejectedTaskIds(new Set()) }}
+        />
+      )}
+
       <div className="flex flex-1 gap-4 overflow-hidden">
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
           <div className="flex flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex min-h-full min-w-full flex-col">
-              <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+              <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85">
                 <div className="w-14 shrink-0 border-r" />
                 {visibleDays.map((day) => {
                   const isToday = day.iso === nowDayISO
@@ -557,7 +622,7 @@ export function ScheduleModule() {
 
                         {hoverSlot?.dateISO === day.iso ? (
                           <div
-                            className="pointer-events-none absolute inset-x-1 z-[9] rounded-md border border-primary/70 bg-primary/5"
+                            className="pointer-events-none absolute inset-x-1 z-9 rounded-md border border-primary/70 bg-primary/5"
                             style={{
                               top: toY(hoverSlot.startTime),
                               height: blockH(hoverSlot.startTime, hoverSlot.endTime),

@@ -6,6 +6,10 @@ import { addDays, format, isAfter, isBefore, parseISO, startOfWeek } from "date-
 import { useAppStore } from "@/lib/store"
 import { calculateCognitiveLoad, getProjectStatus, hasDefinedWeeklyOutcome, selectActiveProjects, selectActiveProjectsMissingWeeklyOutcome } from "@/lib/execution-os"
 import { getWeekDays } from "@/lib/game-utils"
+import { buildVelocitySnapshots, calcCompletionProbability } from "@/lib/ai/predictor"
+import type { ProjectPrediction } from "@/lib/ai/predictor"
+import { detectRiskyProjects } from "@/lib/ai/risk"
+import { ProbabilityBadge, PredictionDashboard } from "@/components/ai/PredictionDashboard"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
-import { FolderKanban, Check, CheckCircle2, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle, ListTodo } from "lucide-react"
+import { FolderKanban, Check, Plus, Pencil, Trash2, ExternalLink, X, CalendarRange, Rows3, Focus, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, PinOff, AlertTriangle, ListTodo } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task, TaskCategory } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -67,10 +71,7 @@ function isProjectVisibleOnTimeline(project: Project) {
 }
 
 function sortMilestonesByDay(milestones: ProjectMilestone[]) {
-  return [...milestones].sort((a, b) => {
-    if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
-    return a.title.localeCompare(b.title)
-  })
+  return [...milestones].sort((a, b) => a.title.localeCompare(b.title))
 }
 
 function isCompletedInVisibleWeek(completedAt: string | undefined, weekDateSet: Set<string>) {
@@ -111,7 +112,14 @@ export function ProjectsModule() {
   const tasks = allTasks.filter((t) => !t.deleted)
   const activeProjects = selectActiveProjects(projects)
   const activeProjectsMissingWeeklyOutcome = selectActiveProjectsMissingWeeklyOutcome(projects)
+  const executionLogs = useAppStore((s) => s.executionLogs)
   const load = calculateCognitiveLoad({ projects, tasks, config: systemConfig })
+
+  const predictions = activeProjects
+    .map((p) => calcCompletionProbability(p, buildVelocitySnapshots(executionLogs, p.id)))
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+  const predMap = new Map(predictions.map((p) => [p.projectId, p]))
+  const riskyProjects = detectRiskyProjects(activeProjects, predictions)
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -131,7 +139,6 @@ export function ProjectsModule() {
   const [slotComposer, setSlotComposer] = useState<{
     projectId: string
     dayIndex: number
-    mode: "milestone" | "task"
     title: string
     category: TaskCategory
   } | null>(null)
@@ -210,7 +217,7 @@ export function ProjectsModule() {
     setWeeklyOutcome(project.weeklyOutcome ?? "")
     setStatus(getProjectStatus(project))
     setColor(normalizeProjectColor(project.color))
-    setMilestones(sortMilestonesByDay(project.milestones).map((m) => `${DAY_LABELS[m.dayIndex]}:${m.title}`).join(", "))
+    setMilestones(project.milestones.map((m) => m.title).join(", "))
     setNewLinkLabel("")
     setNewLinkUrl("")
     setNewLinks(getProjectLinks(project))
@@ -232,16 +239,7 @@ export function ProjectsModule() {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
-      .map((entry, index) => {
-        const parts = entry.split(":")
-        if (parts.length === 2) {
-          const label = parts[0].trim()
-          const titleValue = parts[1].trim()
-          const dayIndex = Math.max(0, DAY_LABELS.findIndex((day) => day.toLowerCase() === label.toLowerCase()))
-          return { title: titleValue || `Milestone ${index + 1}`, dayIndex: dayIndex === -1 ? index % 7 : dayIndex }
-        }
-        return { title: entry, dayIndex: index % 7 }
-      })
+      .map((title) => ({ title, dayIndex: 0 }))
   }
 
   function saveProject() {
@@ -308,16 +306,15 @@ export function ProjectsModule() {
     if (!draft.title.trim()) return
     addMilestone(projectId, {
       title: draft.title.trim(),
-      dayIndex: draft.dayIndex,
+      dayIndex: 0,
     })
-    updateMilestoneDraft(projectId, { title: "", dayIndex: draft.dayIndex })
+    updateMilestoneDraft(projectId, { title: "" })
   }
 
   function openSlotComposer(projectId: string, dayIndex: number) {
     setSlotComposer({
       projectId,
       dayIndex,
-      mode: "task",
       title: "",
       category: (categories[0] ?? "General") as TaskCategory,
     })
@@ -329,21 +326,14 @@ export function ProjectsModule() {
 
   function saveSlotComposer(weekDateISO: string) {
     if (!slotComposer?.title.trim()) return
-    if (slotComposer.mode === "milestone") {
-      addMilestone(slotComposer.projectId, {
-        title: slotComposer.title.trim(),
-        dayIndex: slotComposer.dayIndex,
-      })
-    } else {
-      addTask({
-        title: slotComposer.title.trim(),
-        category: slotComposer.category,
-        completed: false,
-        lane: "backlog",
-        dueDate: weekDateISO,
-        linkedProjectId: slotComposer.projectId,
-      })
-    }
+    addTask({
+      title: slotComposer.title.trim(),
+      category: slotComposer.category,
+      completed: false,
+      lane: "backlog",
+      dueDate: weekDateISO,
+      linkedProjectId: slotComposer.projectId,
+    })
     closeSlotComposer()
   }
 
@@ -496,7 +486,7 @@ export function ProjectsModule() {
                     id="project-milestones"
                     value={milestones}
                     onChange={(e) => setMilestones(e.target.value)}
-                    placeholder="Mon:Design, Wed:Build page, Fri:Deploy"
+                    placeholder="Design, Build page, Deploy"
                   />
                 </div>
               ) : null}
@@ -648,6 +638,14 @@ export function ProjectsModule() {
           ) : null}
         </div>
       ) : null}
+      {predictions.length > 0 && (
+        <PredictionDashboard
+          projects={activeProjects}
+          predictions={predictions}
+          riskyProjects={riskyProjects}
+        />
+      )}
+
       {activeProjectsMissingWeeklyOutcome.length > 0 ? (
         <Card className="border-sky-500/30 bg-sky-500/10">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -701,13 +699,13 @@ export function ProjectsModule() {
                         tasks={tasks}
                         taskCategories={categories}
                         weekDays={weekDays}
+                        predMap={predMap}
                         onEdit={openEditDialog}
                         focusedProjectId={focusedProjectId}
                         onSetFocusedProject={setFocusedProject}
                         onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                         onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                         onDelete={deleteProject}
-                        onToggleMilestone={toggleMilestone}
                         onToggleTask={toggleTask}
                         slotComposer={slotComposer}
                         onOpenSlotComposer={openSlotComposer}
@@ -729,13 +727,13 @@ export function ProjectsModule() {
                 tasks={tasks}
                 taskCategories={categories}
                 weekDays={weekDays}
+                predMap={predMap}
                 onEdit={openEditDialog}
                 focusedProjectId={focusedProjectId}
                 onSetFocusedProject={setFocusedProject}
                 onToggleProjectCompleted={(projectId, completed) => updateProject(projectId, { status: completed ? "completed" : "active" })}
                 onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                 onDelete={deleteProject}
-                onToggleMilestone={toggleMilestone}
                 onToggleTask={toggleTask}
                 slotComposer={slotComposer}
                 onOpenSlotComposer={openSlotComposer}
@@ -777,7 +775,6 @@ export function ProjectsModule() {
                       onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
                       editingMilestone={editingMilestone}
                       editingMilestoneTitle={editingMilestoneTitle}
-                      editingMilestoneDayIndex={editingMilestoneDayIndex}
                       getMilestoneDraft={getMilestoneDraft}
                       updateMilestoneDraft={updateMilestoneDraft}
                       handleAddMilestone={handleAddMilestone}
@@ -786,7 +783,6 @@ export function ProjectsModule() {
                       saveMilestoneEdit={saveMilestoneEdit}
                       cancelMilestoneEdit={cancelMilestoneEdit}
                       setEditingMilestoneTitle={setEditingMilestoneTitle}
-                      setEditingMilestoneDayIndex={setEditingMilestoneDayIndex}
                       deleteMilestone={deleteMilestone}
                     />
                   </CollapsibleContent>
@@ -805,7 +801,6 @@ export function ProjectsModule() {
             onToggleTimelineVisibility={(projectId, visible) => updateProject(projectId, { showOnTimeline: visible })}
             editingMilestone={editingMilestone}
             editingMilestoneTitle={editingMilestoneTitle}
-            editingMilestoneDayIndex={editingMilestoneDayIndex}
             getMilestoneDraft={getMilestoneDraft}
             updateMilestoneDraft={updateMilestoneDraft}
             handleAddMilestone={handleAddMilestone}
@@ -814,7 +809,6 @@ export function ProjectsModule() {
             saveMilestoneEdit={saveMilestoneEdit}
             cancelMilestoneEdit={cancelMilestoneEdit}
             setEditingMilestoneTitle={setEditingMilestoneTitle}
-            setEditingMilestoneDayIndex={setEditingMilestoneDayIndex}
             deleteMilestone={deleteMilestone}
           />
         )
@@ -828,13 +822,13 @@ function WeeklyProjectGrid({
   tasks,
   taskCategories,
   weekDays,
+  predMap,
   onEdit,
   focusedProjectId,
   onSetFocusedProject,
   onToggleProjectCompleted,
   onToggleTimelineVisibility,
   onDelete,
-  onToggleMilestone,
   onToggleTask,
   slotComposer,
   onOpenSlotComposer,
@@ -846,18 +840,17 @@ function WeeklyProjectGrid({
   tasks: Task[]
   taskCategories: string[]
   weekDays: ReturnType<typeof getWeekDays>
+  predMap: Map<string, ProjectPrediction>
   onEdit: (project: Project) => void
   focusedProjectId?: string
   onSetFocusedProject: (projectId?: string) => void
   onToggleProjectCompleted: (projectId: string, completed: boolean) => void
   onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   onDelete: (projectId: string) => void
-  onToggleMilestone: (projectId: string, milestoneId: string) => void
   onToggleTask: (taskId: string) => void
   slotComposer: {
     projectId: string
     dayIndex: number
-    mode: "milestone" | "task"
     title: string
     category: TaskCategory
   } | null
@@ -866,7 +859,6 @@ function WeeklyProjectGrid({
   onUpdateSlotComposer: Dispatch<SetStateAction<{
     projectId: string
     dayIndex: number
-    mode: "milestone" | "task"
     title: string
     category: TaskCategory
   } | null>>
@@ -898,13 +890,11 @@ function WeeklyProjectGrid({
 
       {projects.map((project) => {
         const sortedMilestones = sortMilestonesByDay(project.milestones)
-        const openMilestones = sortedMilestones.filter((milestone) => !milestone.completed)
-        const completedMilestones = sortedMilestones.filter((milestone) => milestone.completed)
-        const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
-        const completedTasks = projectTasks.filter((t) => t.completed).length
-        const completedMilestoneCount = completedMilestones.length
+        const completedMilestoneCount = sortedMilestones.filter((m) => m.completed).length
         const totalMilestones = project.milestones.length
         const progressPercent = totalMilestones > 0 ? (completedMilestoneCount / totalMilestones) * 100 : 0
+        const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
+        const completedTasks = projectTasks.filter((t) => t.completed).length
         const projectCompleted = getProjectStatus(project) === "completed"
 
         return (
@@ -937,6 +927,9 @@ function WeeklyProjectGrid({
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
                 {focusedProjectId === project.id ? <Badge className="text-[10px]">focused</Badge> : null}
+                {predMap.get(project.id) && (
+                  <ProbabilityBadge probability={predMap.get(project.id)!.completionProbability} />
+                )}
                 <div className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[10px] text-muted-foreground">
                   <span>Complete</span>
                   <Switch
@@ -964,13 +957,6 @@ function WeeklyProjectGrid({
             </div>
             <div className="grid grid-cols-7 gap-1">
               {weekDays.map((day, i) => {
-                const dayMilestones = sortedMilestones
-                  .filter(
-                    (milestone) =>
-                      milestone.dayIndex === i &&
-                      (!milestone.completed || isCompletedInVisibleWeek(milestone.completedAt, weekDateSet))
-                  )
-                  .sort((a, b) => Number(a.completed) - Number(b.completed))
                 const dayTasks = projectTasks
                   .filter(
                     (task) =>
@@ -985,7 +971,7 @@ function WeeklyProjectGrid({
                     onClick={() => onOpenSlotComposer(project.id, i)}
                     className={cn(
                       "min-h-14 rounded-md border border-border p-1 text-center transition-colors cursor-pointer",
-                      dayMilestones.length > 0 || dayTasks.length > 0 ? "border-primary/30 bg-primary/5" : "bg-secondary/30 hover:bg-secondary/50"
+                      dayTasks.length > 0 ? "border-primary/30 bg-primary/5" : "bg-secondary/30 hover:bg-secondary/50"
                     )}
                     role="button"
                     tabIndex={0}
@@ -997,33 +983,8 @@ function WeeklyProjectGrid({
                       }
                     }}
                   >
-                    {dayMilestones.length > 0 || dayTasks.length > 0 ? (
+                    {dayTasks.length > 0 ? (
                       <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-0.5">
-                        {dayMilestones.map((milestone) => (
-                          <button
-                            key={milestone.id}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onToggleMilestone(project.id, milestone.id)
-                            }}
-                            className={cn(
-                              "flex items-center gap-1 rounded px-1 py-0.5 text-left transition-colors",
-                              milestone.completed
-                                ? "bg-primary/20 opacity-75 hover:bg-primary/25"
-                                : "hover:bg-primary/10"
-                            )}
-                            aria-label={`Toggle milestone: ${milestone.title}`}
-                          >
-                            <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", milestone.completed ? "text-primary" : "text-muted-foreground")} />
-                            <TruncatedTooltip
-                              content={milestone.title}
-                              className={cn(
-                                "line-clamp-1 text-[9px] leading-tight text-muted-foreground",
-                                milestone.completed && "line-through"
-                              )}
-                            />
-                          </button>
-                        ))}
                         {dayTasks.map((task) => (
                           <button
                             key={task.id}
@@ -1057,40 +1018,23 @@ function WeeklyProjectGrid({
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => event.stopPropagation()}
                       >
-                        <div className="mb-2 flex items-center gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={slotComposer.mode === "task" ? "default" : "outline"}
-                            className="h-7 px-2 text-[10px]"
-                            onClick={() => onUpdateSlotComposer((current) => current ? { ...current, mode: "task" } : current)}
-                          >
-                            Task
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={slotComposer.mode === "milestone" ? "default" : "outline"}
-                            className="h-7 px-2 text-[10px]"
-                            onClick={() => onUpdateSlotComposer((current) => current ? { ...current, mode: "milestone" } : current)}
-                          >
-                            Milestone
-                          </Button>
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-[10px] font-medium text-muted-foreground">Add task</span>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="ml-auto h-7 w-7"
+                            className="h-6 w-6"
                             onClick={onCloseSlotComposer}
                             aria-label="Close slot composer"
                           >
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
                         <Input
                           value={slotComposer.title}
                           onChange={(event) => onUpdateSlotComposer((current) => current ? { ...current, title: event.target.value } : current)}
-                          placeholder={slotComposer.mode === "task" ? "Task title" : "Milestone title"}
+                          placeholder="Task title"
                           className="h-8 text-xs"
                           autoFocus
                           onKeyDown={(event) => {
@@ -1098,25 +1042,24 @@ function WeeklyProjectGrid({
                               event.preventDefault()
                               onSaveSlotComposer(day.iso)
                             }
+                            if (event.key === "Escape") onCloseSlotComposer()
                           }}
                         />
-                        {slotComposer.mode === "task" ? (
-                          <Select
-                            value={taskCategories.includes(slotComposer.category) ? slotComposer.category : taskCategories[0] ?? "General"}
-                            onValueChange={(value) => onUpdateSlotComposer((current) => current ? { ...current, category: value as TaskCategory } : current)}
-                          >
-                            <SelectTrigger className="mt-2 h-8 text-xs">
-                              <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {taskCategories.map((category) => (
-                                <SelectItem key={`${project.id}-${day.iso}-${category}`} value={category}>
-                                  {category}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : null}
+                        <Select
+                          value={taskCategories.includes(slotComposer.category) ? slotComposer.category : taskCategories[0] ?? "General"}
+                          onValueChange={(value) => onUpdateSlotComposer((current) => current ? { ...current, category: value as TaskCategory } : current)}
+                        >
+                          <SelectTrigger className="mt-2 h-8 text-xs">
+                            <SelectValue placeholder="Category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {taskCategories.map((category) => (
+                              <SelectItem key={`${project.id}-${day.iso}-${category}`} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <div className="mt-2 flex gap-1">
                           <Button type="button" size="sm" className="h-7 flex-1 text-[10px]" onClick={() => onSaveSlotComposer(day.iso)}>
                             Add
@@ -1148,7 +1091,6 @@ function ProjectDetailsGrid({
   onToggleTimelineVisibility,
   editingMilestone,
   editingMilestoneTitle,
-  editingMilestoneDayIndex,
   getMilestoneDraft,
   updateMilestoneDraft,
   handleAddMilestone,
@@ -1157,7 +1099,6 @@ function ProjectDetailsGrid({
   saveMilestoneEdit,
   cancelMilestoneEdit,
   setEditingMilestoneTitle,
-  setEditingMilestoneDayIndex,
   deleteMilestone,
 }: {
   projects: Project[]
@@ -1169,7 +1110,6 @@ function ProjectDetailsGrid({
   onToggleTimelineVisibility: (projectId: string, visible: boolean) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
   editingMilestoneTitle: string
-  editingMilestoneDayIndex: number
   getMilestoneDraft: (projectId: string) => { title: string; dayIndex: number }
   updateMilestoneDraft: (projectId: string, updates: Partial<{ title: string; dayIndex: number }>) => void
   handleAddMilestone: (projectId: string) => void
@@ -1178,7 +1118,6 @@ function ProjectDetailsGrid({
   saveMilestoneEdit: () => void
   cancelMilestoneEdit: () => void
   setEditingMilestoneTitle: Dispatch<SetStateAction<string>>
-  setEditingMilestoneDayIndex: Dispatch<SetStateAction<number>>
   deleteMilestone: (projectId: string, milestoneId: string) => void
 }) {
   return (
@@ -1274,53 +1213,32 @@ function ProjectDetailsGrid({
                   <Input
                     value={getMilestoneDraft(project.id).title}
                     onChange={(e) => updateMilestoneDraft(project.id, { title: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAddMilestone(project.id) }}
                     placeholder="New milestone"
                     className="h-8 text-xs"
                   />
-                  <select
-                    value={getMilestoneDraft(project.id).dayIndex}
-                    onChange={(e) => updateMilestoneDraft(project.id, { dayIndex: Number(e.target.value) })}
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                    aria-label="Milestone day"
-                  >
-                    {DAY_LABELS.map((day, index) => (
-                      <option key={`${project.id}-draft-day-${day}`} value={index}>
-                        {day}
-                      </option>
-                    ))}
-                  </select>
                   <Button type="button" size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleAddMilestone(project.id)} aria-label={`Add milestone to ${project.title}`}>
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   {openMilestones.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-2">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        className="h-8 w-8 shrink-0"
-                        onClick={() => toggleMilestone(project.id, m.id)}
+                    <div key={m.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
+                      <Checkbox
+                        checked={false}
+                        onCheckedChange={() => toggleMilestone(project.id, m.id)}
                         aria-label={`Complete milestone: ${m.title}`}
-                      >
-                        <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
+                        className="shrink-0"
+                      />
                       {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
                         <>
-                          <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
-                          <select
-                            value={editingMilestoneDayIndex}
-                            onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
-                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                            aria-label="Edit milestone day"
-                          >
-                            {DAY_LABELS.map((day, index) => (
-                              <option key={`${project.id}-${m.id}-day-${day}`} value={index}>
-                                {day}
-                              </option>
-                            ))}
-                          </select>
+                          <Input
+                            value={editingMilestoneTitle}
+                            onChange={(e) => setEditingMilestoneTitle(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveMilestoneEdit(); if (e.key === "Escape") cancelMilestoneEdit() }}
+                            className="h-7 flex-1 text-xs"
+                            autoFocus
+                          />
                           <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
                             <Check className="h-3.5 w-3.5" />
                           </Button>
@@ -1330,21 +1248,15 @@ function ProjectDetailsGrid({
                         </>
                       ) : (
                         <>
-                          <div className="min-w-0 flex-1">
-                            <TruncatedTooltip as="p" content={m.title} className="truncate text-sm" />
-                            <div className="mt-1 flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">
-                                {DAY_LABELS[m.dayIndex]}
-                              </Badge>
-                              <span className="text-[10px] text-muted-foreground">Ready to complete</span>
-                            </div>
+                          <TruncatedTooltip as="p" content={m.title} className="min-w-0 flex-1 truncate text-sm" />
+                          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button type="button" size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </>
                       )}
                     </div>
@@ -1366,34 +1278,24 @@ function ProjectDetailsGrid({
                         </Badge>
                       </div>
                       <CollapsibleContent className="mt-2">
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-1">
                           {completedMilestones.map((m) => (
-                            <div key={m.id} className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-2">
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8 shrink-0 border-emerald-500/40"
-                                onClick={() => toggleMilestone(project.id, m.id)}
+                            <div key={m.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
+                              <Checkbox
+                                checked={true}
+                                onCheckedChange={() => toggleMilestone(project.id, m.id)}
                                 aria-label={`Reopen milestone: ${m.title}`}
-                              >
-                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                              </Button>
+                                className="shrink-0"
+                              />
                               {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
                                 <>
-                                  <Input value={editingMilestoneTitle} onChange={(e) => setEditingMilestoneTitle(e.target.value)} className="h-8 text-xs" />
-                                  <select
-                                    value={editingMilestoneDayIndex}
-                                    onChange={(e) => setEditingMilestoneDayIndex(Number(e.target.value))}
-                                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                                    aria-label="Edit milestone day"
-                                  >
-                                    {DAY_LABELS.map((day, index) => (
-                                      <option key={`${project.id}-${m.id}-completed-day-${day}`} value={index}>
-                                        {day}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <Input
+                                    value={editingMilestoneTitle}
+                                    onChange={(e) => setEditingMilestoneTitle(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") saveMilestoneEdit(); if (e.key === "Escape") cancelMilestoneEdit() }}
+                                    className="h-7 flex-1 text-xs"
+                                    autoFocus
+                                  />
                                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
                                     <Check className="h-3.5 w-3.5" />
                                   </Button>
@@ -1409,24 +1311,20 @@ function ProjectDetailsGrid({
                                       content={m.title}
                                       className="truncate text-sm line-through text-muted-foreground"
                                     />
-                                    <div className="mt-1 flex items-center gap-2">
-                                      <Badge variant="outline" className="text-[10px]">
-                                        {DAY_LABELS[m.dayIndex]}
-                                      </Badge>
-                                      <span className="text-[10px] text-emerald-300">Completed</span>
-                                      {m.completedAt ? (
-                                        <span className="text-[10px] text-muted-foreground">
-                                          {format(parseISO(m.completedAt), "MMM d, yyyy")}
-                                        </span>
-                                      ) : null}
-                                    </div>
+                                    {m.completedAt ? (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {format(parseISO(m.completedAt), "MMM d, yyyy")}
+                                      </span>
+                                    ) : null}
                                   </div>
-                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditingMilestone(project.id, m)} aria-label={`Edit milestone: ${m.title}`}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => deleteMilestone(project.id, m.id)} aria-label={`Delete milestone: ${m.title}`}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </>
                               )}
                             </div>
