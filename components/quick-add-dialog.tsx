@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus } from "lucide-react"
+import { Pencil, Plus, Settings2, Trash2 } from "lucide-react"
 import type { TaskCategory, TaskRepeat } from "@/lib/types"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 
@@ -21,6 +21,9 @@ export function QuickAddDialog() {
   const addGoal = useAppStore((s) => s.addGoal)
   const addJournalEntry = useAppStore((s) => s.addJournalEntry)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const addCategory = useAppStore((s) => s.addCategory)
+  const renameCategory = useAppStore((s) => s.renameCategory)
+  const deleteCategory = useAppStore((s) => s.deleteCategory)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
 
   const [taskTitle, setTaskTitle] = useState("")
@@ -30,6 +33,13 @@ export function QuickAddDialog() {
   const [taskRepeat, setTaskRepeat] = useState<TaskRepeat>("none")
   const [goalTitle, setGoalTitle] = useState("")
   const [journalHighlights, setJournalHighlights] = useState("")
+
+  const [managingCats, setManagingCats] = useState(false)
+  const [newCatName, setNewCatName] = useState("")
+  const [renamingCat, setRenamingCat] = useState<string | null>(null)
+  const [renameVal, setRenameVal] = useState("")
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
   const activeTaskCategory = useMemo(
     () => (categories.includes(taskCategory) ? taskCategory : (categories[0] ?? "General")),
     [categories, taskCategory]
@@ -67,6 +77,29 @@ export function QuickAddDialog() {
     setOpen(false)
   }
 
+  function handleAddCategory() {
+    const name = newCatName.trim()
+    if (!name || categories.includes(name)) return
+    addCategory(name)
+    setNewCatName("")
+  }
+
+  function startRename(cat: string) {
+    setRenamingCat(cat)
+    setRenameVal(cat)
+    setTimeout(() => renameInputRef.current?.focus(), 0)
+  }
+
+  function commitRename() {
+    if (!renamingCat) return
+    const next = renameVal.trim()
+    if (next && next !== renamingCat && !categories.includes(next)) {
+      renameCategory(renamingCat, next)
+      if (taskCategory === renamingCat) setTaskCategory(next as TaskCategory)
+    }
+    setRenamingCat(null)
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -92,7 +125,18 @@ export function QuickAddDialog() {
               <Input id="task-title" placeholder="What needs to be done?" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddTask()} />
             </div>
             <div>
-              <Label>Category</Label>
+              <div className="mb-1 flex items-center justify-between">
+                <Label>Category</Label>
+                <button
+                  type="button"
+                  onClick={() => { setManagingCats((v) => !v); setRenamingCat(null); setNewCatName("") }}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Manage categories"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  {managingCats ? "Done" : "Manage"}
+                </button>
+              </div>
               <Select value={activeTaskCategory} onValueChange={(v) => setTaskCategory(v as TaskCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -101,6 +145,59 @@ export function QuickAddDialog() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {managingCats ? (
+                <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-border bg-secondary/20 p-2">
+                  {/* Add new category */}
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="New category name…"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                      className="h-7 text-xs"
+                    />
+                    <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddCategory} disabled={!newCatName.trim() || categories.includes(newCatName.trim())}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* Existing categories */}
+                  {categories.map((cat) => (
+                    <div key={cat} className="flex items-center gap-1">
+                      {renamingCat === cat ? (
+                        <Input
+                          ref={renameInputRef}
+                          value={renameVal}
+                          onChange={(e) => setRenameVal(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingCat(null) }}
+                          className="h-6 flex-1 text-xs"
+                        />
+                      ) : (
+                        <span className="flex-1 truncate text-xs">{cat}</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => startRename(cat)}
+                        className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        aria-label={`Rename ${cat}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteCategory(cat)}
+                        disabled={categories.length <= 1}
+                        className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
+                        aria-label={`Delete ${cat}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div>

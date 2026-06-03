@@ -319,6 +319,7 @@ export function TodoModule() {
                 taskTimeSlots={taskTimeSlots}
                 onToggle={toggleTask}
                 onSelect={openTask}
+                onQuickEdit={updateTask}
                 {...handlers}
               />
             )
@@ -459,12 +460,13 @@ function LaneSummaryCard({ title, count, badge, description, icon: Icon, tone }:
 
 // ── Kanban column (row 2) ────────────────────────────────────────────────────
 
-function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd }: {
+function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
   lane: TaskLane; tasks: Task[]; limit?: number; categoryColors: Record<string, string>
   taskTimeSlots: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }>
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
   onDropOnLane: () => void; onDragEnd: () => void
+  onQuickEdit?: (id: string, patch: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>, timing?: { startHHmm?: string; endHHmm?: string; blockTypeId?: string; clearTimeSlot?: boolean }) => void
 }) {
   const config = TASK_LANES.find((l) => l.id === lane)
   const atLimit = typeof limit === "number" && tasks.length >= limit
@@ -506,6 +508,7 @@ function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onTog
             onDropOnTask={onDropOnTask}
             onDragEnd={onDragEnd}
             draggable={!task.completed}
+            onQuickEdit={onQuickEdit}
           />
         ))}
       </div>
@@ -528,12 +531,38 @@ function fmtOverrun(diffHours: number) {
   return m > 0 ? `+${h}h ${m}m` : `+${h}h`
 }
 
-function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd, showLane = false }: {
+function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd, showLane = false, onQuickEdit }: {
   task: Task; categoryColor?: string; timeSlot?: { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
   draggable?: boolean; onDragEnd: () => void; showLane?: boolean
+  onQuickEdit?: (id: string, patch: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>, timing?: { startHHmm?: string; endHHmm?: string; blockTypeId?: string; clearTimeSlot?: boolean }) => void
 }) {
+  const [editingField, setEditingField] = useState<null | "date" | "time">(null)
+  const [dateVal, setDateVal] = useState("")
+  const [startVal, setStartVal] = useState("")
+  const [endVal, setEndVal] = useState("")
+
+  function startDateEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    setDateVal(task.dueDate ?? "")
+    setEditingField("date")
+  }
+  function saveDateEdit() {
+    onQuickEdit?.(task.id, { dueDate: dateVal || undefined })
+    setEditingField(null)
+  }
+  function startTimeEdit(e: React.MouseEvent) {
+    e.stopPropagation()
+    setStartVal(timeSlot?.startTime ?? "")
+    setEndVal(timeSlot?.endTime ?? "")
+    setEditingField("time")
+  }
+  function saveTimeEdit() {
+    onQuickEdit?.(task.id, {}, { startHHmm: startVal || undefined, endHHmm: endVal || undefined })
+    setEditingField(null)
+  }
+
   return (
     <div
       className={cn("flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-secondary/30", draggable ? "cursor-grab active:cursor-grabbing" : "", task.completed && "opacity-50")}
@@ -558,9 +587,31 @@ function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragSta
         {showLane ? <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge> : null}
         {(task.repeat ?? "none") !== "none" ? <Badge variant="outline" className="text-[10px]">Repeats {task.repeat}</Badge> : null}
         {timeSlot ? (
-          <Badge variant="outline" className="gap-1 text-[10px] font-normal tabular-nums">
-            <Clock className="h-2.5 w-2.5" />{fmtTime(timeSlot.startTime)} – {fmtTime(timeSlot.endTime)}
-          </Badge>
+          editingField === "time" ? (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="time"
+                value={startVal}
+                autoFocus
+                className="h-5 w-[4.5rem] rounded border border-border bg-background px-1 text-[10px] tabular-nums"
+                onChange={(e) => setStartVal(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveTimeEdit(); if (e.key === "Escape") setEditingField(null) }}
+              />
+              <span className="text-[10px] text-muted-foreground">–</span>
+              <input
+                type="time"
+                value={endVal}
+                className="h-5 w-[4.5rem] rounded border border-border bg-background px-1 text-[10px] tabular-nums"
+                onChange={(e) => setEndVal(e.target.value)}
+                onBlur={saveTimeEdit}
+                onKeyDown={(e) => { if (e.key === "Enter") saveTimeEdit(); if (e.key === "Escape") setEditingField(null) }}
+              />
+            </div>
+          ) : (
+            <Badge variant="outline" className="cursor-pointer gap-1 text-[10px] font-normal tabular-nums hover:bg-secondary" onClick={startTimeEdit} title="Click to edit time">
+              <Clock className="h-2.5 w-2.5" />{fmtTime(timeSlot.startTime)} – {fmtTime(timeSlot.endTime)}
+            </Badge>
+          )
         ) : null}
         {timeSlot?.status === "done" && timeSlot.actualHours != null && timeSlot.actualHours > timeSlot.plannedHours ? (
           <Badge variant="outline" className="gap-1 text-[10px] font-medium tabular-nums border-amber-500/50 text-amber-500">
@@ -568,9 +619,26 @@ function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragSta
           </Badge>
         ) : null}
         {task.dueDate ? (
-          <span className={cn("text-[10px] text-muted-foreground", isOverdue(task.dueDate) && "font-medium text-destructive")}>
-            {isDueToday(task.dueDate) ? "Today" : task.dueDate}
-          </span>
+          editingField === "date" ? (
+            <input
+              type="date"
+              value={dateVal}
+              autoFocus
+              className="h-5 rounded border border-border bg-background px-1 text-[10px] tabular-nums"
+              onChange={(e) => setDateVal(e.target.value)}
+              onBlur={saveDateEdit}
+              onKeyDown={(e) => { if (e.key === "Enter") saveDateEdit(); if (e.key === "Escape") setEditingField(null) }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+              className={cn("cursor-pointer text-[10px] text-muted-foreground hover:underline", isOverdue(task.dueDate) && "font-medium text-destructive")}
+              onClick={startDateEdit}
+              title="Click to edit date"
+            >
+              {isDueToday(task.dueDate) ? "Today" : task.dueDate}
+            </span>
+          )
         ) : null}
         {task.estimateMin && !timeSlot ? (
           <Badge variant="secondary" className="gap-1 text-[10px]">
