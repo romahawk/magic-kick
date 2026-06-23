@@ -21,11 +21,9 @@ jobs:
             "CLAUDE.md"
             "CONTRIBUTING.md"
             "CHANGELOG.md"
-            "docs/ROADMAP.md"
-            "docs/SPRINT_BACKLOG.md"
             "docs/ARCHITECTURE.md"
             "docs/DAILY_CHECKLIST.md"
-            "docs/NEXT_SESSION_START.md"
+            "docs/SANDBOX_RULES.md"
             "docs/WORKFLOW_AUTOMATION_PLAYBOOK.md"
             ".github/PULL_REQUEST_TEMPLATE.md"
           )

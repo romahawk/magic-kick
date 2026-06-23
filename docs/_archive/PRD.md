@@ -1,3 +1,5 @@
+> ARCHIVED 2026-06-23: Magic Kick is not a product. Kept for history only. See README.md.
+
 # Product Requirements Document - Magic Kick
 
 **Version:** 1.1  

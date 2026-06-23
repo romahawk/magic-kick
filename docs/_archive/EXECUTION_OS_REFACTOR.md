@@ -1,3 +1,5 @@
+> ARCHIVED 2026-06-23: Magic Kick is not a product. Kept for history only. See README.md.
+
 # Execution OS Refactor Summary
 
 ## Delivered Outputs
@@ -9,7 +11,7 @@
 5. Dashboard layout proposal
 6. Minimal migration strategy
 
-Primary reference: [ARCHITECTURE.md](/d:/WORK/IT_Projects/magic-kick/docs/ARCHITECTURE.md)
+Primary reference: [ARCHITECTURE.md](../ARCHITECTURE.md)
 
 ## Scope
 

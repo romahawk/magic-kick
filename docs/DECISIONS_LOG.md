@@ -92,3 +92,22 @@ Architecture Decision Records (ADR-style). Each entry explains a real choice mad
 - Con: Short-term overhead (docs sprint before feature sprint)
 
 **Revisit trigger:** Framework becomes obsolete or team grows beyond 1 person.
+
+---
+
+## ADR-006: Magic Kick Reframed as Personal Tool + AI-SDLC Sandbox
+
+**Date:** 2026-06-23
+**Status:** Accepted
+
+**Context:** Product framing caused scope drift. AI routes were shipped against the Freeze List declared in ROADMAP.md. Phase 0 governance was abandoned mid-flight. The repo is not in the declared WIP-3 (AlphaRhythm, FlowLogix, LiveSurgery) and was effectively a 4th active project competing for limited solo build hours. Docs treated Magic Kick as a multi-phase product with sprints, a PRD, and a roadmap — none of which reflect the actual use of the tool.
+
+**Decision:** Stop treating Magic Kick as a product. Adopt the governing rule now pinned in CLAUDE.md and README.md. Archive PRD, ROADMAP, SPRINT_BACKLOG, EXECUTION_OS_REFACTOR, and NEXT_SESSION_START. Cap surface area at the current 9 modules. AI routes remain behind feature flag; no new AI surface without a named, time-boxed experiment.
+
+**Consequences:**
+- No more phase plans or sprint backlogs.
+- Future work is either personal-itch fixes or logged sandbox experiments.
+- Existing AI code stays flagged; a separate ADR documenting the original out-of-scope AI ship is still required (track as follow-up issue).
+- The WORKFLOW_AUTOMATION_PLAYBOOK.md is now the primary artifact — the app itself is the worked example.
+
+**Revisit trigger:** Never, unless the project changes hands or purpose.
