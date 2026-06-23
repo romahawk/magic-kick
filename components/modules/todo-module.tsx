@@ -11,13 +11,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Archive, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Tags, Trash2, Zap } from "lucide-react"
+import { Archive, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Trash2, Zap } from "lucide-react"
 import type { Task, TaskCategory, TaskLane, TaskRepeat } from "@/lib/types"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
@@ -39,11 +37,6 @@ export function TodoModule() {
   const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
   const updateTask = useAppStore((s) => s.updateTask)
   const deleteTask = useAppStore((s) => s.deleteTask)
-  const addCategory = useAppStore((s) => s.addCategory)
-  const renameCategory = useAppStore((s) => s.renameCategory)
-  const removeCategory = useAppStore((s) => s.deleteCategory)
-  const setCategoryColor = useAppStore((s) => s.setCategoryColor)
-
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
   const categoryColors = taskCategoryColors ?? {}
   const tasks = useMemo(() => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [allTasks])
@@ -86,11 +79,6 @@ export function TodoModule() {
   const [editEndTime, setEditEndTime] = useState("")
   const [editEstimate, setEditEstimate] = useState("")
   const [editPomodoros, setEditPomodoros] = useState("")
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
-  const [newCategory, setNewCategory] = useState("")
-  const [renameFrom, setRenameFrom] = useState("")
-  const [renameTo, setRenameTo] = useState("")
-
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       if (search && !task.title.toLowerCase().includes(search.toLowerCase())) return false
@@ -245,56 +233,6 @@ export function TodoModule() {
             <SelectItem value="manual">Manual order</SelectItem>
           </SelectContent>
         </Select>
-        <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Manage categories"><Tags className="h-4 w-4" /></Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent sideOffset={8}>Manage Categories</TooltipContent>
-          </Tooltip>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Manage Categories</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-category">Add Category</Label>
-                <div className="flex gap-2">
-                  <Input id="new-category" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Category name" />
-                  <Button type="button" onClick={() => { if (!newCategory.trim()) return; addCategory(newCategory); setNewCategory("") }}>Add</Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Rename Category</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Select value={renameFrom} onValueChange={setRenameFrom}>
-                    <SelectTrigger><SelectValue placeholder="Current" /></SelectTrigger>
-                    <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <Input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} placeholder="New name" />
-                  <Button type="button" variant="outline" onClick={() => { if (!renameFrom || !renameTo.trim()) return; renameCategory(renameFrom, renameTo); setRenameFrom(""); setRenameTo("") }}>Rename</Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Delete Category</Label>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((c) => <Button key={c} type="button" variant="outline" size="sm" onClick={() => removeCategory(c)} disabled={categories.length <= 1}>Delete {c}</Button>)}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Category Colors</Label>
-                <div className="space-y-2">
-                  {categories.map((c) => (
-                    <div key={c} className="flex items-center justify-between rounded-md border border-border p-2">
-                      <span className="text-sm">{c}</span>
-                      <input type="color" value={categoryColors[c] ?? "#64748b"} onChange={(e) => setCategoryColor(c, e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0" aria-label={`Pick color for ${c}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Row 1 — Summary cards: Backlog | Daily Focus | Parking Lot */}
