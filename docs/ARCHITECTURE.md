@@ -216,18 +216,3 @@ In development, cache hit/miss counts are logged to the console:
 - Async HTTP errors (e.g. 500 from a route) should be caught by the caller and trigger `<AiFallback>` directly.
 - `callClaude` retries once automatically on Anthropic 529 (overloaded) errors.
 
-## Future Extension Compatibility
-
-The current app remains single-user under `users/{uid}`. Future SaaS evolution should introduce a workspace layer, but the new rule engine is portable:
-
-```text
-workspaces/{workspaceId}
-  members/{uid}
-  profiles/{uid}
-  rules/system
-  goals/{id}
-  projects/{id}
-  tasks/{id}
-```
-
-That enables future family supervision, teams, AI coaching, analytics, and accountability features without rewriting the execution model.

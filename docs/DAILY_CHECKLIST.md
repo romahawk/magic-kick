@@ -3,9 +3,8 @@
 ## Start of Day
 
 - Pull latest changes from `main`
-- Review the sprint backlog and choose one issue
+- Name the itch or experiment for this session (if neither can be named, stop and work on a different repo)
 - Confirm the working branch is not `main`
-- Read `docs/NEXT_SESSION_START.md` if resuming interrupted work
 - Verify local setup still passes `npm run build`
 
 ## Before Opening a PR
@@ -18,6 +17,5 @@
 
 ## End of Day
 
-- Capture current state in `docs/NEXT_SESSION_START.md` when work is mid-flight
 - Push the working branch or stash local changes cleanly
-- Update the sprint backlog if scope changed
+- Log what was learned in `docs/DECISIONS_LOG.md` if this was an experiment
