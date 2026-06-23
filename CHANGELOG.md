@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-06-23 — Reframe as personal tool + AI-SDLC sandbox
+
+### Changed
+- Reframed project as personal tool + AI-SDLC sandbox; governing rule pinned in `CLAUDE.md` and `README.md`
+- Archived product-framing docs (`PRD.md`, `ROADMAP.md`, `SPRINT_BACKLOG.md`, `EXECUTION_OS_REFACTOR.md`, `NEXT_SESSION_START.md`) to `docs/_archive/`
+- Removed `weekly-roadmap-sync.yml` GitHub Actions workflow
+- Updated `policy-check.yml` to require `docs/SANDBOX_RULES.md` instead of archived planning files
+- Updated issue template to itch/experiment model; removed "feature request" framing
+- Updated `DAILY_CHECKLIST.md` to remove sprint backlog references
+- Updated `WORKFLOW_AUTOMATION_PLAYBOOK.md` to reflect current two-workflow set
+- Removed "Future Extension Compatibility" section from `ARCHITECTURE.md`
+
+### Added
+- `docs/SANDBOX_RULES.md`: governing rule + module ceiling (9 modules, no additions)
+- ADR-006 in `docs/DECISIONS_LOG.md`: documents the reframe decision and its consequences
+
+---
+
 ## [Unreleased]
 
 ### Added
