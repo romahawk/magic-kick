@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-06-24 — Projects tab density redesign
+
+### Changed
+- Projects tab: 2-line header (title+CTA / filter+toggle), list rows ~44px with color dot · name · task count · days-left · progress · ⚠ risk, hover ⋯ dropdown (Edit/Pause/Park/Complete/Delete)
+- Projects detail panel: header (● title · status/days · ⋯ · ✕), scrollable body (goal, progress bar, this-week bullets, milestones CRUD with +Add toggle, links), sticky footer (Mark complete/Reopen · Edit · Pause/Unpause)
+- Projects timeline: replaced 52-week Gantt with month-axis bar chart (bars, milestone dots, today line, legend)
+- Top bar: removed clock, week range, XP badge, streak badge; avatar dropdown now contains email, XP/streak, theme toggle, logout
+
+---
+
 ## [Unreleased] - 2026-06-23 — Reframe as personal tool + AI-SDLC sandbox
 
 ### Changed
