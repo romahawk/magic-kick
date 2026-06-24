@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 import { AlertTriangle, Check, ChevronRight, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
@@ -472,21 +472,15 @@ export function ProjectsModule() {
 
       {/* Detail sheet (click-to-open from list row) */}
       <Sheet open={!!selectedProject} onOpenChange={(isOpen) => !isOpen && setSelectedProjectId(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: normalizeProjectColor(selectedProject?.color) }}
-              />
-              <span className="truncate">{selectedProject?.title}</span>
-            </SheetTitle>
-          </SheetHeader>
+        <SheetContent className="w-full sm:max-w-md flex flex-col gap-0 p-0 [&>button:last-child]:hidden">
+          <SheetTitle className="sr-only">{selectedProject?.title ?? "Project details"}</SheetTitle>
           {selectedProject ? (
             <ProjectDetailPanel
               project={selectedProject}
               tasks={tasks}
               onEdit={openEditDialog}
+              onStatusChange={(id, nextStatus) => updateProject(id, { status: nextStatus })}
+              onDelete={deleteProject}
               editingMilestone={editingMilestone}
               editingMilestoneTitle={editingMilestoneTitle}
               getMilestoneDraft={getMilestoneDraft}
@@ -653,11 +647,13 @@ function ProjectRow({
   )
 }
 
-// Detail panel rendered inside SheetContent when a row is clicked
+// Detail panel fills SheetContent — header · scrollable body · footer actions
 function ProjectDetailPanel({
   project,
   tasks,
   onEdit,
+  onStatusChange,
+  onDelete,
   editingMilestone,
   editingMilestoneTitle,
   getMilestoneDraft,
@@ -673,6 +669,8 @@ function ProjectDetailPanel({
   project: Project
   tasks: Task[]
   onEdit: (project: Project) => void
+  onStatusChange: (id: string, status: ProjectStatus) => void
+  onDelete: (id: string) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
   editingMilestoneTitle: string
   getMilestoneDraft: (projectId: string) => { title: string; dayIndex: number }
@@ -685,169 +683,319 @@ function ProjectDetailPanel({
   setEditingMilestoneTitle: (value: string) => void
   deleteMilestone: (projectId: string, milestoneId: string) => void
 }) {
+  const [showAddMilestone, setShowAddMilestone] = useState(false)
+
   const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
   const completedTasks = projectTasks.filter((t) => t.completed).length
   const sortedMilestones = sortMilestonesByTitle(project.milestones)
   const openMilestones = sortedMilestones.filter((m) => !m.completed)
   const completedMilestones = sortedMilestones.filter((m) => m.completed)
+  const totalMilestones = project.milestones.length
+  const progressPct = totalMilestones > 0 ? (completedMilestones.length / totalMilestones) * 100 : 0
+  const dotColor = normalizeProjectColor(project.color)
+  const currentStatus = getProjectStatus(project)
+  const days = daysLeftInfo(project)
+  const daysText = days.label === "Overdue" || days.label === "Today" ? days.label : `${days.label} left`
+  const statusLine = `${currentStatus.charAt(0).toUpperCase()}${currentStatus.slice(1)} · ${daysText}`
+  const weeklyLines = project.weeklyOutcome?.trim()
+    ? project.weeklyOutcome.trim().split("\n").filter((l) => l.trim())
+    : []
+  const links = getProjectLinks(project)
+
+  function commitAddMilestone() {
+    handleAddMilestone(project.id)
+    setShowAddMilestone(false)
+  }
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className="text-[10px] capitalize">{getProjectStatus(project)}</Badge>
-        <Badge variant="secondary" className="text-[10px]">
-          {projectTasks.length} tasks ({completedTasks} done)
-        </Badge>
-        <Button variant="outline" size="sm" className="ml-auto gap-1.5" onClick={() => onEdit(project)}>
-          <Pencil className="h-3.5 w-3.5" /> Edit
-        </Button>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Header: ● title · status line · ⋯ · ✕ */}
+      <div className="flex items-start gap-2 border-b border-border px-4 py-3">
+        <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-sm leading-tight">{project.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{statusLine}</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="More actions">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {currentStatus !== "active" && (
+              <DropdownMenuItem onClick={() => onStatusChange(project.id, "active")}>Make Active</DropdownMenuItem>
+            )}
+            {currentStatus !== "parked" && (
+              <DropdownMenuItem onClick={() => onStatusChange(project.id, "parked")}>Park</DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(project.id)}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <SheetClose asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Close">
+            <X className="h-4 w-4" />
+          </Button>
+        </SheetClose>
       </div>
 
-      <p className="text-sm text-muted-foreground">{project.objective}</p>
+      {/* Body — scrollable */}
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+        {/* Goal */}
+        {project.objective ? (
+          <p className="text-sm italic text-muted-foreground">{project.objective}</p>
+        ) : null}
 
-      {project.weeklyOutcome?.trim() ? (
-        <div className="rounded-md border border-border/60 bg-background/60 p-2 text-xs text-muted-foreground">
-          This week:{" "}
-          <span className="font-medium text-foreground">{project.weeklyOutcome.trim()}</span>
-        </div>
-      ) : null}
-
-      {getProjectLinks(project).length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {getProjectLinks(project).map((link, i) => (
-            <a
-              key={`${link.url}-${i}`}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <span className="truncate">{link.label || "Link"}</span>
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium">Milestones</p>
-          <Badge variant="outline" className="text-[10px]">{openMilestones.length} open</Badge>
-        </div>
-        <div className="flex gap-1.5">
-          <Input
-            value={getMilestoneDraft(project.id).title}
-            onChange={(e) => updateMilestoneDraft(project.id, { title: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAddMilestone(project.id) }}
-            placeholder="New milestone"
-            className="h-8 text-xs"
-          />
-          <Button
-            type="button"
-            size="icon"
-            variant="secondary"
-            className="h-8 w-8"
-            onClick={() => handleAddMilestone(project.id)}
-            aria-label="Add milestone"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {/* Progress */}
         <div className="flex flex-col gap-1">
-          {openMilestones.map((m) => (
-            <div key={m.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
-              <Checkbox
-                checked={false}
-                onCheckedChange={() => toggleMilestone(project.id, m.id)}
-                aria-label={`Complete milestone: ${m.title}`}
-                className="shrink-0"
-              />
-              {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
-                <>
-                  <Input
-                    value={editingMilestoneTitle}
-                    onChange={(e) => setEditingMilestoneTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveMilestoneEdit()
-                      if (e.key === "Escape") cancelMilestoneEdit()
-                    }}
-                    className="h-7 flex-1 text-xs"
-                    autoFocus
-                  />
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit} aria-label="Save milestone">
-                    <Check className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit} aria-label="Cancel">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <TruncatedTooltip as="p" content={m.title} className="min-w-0 flex-1 truncate text-sm" />
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={() => startEditingMilestone(project.id, m)}
-                      aria-label={`Edit milestone: ${m.title}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 text-destructive"
-                      onClick={() => deleteMilestone(project.id, m.id)}
-                      aria-label={`Delete milestone: ${m.title}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </>
-              )}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium">Progress</p>
+            <div className="flex items-center gap-2">
+              <Progress value={progressPct} className="h-1.5 w-28 [&>div]:bg-primary" />
+              <span className="w-8 text-right text-xs text-muted-foreground">{Math.round(progressPct)}%</span>
             </div>
-          ))}
-          {openMilestones.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No open milestones.</p>
-          ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {completedMilestones.length} of {totalMilestones} milestones
+            {projectTasks.length > 0 ? (
+              <> · {completedTasks}/{projectTasks.length} tasks</>
+            ) : null}
+          </p>
         </div>
-        {completedMilestones.length > 0 ? (
-          <Collapsible>
-            <div className="mt-1 rounded-md border border-border/60 bg-background/40 p-2">
-              <div className="flex items-center justify-between gap-2">
+
+        {/* This week — weekly outcome as bullet lines */}
+        {weeklyLines.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-medium">This week</p>
+            {weeklyLines.map((line, i) => (
+              <p key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                <span className="mt-px shrink-0 select-none">·</span>
+                <span>{line.trim()}</span>
+              </p>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Milestones */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium">Milestones</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setShowAddMilestone(true)}
+            >
+              <Plus className="h-3 w-3" /> Add
+            </Button>
+          </div>
+
+          {showAddMilestone ? (
+            <div className="flex gap-1.5">
+              <Input
+                value={getMilestoneDraft(project.id).title}
+                onChange={(e) => updateMilestoneDraft(project.id, { title: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitAddMilestone()
+                  if (e.key === "Escape") {
+                    setShowAddMilestone(false)
+                    updateMilestoneDraft(project.id, { title: "" })
+                  }
+                }}
+                placeholder="Milestone name..."
+                className="h-8 text-xs"
+                autoFocus
+              />
+              <Button type="button" size="icon" variant="secondary" className="h-8 w-8" onClick={commitAddMilestone}>
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() => {
+                  setShowAddMilestone(false)
+                  updateMilestoneDraft(project.id, { title: "" })
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-1">
+            {openMilestones.map((m) => (
+              <div key={m.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
+                <Checkbox
+                  checked={false}
+                  onCheckedChange={() => toggleMilestone(project.id, m.id)}
+                  aria-label={`Complete milestone: ${m.title}`}
+                  className="shrink-0"
+                />
+                {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
+                  <>
+                    <Input
+                      value={editingMilestoneTitle}
+                      onChange={(e) => setEditingMilestoneTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveMilestoneEdit()
+                        if (e.key === "Escape") cancelMilestoneEdit()
+                      }}
+                      className="h-7 flex-1 text-xs"
+                      autoFocus
+                    />
+                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit}>
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <TruncatedTooltip as="p" content={m.title} className="min-w-0 flex-1 truncate text-sm" />
+                    <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => startEditingMilestone(project.id, m)}
+                        aria-label={`Edit milestone: ${m.title}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-destructive"
+                        onClick={() => deleteMilestone(project.id, m.id)}
+                        aria-label={`Delete milestone: ${m.title}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+            {openMilestones.length === 0 && !showAddMilestone ? (
+              <p className="text-xs text-muted-foreground">No open milestones.</p>
+            ) : null}
+          </div>
+
+          {completedMilestones.length > 0 ? (
+            <Collapsible>
+              <div className="rounded-md border border-border/60 bg-background/40 p-2">
                 <CollapsibleTrigger asChild>
-                  <button type="button" className="group flex items-center gap-2 text-left">
+                  <button type="button" className="group flex w-full items-center gap-2 text-left">
                     <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Completed ({completedMilestones.length})
+                    </p>
                   </button>
                 </CollapsibleTrigger>
-                <Badge variant="secondary" className="text-[10px]">{completedMilestones.length}</Badge>
+                <CollapsibleContent className="mt-2">
+                  <div className="flex flex-col gap-1">
+                    {completedMilestones.map((m) => (
+                      <div key={m.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
+                        <Checkbox
+                          checked={true}
+                          onCheckedChange={() => toggleMilestone(project.id, m.id)}
+                          aria-label={`Reopen milestone: ${m.title}`}
+                          className="shrink-0"
+                        />
+                        <TruncatedTooltip
+                          as="p"
+                          content={m.title}
+                          className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
               </div>
-              <CollapsibleContent className="mt-2">
-                <div className="flex flex-col gap-1">
-                  {completedMilestones.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
-                      <Checkbox
-                        checked={true}
-                        onCheckedChange={() => toggleMilestone(project.id, m.id)}
-                        aria-label={`Reopen milestone: ${m.title}`}
-                        className="shrink-0"
-                      />
-                      <TruncatedTooltip
-                        as="p"
-                        content={m.title}
-                        className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+        </div>
+
+        {/* Links */}
+        {links.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium">Links</p>
+            <div className="flex flex-col gap-1">
+              {links.map((link, i) => (
+                <a
+                  key={`${link.url}-${i}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{link.label || "Link"}</span>
+                </a>
+              ))}
             </div>
-          </Collapsible>
+          </div>
         ) : null}
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex shrink-0 items-center justify-between border-t border-border px-4 py-3">
+        {currentStatus !== "completed" ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onStatusChange(project.id, "completed")}
+          >
+            Mark complete
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => onStatusChange(project.id, "active")}
+          >
+            Reopen
+          </Button>
+        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => onEdit(project)}>
+            Edit
+          </Button>
+          {currentStatus === "active" ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => onStatusChange(project.id, "paused")}
+            >
+              Pause
+            </Button>
+          ) : null}
+          {currentStatus === "paused" ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => onStatusChange(project.id, "active")}
+            >
+              Unpause
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   )
