@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags } from "lucide-react"
+import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags, Trash2, Check, X } from "lucide-react"
 import type { Goal } from "@/lib/types"
 
 const PRIORITY_STYLES = {
@@ -66,8 +66,8 @@ export function GoalsModule() {
   const [editPriority, setEditPriority] = useState<Goal["priority"]>("medium")
   const [editTargetDate, setEditTargetDate] = useState("")
   const [newCategory, setNewCategory] = useState("")
-  const [renameFrom, setRenameFrom] = useState("")
-  const [renameTo, setRenameTo] = useState("")
+  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState("")
 
   const activeCreateCategory = useMemo(
     () => (categories.includes(category) ? category : (categories[0] ?? "General")),
@@ -156,88 +156,117 @@ export function GoalsModule() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Manage Categories</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Tags className="h-4 w-4" />
+                  Categories
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-goal-category">Add Category</Label>
-                  <div className="flex gap-2">
-                    <Input id="new-goal-category" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Category name" />
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (!newCategory.trim()) return
-                        addCategory(newCategory)
-                        setNewCategory("")
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Rename Category</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Select value={renameFrom} onValueChange={setRenameFrom}>
-                      <SelectTrigger><SelectValue placeholder="Current" /></SelectTrigger>
-                      <SelectContent>
-                        {categories.map((existingCategory) => (
-                          <SelectItem key={existingCategory} value={existingCategory}>{existingCategory}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} placeholder="New name" />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (!renameFrom || !renameTo.trim()) return
-                        renameCategory(renameFrom, renameTo)
-                        setRenameFrom("")
-                        setRenameTo("")
-                      }}
-                    >
-                      Rename
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Delete Category</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((existingCategory) => (
-                      <Button
-                        key={existingCategory}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeCategory(existingCategory)}
-                        disabled={categories.length <= 1}
-                      >
-                        Delete {existingCategory}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Category Colors</Label>
-                  <div className="space-y-2">
-                    {categories.map((existingCategory) => (
-                      <div key={existingCategory} className="flex items-center justify-between rounded-md border border-border p-2">
-                        <span className="text-sm">{existingCategory}</span>
-                        <input
-                          type="color"
-                          value={categoryColors[existingCategory] ?? "#64748b"}
-                          onChange={(e) => setCategoryColor(existingCategory, e.target.value)}
-                          className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent p-0"
-                          aria-label={`Pick color for ${existingCategory}`}
+              <div className="space-y-2">
+                {categories.map((c) => (
+                  <div key={c} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
+                    <input
+                      type="color"
+                      value={categoryColors[c] ?? "#64748b"}
+                      onChange={(e) => setCategoryColor(c, e.target.value)}
+                      className="h-6 w-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                      aria-label={`Color for ${c}`}
+                    />
+                    {editingCategory === c ? (
+                      <>
+                        <Input
+                          autoFocus
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          className="h-7 flex-1 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && editingValue.trim()) {
+                              renameCategory(c, editingValue.trim())
+                              setEditingCategory(null)
+                            }
+                            if (e.key === "Escape") setEditingCategory(null)
+                          }}
                         />
-                      </div>
-                    ))}
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          disabled={!editingValue.trim()}
+                          onClick={() => {
+                            if (!editingValue.trim()) return
+                            renameCategory(c, editingValue.trim())
+                            setEditingCategory(null)
+                          }}
+                          aria-label="Confirm rename"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => setEditingCategory(null)}
+                          aria-label="Cancel rename"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm">{c}</span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => { setEditingCategory(c); setEditingValue(c) }}
+                          aria-label={`Rename ${c}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeCategory(c)}
+                          disabled={categories.length <= 1}
+                          aria-label={`Delete ${c}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
                   </div>
-                </div>
+                ))}
+              </div>
+              <div className="flex gap-2 border-t border-border pt-3">
+                <Input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="New category name"
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newCategory.trim()) {
+                      addCategory(newCategory.trim())
+                      setNewCategory("")
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="shrink-0 gap-1"
+                  disabled={!newCategory.trim()}
+                  onClick={() => {
+                    if (!newCategory.trim()) return
+                    addCategory(newCategory.trim())
+                    setNewCategory("")
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
