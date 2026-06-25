@@ -121,6 +121,8 @@ export function ProjectsModule() {
   const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
   const [newLinkUrl, setNewLinkUrl] = useState("")
   const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
@@ -161,6 +163,8 @@ export function ProjectsModule() {
     setWeeklyOutcome("")
     setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
+    setStartDate(defaultWeekRange.start)
+    setEndDate(defaultWeekRange.end)
     setMilestones("")
     setNewLinkLabel("")
     setNewLinkUrl("")
@@ -176,6 +180,8 @@ export function ProjectsModule() {
     setWeeklyOutcome(project.weeklyOutcome ?? "")
     setStatus(getProjectStatus(project))
     setColor(normalizeProjectColor(project.color))
+    setStartDate(project.weekStartISO)
+    setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
     setNewLinkLabel("")
     setNewLinkUrl("")
@@ -209,6 +215,8 @@ export function ProjectsModule() {
       .filter((link) => Boolean(link.url))
     const selectedColor = normalizeProjectColor(color)
 
+    const weekStartISO = startDate || defaultWeekRange.start
+    const weekEndISO = endDate || defaultWeekRange.end
     if (!editingId) {
       addProject({
         title: title.trim(),
@@ -216,8 +224,8 @@ export function ProjectsModule() {
         showOnTimeline: true,
         weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
-        weekStartISO: defaultWeekRange.start,
-        weekEndISO: defaultWeekRange.end,
+        weekStartISO,
+        weekEndISO,
         color: selectedColor,
         url: normalizedLinks[0]?.url,
         links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
@@ -229,6 +237,8 @@ export function ProjectsModule() {
         objective: objective.trim() || "Project objective",
         weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
+        weekStartISO,
+        weekEndISO,
         color: selectedColor,
         url: normalizedLinks[0]?.url,
         links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
@@ -328,6 +338,26 @@ export function ProjectsModule() {
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Duration</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 text-xs"
+                    aria-label="Start date"
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">→</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 text-xs"
+                    aria-label="End date"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="project-color">Card color</Label>
