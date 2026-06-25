@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-06-25 — Category color picker in Quick Add
+
+### Added
+- Color swatch in Quick Add category manager — click to open native `<input type="color">` picker; color persists per category in `profile.taskCategoryColors`
+
+---
+
 ## [Unreleased] - 2026-06-23 — Reframe as personal tool + AI-SDLC sandbox
 
 ### Changed
