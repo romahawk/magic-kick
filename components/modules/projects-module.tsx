@@ -73,15 +73,16 @@ function isAtRisk(project: Project): boolean {
   const today = new Date()
   const end = parseISO(project.weekEndISO)
   const daysLeft = differenceInCalendarDays(end, today)
+  const total = project.milestones.length
+  const done = project.milestones.filter((m) => m.completed).length
+  if (total > 0 && done === total) return false
   if (daysLeft <= 2) return true
   const start = parseISO(project.weekStartISO)
   const totalDays = differenceInCalendarDays(end, start)
   if (totalDays <= 0) return false
   const elapsed = Math.max(0, differenceInCalendarDays(today, start))
   const expectedPct = elapsed / totalDays
-  const total = project.milestones.length
   if (total === 0) return false
-  const done = project.milestones.filter((m) => m.completed).length
   return done / total < expectedPct
 }
 
