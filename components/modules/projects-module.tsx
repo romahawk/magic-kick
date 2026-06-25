@@ -103,6 +103,7 @@ export function ProjectsModule() {
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
+  const toggleTask = useAppStore((s) => s.toggleTask)
   const toggleMilestone = useAppStore((s) => s.toggleMilestone)
   const addMilestone = useAppStore((s) => s.addMilestone)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
@@ -487,6 +488,7 @@ export function ProjectsModule() {
               getMilestoneDraft={getMilestoneDraft}
               updateMilestoneDraft={updateMilestoneDraft}
               handleAddMilestone={handleAddMilestone}
+              onToggleTask={toggleTask}
               toggleMilestone={toggleMilestone}
               startEditingMilestone={startEditingMilestone}
               saveMilestoneEdit={saveMilestoneEdit}
@@ -666,6 +668,7 @@ function ProjectDetailPanel({
   cancelMilestoneEdit,
   setEditingMilestoneTitle,
   deleteMilestone,
+  onToggleTask,
 }: {
   project: Project
   tasks: Task[]
@@ -683,6 +686,7 @@ function ProjectDetailPanel({
   cancelMilestoneEdit: () => void
   setEditingMilestoneTitle: (value: string) => void
   deleteMilestone: (projectId: string, milestoneId: string) => void
+  onToggleTask: (taskId: string) => void
 }) {
   const [showAddMilestone, setShowAddMilestone] = useState(false)
 
@@ -928,6 +932,80 @@ function ProjectDetailPanel({
             </Collapsible>
           ) : null}
         </div>
+
+        {/* Tasks */}
+        {projectTasks.length > 0 ? (() => {
+          const today = new Date()
+          const openTasks = projectTasks.filter((t) => !t.completed)
+          const doneTasks = projectTasks.filter((t) => t.completed)
+          return (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium">Tasks</p>
+              <div className="flex flex-col gap-1">
+                {openTasks.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No open tasks.</p>
+                ) : (
+                  openTasks.map((t) => {
+                    const overdue = t.dueDate
+                      ? differenceInCalendarDays(parseISO(t.dueDate), today) < 0
+                      : false
+                    return (
+                      <div key={t.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
+                        <Checkbox
+                          checked={false}
+                          onCheckedChange={() => onToggleTask(t.id)}
+                          aria-label={`Complete task: ${t.title}`}
+                          className="shrink-0"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>
+                        {overdue && t.dueDate ? (
+                          <span className="shrink-0 text-xs text-destructive">
+                            {format(parseISO(t.dueDate), "MMM d")}
+                          </span>
+                        ) : t.dueDate ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {format(parseISO(t.dueDate), "MMM d")}
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              {doneTasks.length > 0 ? (
+                <Collapsible>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <CollapsibleTrigger asChild>
+                      <button type="button" className="group flex w-full items-center gap-2 text-left">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Done ({doneTasks.length})
+                        </p>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <div className="flex flex-col gap-1">
+                        {doneTasks.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
+                            <Checkbox
+                              checked={true}
+                              onCheckedChange={() => onToggleTask(t.id)}
+                              aria-label={`Reopen task: ${t.title}`}
+                              className="shrink-0"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground">
+                              {t.title}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              ) : null}
+            </div>
+          )
+        })() : null}
 
         {/* Links */}
         {links.length > 0 ? (
