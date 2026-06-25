@@ -24,6 +24,8 @@ export function QuickAddDialog() {
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const deleteCategory = useAppStore((s) => s.deleteCategory)
+  const setCategoryColor = useAppStore((s) => s.setCategoryColor)
+  const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
 
   const [taskTitle, setTaskTitle] = useState("")
@@ -165,6 +167,18 @@ export function QuickAddDialog() {
                   {/* Existing categories */}
                   {categories.map((cat) => (
                     <div key={cat} className="flex items-center gap-1">
+                      <label
+                        className="relative h-5 w-5 shrink-0 cursor-pointer rounded-full border border-border"
+                        style={{ background: taskCategoryColors?.[cat] ?? "#888" }}
+                        title="Change color"
+                      >
+                        <input
+                          type="color"
+                          value={taskCategoryColors?.[cat] ?? "#888888"}
+                          onChange={(e) => setCategoryColor(cat, e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
                       {renamingCat === cat ? (
                         <Input
                           ref={renameInputRef}
