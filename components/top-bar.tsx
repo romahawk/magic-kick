@@ -2,52 +2,31 @@
 
 import { useTheme } from "next-themes"
 import { signOut } from "firebase/auth"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { auth } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { syncNow } from "@/lib/sync/engine"
-import { getCurrentWeekRange } from "@/lib/game-utils"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { QuickAddDialog } from "./quick-add-dialog"
 import { Zap, Flame, Moon, Sun, Menu, RefreshCcw, LogOut } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { MobileNav } from "./mobile-nav"
 
+// §4 — Top bar stripped to: workspace mark · sync · avatar menu · Quick Add
+// XP, streak, email, theme toggle, logout moved into avatar dropdown
 export function TopBar() {
   const { theme, setTheme } = useTheme()
   const { user } = useAuth()
   const syncStatus = useAppStore((s) => s.sync.status)
   const profile = useAppStore((s) => s.profile)
-  const weekRange = getCurrentWeekRange()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [currentTime, setCurrentTime] = useState(() =>
-    new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).format(new Date())
-  )
-
-  useEffect(() => {
-    const formatter = new Intl.DateTimeFormat("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    })
-
-    const updateClock = () => setCurrentTime(formatter.format(new Date()))
-    const timer = window.setInterval(updateClock, 1000)
-    updateClock()
-
-    return () => window.clearInterval(timer)
-  }, [])
 
   return (
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 md:flex-nowrap md:gap-3 md:px-6 md:py-0">
-      {/* Mobile menu */}
+      {/* Mobile nav sheet */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="md:hidden">
@@ -61,51 +40,15 @@ export function TopBar() {
         </SheetContent>
       </Sheet>
 
-      {/* Brand for mobile */}
+      {/* Workspace mark (mobile only) */}
       <div className="flex items-center gap-2 md:hidden">
         <Zap className="h-4 w-4 text-primary" />
         <span className="font-serif text-sm font-bold">Magic Kick</span>
       </div>
 
-      {/* Week range */}
-      <p className="order-last basis-full text-xs text-muted-foreground md:order-none md:basis-auto md:text-sm">{weekRange.label}</p>
-
       <div className="hidden flex-1 md:block" />
 
-      {user ? (
-        <div className="hidden max-w-40 truncate rounded-full border border-border px-3 py-1 text-xs text-muted-foreground lg:block">
-          {user.email}
-        </div>
-      ) : null}
-
-      <div className="hidden rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground sm:block">
-        {currentTime}
-      </div>
-
-      {/* XP badge */}
-      <div className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-        <Zap className="h-3 w-3" />
-        {profile.xpThisWeek} XP
-      </div>
-
-      {/* Streak badge */}
-      <div className="hidden items-center gap-1.5 rounded-full bg-streak/15 px-3 py-1 text-xs font-medium text-foreground sm:flex">
-        <Flame className="h-3 w-3 text-streak" />
-        {profile.streakDays}d
-      </div>
-
-      {/* Theme toggle */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="h-8 w-8"
-      >
-        <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
-        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
-        <span className="sr-only">Toggle theme</span>
-      </Button>
-
+      {/* Sync indicator */}
       <Button
         variant="outline"
         size="sm"
@@ -120,19 +63,54 @@ export function TopBar() {
         <span className="hidden sm:inline">{syncStatus}</span>
       </Button>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => {
-          if (!auth) return
-          void signOut(auth)
-        }}
-        asChild={false}
-      >
-        <LogOut className="h-4 w-4" />
-        <span className="sr-only">Log out</span>
-      </Button>
+      {/* Avatar dropdown — contains email, XP/streak, theme toggle, logout */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" aria-label="User menu">
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="text-xs">
+                {user?.email?.[0]?.toUpperCase() ?? "U"}
+              </AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {user?.email ? (
+            <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{user.email}</div>
+          ) : null}
+          <DropdownMenuSeparator />
+          <div className="flex items-center gap-4 px-2 py-2">
+            <div className="flex items-center gap-1 text-xs">
+              <Zap className="h-3 w-3 text-primary" />
+              <span>{profile.xpThisWeek} XP</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <Flame className="h-3 w-3 text-streak" />
+              <span>{profile.streakDays}d streak</span>
+            </div>
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? (
+              <Sun className="mr-2 h-4 w-4" />
+            ) : (
+              <Moon className="mr-2 h-4 w-4" />
+            )}
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => {
+              if (!auth) return
+              void signOut(auth)
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Quick add */}
       <QuickAddDialog />
