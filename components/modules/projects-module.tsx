@@ -73,15 +73,16 @@ function isAtRisk(project: Project): boolean {
   const today = new Date()
   const end = parseISO(project.weekEndISO)
   const daysLeft = differenceInCalendarDays(end, today)
+  const total = project.milestones.length
+  const done = project.milestones.filter((m) => m.completed).length
+  if (total > 0 && done === total) return false
   if (daysLeft <= 2) return true
   const start = parseISO(project.weekStartISO)
   const totalDays = differenceInCalendarDays(end, start)
   if (totalDays <= 0) return false
   const elapsed = Math.max(0, differenceInCalendarDays(today, start))
   const expectedPct = elapsed / totalDays
-  const total = project.milestones.length
   if (total === 0) return false
-  const done = project.milestones.filter((m) => m.completed).length
   return done / total < expectedPct
 }
 
@@ -102,6 +103,7 @@ export function ProjectsModule() {
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
+  const toggleTask = useAppStore((s) => s.toggleTask)
   const toggleMilestone = useAppStore((s) => s.toggleMilestone)
   const addMilestone = useAppStore((s) => s.addMilestone)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
@@ -119,6 +121,8 @@ export function ProjectsModule() {
   const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [newLinkLabel, setNewLinkLabel] = useState("")
   const [newLinkUrl, setNewLinkUrl] = useState("")
   const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
@@ -159,6 +163,8 @@ export function ProjectsModule() {
     setWeeklyOutcome("")
     setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
+    setStartDate(defaultWeekRange.start)
+    setEndDate(defaultWeekRange.end)
     setMilestones("")
     setNewLinkLabel("")
     setNewLinkUrl("")
@@ -174,6 +180,8 @@ export function ProjectsModule() {
     setWeeklyOutcome(project.weeklyOutcome ?? "")
     setStatus(getProjectStatus(project))
     setColor(normalizeProjectColor(project.color))
+    setStartDate(project.weekStartISO)
+    setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
     setNewLinkLabel("")
     setNewLinkUrl("")
@@ -207,6 +215,8 @@ export function ProjectsModule() {
       .filter((link) => Boolean(link.url))
     const selectedColor = normalizeProjectColor(color)
 
+    const weekStartISO = startDate || defaultWeekRange.start
+    const weekEndISO = endDate || defaultWeekRange.end
     if (!editingId) {
       addProject({
         title: title.trim(),
@@ -214,8 +224,8 @@ export function ProjectsModule() {
         showOnTimeline: true,
         weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
-        weekStartISO: defaultWeekRange.start,
-        weekEndISO: defaultWeekRange.end,
+        weekStartISO,
+        weekEndISO,
         color: selectedColor,
         url: normalizedLinks[0]?.url,
         links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
@@ -227,6 +237,8 @@ export function ProjectsModule() {
         objective: objective.trim() || "Project objective",
         weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
+        weekStartISO,
+        weekEndISO,
         color: selectedColor,
         url: normalizedLinks[0]?.url,
         links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
@@ -326,6 +338,26 @@ export function ProjectsModule() {
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Duration</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 text-xs"
+                    aria-label="Start date"
+                  />
+                  <span className="shrink-0 text-xs text-muted-foreground">→</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 text-xs"
+                    aria-label="End date"
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="project-color">Card color</Label>
@@ -486,6 +518,7 @@ export function ProjectsModule() {
               getMilestoneDraft={getMilestoneDraft}
               updateMilestoneDraft={updateMilestoneDraft}
               handleAddMilestone={handleAddMilestone}
+              onToggleTask={toggleTask}
               toggleMilestone={toggleMilestone}
               startEditingMilestone={startEditingMilestone}
               saveMilestoneEdit={saveMilestoneEdit}
@@ -665,6 +698,7 @@ function ProjectDetailPanel({
   cancelMilestoneEdit,
   setEditingMilestoneTitle,
   deleteMilestone,
+  onToggleTask,
 }: {
   project: Project
   tasks: Task[]
@@ -682,6 +716,7 @@ function ProjectDetailPanel({
   cancelMilestoneEdit: () => void
   setEditingMilestoneTitle: (value: string) => void
   deleteMilestone: (projectId: string, milestoneId: string) => void
+  onToggleTask: (taskId: string) => void
 }) {
   const [showAddMilestone, setShowAddMilestone] = useState(false)
 
@@ -927,6 +962,80 @@ function ProjectDetailPanel({
             </Collapsible>
           ) : null}
         </div>
+
+        {/* Tasks */}
+        {projectTasks.length > 0 ? (() => {
+          const today = new Date()
+          const openTasks = projectTasks.filter((t) => !t.completed)
+          const doneTasks = projectTasks.filter((t) => t.completed)
+          return (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium">Tasks</p>
+              <div className="flex flex-col gap-1">
+                {openTasks.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No open tasks.</p>
+                ) : (
+                  openTasks.map((t) => {
+                    const overdue = t.dueDate
+                      ? differenceInCalendarDays(parseISO(t.dueDate), today) < 0
+                      : false
+                    return (
+                      <div key={t.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
+                        <Checkbox
+                          checked={false}
+                          onCheckedChange={() => onToggleTask(t.id)}
+                          aria-label={`Complete task: ${t.title}`}
+                          className="shrink-0"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>
+                        {overdue && t.dueDate ? (
+                          <span className="shrink-0 text-xs text-destructive">
+                            {format(parseISO(t.dueDate), "MMM d")}
+                          </span>
+                        ) : t.dueDate ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {format(parseISO(t.dueDate), "MMM d")}
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              {doneTasks.length > 0 ? (
+                <Collapsible>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                    <CollapsibleTrigger asChild>
+                      <button type="button" className="group flex w-full items-center gap-2 text-left">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Done ({doneTasks.length})
+                        </p>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <div className="flex flex-col gap-1">
+                        {doneTasks.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
+                            <Checkbox
+                              checked={true}
+                              onCheckedChange={() => onToggleTask(t.id)}
+                              aria-label={`Reopen task: ${t.title}`}
+                              className="shrink-0"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground">
+                              {t.title}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              ) : null}
+            </div>
+          )
+        })() : null}
 
         {/* Links */}
         {links.length > 0 ? (
