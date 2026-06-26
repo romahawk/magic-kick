@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-06-26 — Schedule block editor improvements
+
+### Added
+- Notes field on time blocks — freeform textarea persisted to `TimeBlock.notes`
+- Category selector in the block edit panel when a task is linked — reads from `profile.taskCategories` with a built-in fallback list
+- Metadata row in block edit panel showing linked task's category, lane, and due date at a glance
+
+---
+
 ## [Unreleased] - 2026-06-24 — Projects tab density redesign
 
 ### Changed
