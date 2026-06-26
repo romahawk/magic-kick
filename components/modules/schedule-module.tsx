@@ -1021,7 +1021,16 @@ function EditPanel({
               <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
             ) : null}
             {linkedTask.dueDate ? (
-              <span className="text-[10px] text-muted-foreground">Due {linkedTask.dueDate}</span>
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                Due {linkedTask.dueDate}
+                <button
+                  onClick={() => { onUpdateTask({ dueDate: undefined }, { clearTimeSlot: true }); onClose() }}
+                  className="ml-0.5 rounded hover:text-foreground"
+                  title="Remove due date and unschedule"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
             ) : null}
           </div>
         ) : null}
