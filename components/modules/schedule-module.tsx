@@ -129,6 +129,7 @@ interface DisplayBlock {
   actualHours?: number
   status: TimeBlockStatus
   repeat?: TaskRepeat
+  notes?: string
 }
 
 export function ScheduleModule() {
@@ -230,6 +231,7 @@ export function ScheduleModule() {
         plannedHours: block.plannedHours,
         actualHours: block.actualHours,
         status: block.status,
+        notes: block.notes,
       }))
 
     const recurringBlocks: DisplayBlock[] = tasks.flatMap((task) => {
