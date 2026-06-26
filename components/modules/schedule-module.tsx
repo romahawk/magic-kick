@@ -8,6 +8,7 @@ import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock, Sparkles } from "lucide-react"
@@ -18,6 +19,8 @@ import { auth } from "@/lib/firebase/client"
 import { isAiEnabled } from "@/lib/ai/flags"
 import { detectConflicts, dayIndexToISO } from "@/lib/ai/conflict"
 import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel"
+
+const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 const HOUR_PX = 64
 const DAY_START = 6
@@ -129,6 +132,7 @@ interface DisplayBlock {
 }
 
 export function ScheduleModule() {
+  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const projects = useAppStore((s) => s.projects).filter((p) => !p.deleted)
   const tasks = useAppStore((s) => s.tasks).filter((t) => !t.deleted)
   const scheduleItems = useAppStore((s) => s.schedule)
@@ -797,6 +801,7 @@ export function ScheduleModule() {
               linkedTask={editTask}
               project={projects.find((p) => p.id === editBlock.projectId)}
               allProjects={activeProjects}
+              allCategories={taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES}
               onUpdateTask={(updates, timing) => {
                 if (!editBlock.linkedTaskId) return
                 updateTask(editBlock.linkedTaskId, updates, timing)
@@ -944,6 +949,7 @@ interface EditPanelProps {
   linkedTask?: Task
   project: { id: string; title: string; color: string } | undefined
   allProjects: { id: string; title: string; color: string }[]
+  allCategories: string[]
   onUpdateTask: (updates: Partial<Omit<Task, "id" | "deleted" | "clientUpdatedAt">>, timing?: { startHHmm?: string; endHHmm?: string; clearTimeSlot?: boolean }) => void
   onUpdateTimeBlock: (updates: Partial<Omit<TimeBlock, "id" | "deleted" | "clientUpdatedAt">>) => void
   onToggleOccurrenceDone: () => void
@@ -956,6 +962,7 @@ function EditPanel({
   linkedTask,
   project,
   allProjects,
+  allCategories,
   onUpdateTask,
   onUpdateTimeBlock,
   onToggleOccurrenceDone,
@@ -1005,10 +1012,39 @@ function EditPanel({
         </button>
       </div>
       <div className="space-y-3">
+        {linkedTask ? (
+          <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-secondary/40 px-2 py-1.5">
+            <Badge variant="secondary" className="text-[10px]">{linkedTask.category}</Badge>
+            {linkedTask.lane ? (
+              <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
+            ) : null}
+            {linkedTask.dueDate ? (
+              <span className="text-[10px] text-muted-foreground">Due {linkedTask.dueDate}</span>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="space-y-1.5">
           <Label className="text-xs">Description</Label>
           <Input value={block.taskDescription} onChange={(e) => updateDescription(e.target.value)} />
         </div>
+
+        {linkedTask ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Category</Label>
+            <Select value={linkedTask.category} onValueChange={(value) => onUpdateTask({ category: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         <div className="space-y-1.5">
           <Label className="text-xs">
             Project <span className="text-muted-foreground">(optional)</span>
@@ -1089,6 +1125,17 @@ function EditPanel({
             This edits the repeating template. Moving or resizing this occurrence updates the repeating slot for future weeks too.
           </div>
         ) : null}
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Notes</Label>
+          <Textarea
+            value={block.notes ?? ""}
+            onChange={(e) => onUpdateTimeBlock({ notes: e.target.value })}
+            placeholder="Add notes…"
+            rows={3}
+            className="resize-none text-xs"
+          />
+        </div>
 
         {isRecurring ? (
           <div className="flex items-center justify-between rounded-lg border border-border/70 px-3 py-2 text-sm">
