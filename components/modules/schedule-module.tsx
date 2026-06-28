@@ -975,12 +975,13 @@ function EditPanel({
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
   const [localNotes, setLocalNotes] = useState(block.notes ?? "")
-  const localNotesRef = useRef(localNotes)
-  const onUpdateTimeBlockRef = useRef(onUpdateTimeBlock)
-  useEffect(() => { localNotesRef.current = localNotes })
-  useEffect(() => { onUpdateTimeBlockRef.current = onUpdateTimeBlock })
-  // Save notes when the panel closes (blur may not fire when switching blocks via div clicks)
-  useEffect(() => () => { onUpdateTimeBlockRef.current({ notes: localNotesRef.current.trim() || undefined }) }, [])
+  const [notesMode, setNotesMode] = useState<"view" | "edit">(block.notes ? "view" : "edit")
+
+  function saveNotes() {
+    const trimmed = localNotes.trim()
+    onUpdateTimeBlock({ notes: trimmed || undefined })
+    setNotesMode(trimmed ? "view" : "edit")
+  }
 
   function updateTimes(nextStart: string, nextEnd: string) {
     if (linkedTask) {
@@ -1160,15 +1161,38 @@ function EditPanel({
         ) : null}
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Notes</Label>
-          <Textarea
-            value={localNotes}
-            onChange={(e) => setLocalNotes(e.target.value)}
-            onBlur={() => onUpdateTimeBlock({ notes: localNotes.trim() || undefined })}
-            placeholder="Add notes…"
-            rows={3}
-            className="resize-none text-xs"
-          />
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Notes</Label>
+            {notesMode === "view" ? (
+              <button
+                onClick={() => setNotesMode("edit")}
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Edit
+              </button>
+            ) : null}
+          </div>
+          {notesMode === "view" ? (
+            <div className="min-h-[4.5rem] rounded-md border border-input bg-background px-3 py-2 text-xs whitespace-pre-wrap">
+              {localNotes}
+            </div>
+          ) : (
+            <>
+              <Textarea
+                value={localNotes}
+                onChange={(e) => setLocalNotes(e.target.value)}
+                placeholder="Add notes…"
+                rows={3}
+                className="resize-none text-xs"
+                autoFocus={notesMode === "edit" && Boolean(block.notes)}
+              />
+              {localNotes.trim() ? (
+                <Button size="sm" variant="secondary" className="w-full" onClick={saveNotes}>
+                  Save notes
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
 
         {isRecurring ? (
