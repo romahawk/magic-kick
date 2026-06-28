@@ -975,6 +975,12 @@ function EditPanel({
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
   const [localNotes, setLocalNotes] = useState(block.notes ?? "")
+  const localNotesRef = useRef(localNotes)
+  const onUpdateTimeBlockRef = useRef(onUpdateTimeBlock)
+  useEffect(() => { localNotesRef.current = localNotes })
+  useEffect(() => { onUpdateTimeBlockRef.current = onUpdateTimeBlock })
+  // Save notes when the panel closes (blur may not fire when switching blocks via div clicks)
+  useEffect(() => () => { onUpdateTimeBlockRef.current({ notes: localNotesRef.current.trim() || undefined }) }, [])
 
   function updateTimes(nextStart: string, nextEnd: string) {
     if (linkedTask) {
