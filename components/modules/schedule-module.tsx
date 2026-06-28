@@ -799,6 +799,7 @@ export function ScheduleModule() {
         <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
           {editBlock ? (
             <EditPanel
+              key={editBlock.id}
               block={editBlock}
               linkedTask={editTask}
               project={projects.find((p) => p.id === editBlock.projectId)}
@@ -973,6 +974,7 @@ function EditPanel({
 }: EditPanelProps) {
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
+  const [localNotes, setLocalNotes] = useState(block.notes ?? "")
 
   function updateTimes(nextStart: string, nextEnd: string) {
     if (linkedTask) {
@@ -1154,8 +1156,9 @@ function EditPanel({
         <div className="space-y-1.5">
           <Label className="text-xs">Notes</Label>
           <Textarea
-            value={block.notes ?? ""}
-            onChange={(e) => onUpdateTimeBlock({ notes: e.target.value })}
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            onBlur={() => onUpdateTimeBlock({ notes: localNotes.trim() || undefined })}
             placeholder="Add notes…"
             rows={3}
             className="resize-none text-xs"
