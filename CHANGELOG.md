@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Notes field on time blocks — freeform textarea persisted to `TimeBlock.notes`
 - Category selector in the block edit panel when a task is linked — reads from `profile.taskCategories` with a built-in fallback list
 - Metadata row in block edit panel showing linked task's category, lane, and due date at a glance
+- × button on the due date chip — clears due date and time slot, moving the task back to the Unscheduled tasks list
 
 ---
 
