@@ -1021,16 +1021,7 @@ function EditPanel({
               <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
             ) : null}
             {linkedTask.dueDate ? (
-              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                Due {linkedTask.dueDate}
-                <button
-                  onClick={() => { onUpdateTask({ dueDate: undefined }, { clearTimeSlot: true }); onClose() }}
-                  className="ml-0.5 rounded hover:text-foreground"
-                  title="Remove due date and unschedule"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </span>
+              <span className="text-[10px] text-muted-foreground">Due {linkedTask.dueDate}</span>
             ) : null}
           </div>
         ) : null}
@@ -1053,6 +1044,29 @@ function EditPanel({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        ) : null}
+
+        {linkedTask ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Due date</Label>
+            <div className="flex gap-1.5">
+              <Input
+                type="date"
+                value={linkedTask.dueDate ?? ""}
+                onChange={(e) => onUpdateTask({ dueDate: e.target.value || undefined })}
+                className="flex-1"
+              />
+              {linkedTask.dueDate ? (
+                <button
+                  onClick={() => { onUpdateTask({ dueDate: undefined }, { clearTimeSlot: true }); onClose() }}
+                  className="flex items-center rounded-md border border-input px-2 text-muted-foreground hover:text-foreground"
+                  title="Remove due date and unschedule"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
