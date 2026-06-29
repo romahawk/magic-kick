@@ -18,8 +18,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Progress } from "@/components/ui/progress"
 import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
-import { AlertTriangle, CalendarIcon, Check, ChevronRight, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import { AlertTriangle, CalendarIcon, Check, ChevronRight, ExternalLink, Link as LinkIcon, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -461,6 +462,7 @@ export function ProjectsModule() {
               project={selectedProject}
               tasks={tasks}
               onEdit={openEditDialog}
+              onUpdateProject={updateProject}
               onStatusChange={(id, nextStatus) => updateProject(id, { status: nextStatus })}
               onDelete={deleteProject}
               editingMilestone={editingMilestone}
@@ -635,6 +637,7 @@ function ProjectDetailPanel({
   project,
   tasks,
   onEdit,
+  onUpdateProject,
   onStatusChange,
   onDelete,
   editingMilestone,
@@ -653,6 +656,7 @@ function ProjectDetailPanel({
   project: Project
   tasks: Task[]
   onEdit: (project: Project) => void
+  onUpdateProject: (id: string, updates: Partial<Project>) => void
   onStatusChange: (id: string, status: ProjectStatus) => void
   onDelete: (id: string) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
@@ -669,6 +673,13 @@ function ProjectDetailPanel({
   onToggleTask: (taskId: string) => void
 }) {
   const [showAddMilestone, setShowAddMilestone] = useState(false)
+  const [showAddLink, setShowAddLink] = useState(false)
+  const [addLinkLabel, setAddLinkLabel] = useState("")
+  const [addLinkUrl, setAddLinkUrl] = useState("")
+  const [editingLinkIdx, setEditingLinkIdx] = useState<number | null>(null)
+  const [editingLinkLabel, setEditingLinkLabel] = useState("")
+  const [editingLinkUrl, setEditingLinkUrl] = useState("")
+  const [deleteLinkIdx, setDeleteLinkIdx] = useState<number | null>(null)
 
   const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
   const completedTasks = projectTasks.filter((t) => t.completed).length
@@ -685,11 +696,39 @@ function ProjectDetailPanel({
   const weeklyLines = project.weeklyOutcome?.trim()
     ? project.weeklyOutcome.trim().split("\n").filter((l) => l.trim())
     : []
-  const links = getProjectLinks(project)
 
   function commitAddMilestone() {
     handleAddMilestone(project.id)
     setShowAddMilestone(false)
+  }
+
+  const projectLinks = getProjectLinks(project)
+
+  function commitAddLink() {
+    const url = normalizeUrl(addLinkUrl)
+    if (!url) return
+    const label = addLinkLabel.trim() || "Link"
+    const next = [...projectLinks, { label, url }]
+    onUpdateProject(project.id, { links: next, url: next[0]?.url })
+    setAddLinkLabel("")
+    setAddLinkUrl("")
+    setShowAddLink(false)
+  }
+
+  function commitEditLink(idx: number) {
+    const url = normalizeUrl(editingLinkUrl)
+    if (!url) return
+    const next = projectLinks.map((l, i) =>
+      i === idx ? { label: editingLinkLabel.trim() || "Link", url } : l
+    )
+    onUpdateProject(project.id, { links: next, url: next[0]?.url })
+    setEditingLinkIdx(null)
+  }
+
+  function commitDeleteLink(idx: number) {
+    const next = projectLinks.filter((_, i) => i !== idx)
+    onUpdateProject(project.id, { links: next.length > 0 ? next : undefined, url: next[0]?.url })
+    setDeleteLinkIdx(null)
   }
 
   return (
@@ -987,26 +1026,155 @@ function ProjectDetailPanel({
           )
         })() : null}
 
-        {/* Links */}
-        {links.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
+        {/* Links — inline editable */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
             <p className="text-xs font-medium">Links</p>
-            <div className="flex flex-col gap-1">
-              {links.map((link, i) => (
-                <a
-                  key={`${link.url}-${i}`}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{link.label || "Link"}</span>
-                </a>
-              ))}
-            </div>
+            {!showAddLink ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAddLink(true)}
+              >
+                <Plus className="h-3 w-3" /> Add
+              </Button>
+            ) : null}
           </div>
-        ) : null}
+
+          {showAddLink ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-1.5">
+                <Input
+                  value={addLinkLabel}
+                  onChange={(e) => setAddLinkLabel(e.target.value)}
+                  placeholder="Label"
+                  className="h-7 text-xs"
+                />
+                <Input
+                  value={addLinkUrl}
+                  onChange={(e) => setAddLinkUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="h-7 flex-1 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitAddLink()
+                    if (e.key === "Escape") setShowAddLink(false)
+                  }}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-1.5">
+                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink}>
+                  Save
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddLink(false); setAddLinkLabel(""); setAddLinkUrl("") }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {projectLinks.length === 0 && !showAddLink ? (
+            <p className="text-xs text-muted-foreground">No links yet — add one.</p>
+          ) : null}
+
+          <div className="flex flex-col gap-1">
+            {projectLinks.map((link, i) => (
+              <div key={`${link.url}-${i}`} className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-muted/40">
+                {editingLinkIdx === i ? (
+                  <>
+                    <Input
+                      value={editingLinkLabel}
+                      onChange={(e) => setEditingLinkLabel(e.target.value)}
+                      className="h-6 w-24 shrink-0 text-xs"
+                    />
+                    <Input
+                      value={editingLinkUrl}
+                      onChange={(e) => setEditingLinkUrl(e.target.value)}
+                      className="h-6 min-w-0 flex-1 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEditLink(i)
+                        if (e.key === "Escape") setEditingLinkIdx(null)
+                      }}
+                      autoFocus
+                    />
+                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => commitEditLink(i)}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setEditingLinkIdx(null)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-w-0 flex-1 truncate text-xs hover:underline"
+                        >
+                          {link.label || "Link"}
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{link.url}</TooltipContent>
+                    </Tooltip>
+                    <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5"
+                        onClick={() => { setEditingLinkIdx(i); setEditingLinkLabel(link.label); setEditingLinkUrl(link.url) }}
+                        aria-label={`Edit ${link.label} link`}
+                      >
+                        <Pencil className="h-2.5 w-2.5" />
+                      </Button>
+                      {deleteLinkIdx === i ? (
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5 text-destructive"
+                            onClick={() => commitDeleteLink(i)}
+                            aria-label="Confirm delete"
+                          >
+                            <Check className="h-2.5 w-2.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => setDeleteLinkIdx(null)}
+                            aria-label="Cancel delete"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5 text-destructive"
+                          onClick={() => setDeleteLinkIdx(i)}
+                          aria-label={`Delete ${link.label} link`}
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Footer actions */}
