@@ -117,15 +117,11 @@ export function ProjectsModule() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [objective, setObjective] = useState("")
-  const [weeklyOutcome, setWeeklyOutcome] = useState("")
   const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [newLinkLabel, setNewLinkLabel] = useState("")
-  const [newLinkUrl, setNewLinkUrl] = useState("")
-  const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
   const [formError, setFormError] = useState<string | null>(null)
 
   // Module state
@@ -160,15 +156,11 @@ export function ProjectsModule() {
     setEditingId(null)
     setTitle("")
     setObjective("")
-    setWeeklyOutcome("")
     setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
     setStartDate(defaultWeekRange.start)
     setEndDate(defaultWeekRange.end)
     setMilestones("")
-    setNewLinkLabel("")
-    setNewLinkUrl("")
-    setNewLinks([])
     setFormError(null)
     setOpen(true)
   }
@@ -177,44 +169,18 @@ export function ProjectsModule() {
     setEditingId(project.id)
     setTitle(project.title)
     setObjective(project.objective)
-    setWeeklyOutcome(project.weeklyOutcome ?? "")
     setStatus(getProjectStatus(project))
     setColor(normalizeProjectColor(project.color))
     setStartDate(project.weekStartISO)
     setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
-    setNewLinkLabel("")
-    setNewLinkUrl("")
-    setNewLinks(getProjectLinks(project))
     setFormError(null)
     setOpen(true)
   }
 
-  function addStagedLink() {
-    const url = normalizeUrl(newLinkUrl)
-    if (!url) return
-    const label = newLinkLabel.trim() || "Link"
-    setNewLinks((prev) => [...prev, { label, url }])
-    setNewLinkLabel("")
-    setNewLinkUrl("")
-  }
-
   function saveProject() {
     if (!title.trim()) return
-    const normalizedOutcome = weeklyOutcome.trim()
-    if (status === "active" && !normalizedOutcome) {
-      setFormError("Active projects must have exactly one weekly outcome.")
-      return
-    }
-    const draftUrl = normalizeUrl(newLinkUrl)
-    const draftLinks = draftUrl
-      ? [...newLinks, { label: newLinkLabel.trim() || "Link", url: draftUrl }]
-      : newLinks
-    const normalizedLinks = draftLinks
-      .map((link) => ({ label: link.label.trim() || "Link", url: normalizeUrl(link.url) }))
-      .filter((link) => Boolean(link.url))
     const selectedColor = normalizeProjectColor(color)
-
     const weekStartISO = startDate || defaultWeekRange.start
     const weekEndISO = endDate || defaultWeekRange.end
     if (!editingId) {
@@ -222,26 +188,20 @@ export function ProjectsModule() {
         title: title.trim(),
         objective: objective.trim() || "Project objective",
         showOnTimeline: true,
-        weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
         weekStartISO,
         weekEndISO,
         color: selectedColor,
-        url: normalizedLinks[0]?.url,
-        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
         milestones: parseMilestones(milestones),
       })
     } else {
       updateProject(editingId, {
         title: title.trim(),
         objective: objective.trim() || "Project objective",
-        weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
         weekStartISO,
         weekEndISO,
         color: selectedColor,
-        url: normalizedLinks[0]?.url,
-        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
       })
     }
     setFormError(null)
@@ -314,18 +274,6 @@ export function ProjectsModule() {
                 <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="project-weekly-outcome">Weekly Outcome</Label>
-                <Input
-                  id="project-weekly-outcome"
-                  value={weeklyOutcome}
-                  onChange={(e) => setWeeklyOutcome(e.target.value)}
-                  placeholder="One concrete result for this week"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Active projects require exactly one weekly outcome.
-                </p>
-              </div>
-              <div>
                 <Label>Project Status</Label>
                 <Select value={status ?? "active"} onValueChange={(value) => setStatus(value as Project["status"])}>
                   <SelectTrigger>
@@ -377,47 +325,6 @@ export function ProjectsModule() {
                     className="font-mono text-xs"
                   />
                 </div>
-              </div>
-              <div>
-                <Label>Links (optional)</Label>
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    value={newLinkLabel}
-                    onChange={(e) => setNewLinkLabel(e.target.value)}
-                    placeholder="Label (e.g. Figma)"
-                    className="sm:w-44 sm:flex-none"
-                  />
-                  <Input
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="min-w-0"
-                  />
-                  <Button type="button" variant="secondary" onClick={addStagedLink} className="sm:flex-none">
-                    Add
-                  </Button>
-                </div>
-                {newLinks.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {newLinks.map((link, index) => (
-                      <div key={`${link.url}-${index}`} className="flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs">
-                        <span className="min-w-0 flex-1 break-all pr-1">
-                          <span className="font-medium">{link.label}:</span> {link.url}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => setNewLinks((prev) => prev.filter((_, i) => i !== index))}
-                          aria-label={`Remove ${link.label} link`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               {!editingId ? (
                 <div>
