@@ -9,15 +9,19 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
-import { AlertTriangle, Check, ChevronRight, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import { AlertTriangle, CalendarIcon, Check, ChevronRight, ExternalLink, Link as LinkIcon, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -29,6 +33,17 @@ const LEGACY_COLOR_MAP: Record<string, string> = {
   "bg-chart-4": "#f97316",
   "bg-chart-5": "#a855f7",
 }
+
+const PRESET_COLORS = [
+  { name: "blue",   value: "#3b82f6" },
+  { name: "purple", value: "#8b5cf6" },
+  { name: "yellow", value: "#eab308" },
+  { name: "green",  value: "#22c55e" },
+  { name: "pink",   value: "#ec4899" },
+  { name: "orange", value: "#f97316" },
+  { name: "red",    value: "#ef4444" },
+  { name: "slate",  value: "#64748b" },
+]
 
 const STATUS_SECTIONS: Array<{ id: ProjectStatus; label: string }> = [
   { id: "active", label: "Active" },
@@ -117,16 +132,15 @@ export function ProjectsModule() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [objective, setObjective] = useState("")
-  const [weeklyOutcome, setWeeklyOutcome] = useState("")
   const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
   const [milestones, setMilestones] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [newLinkLabel, setNewLinkLabel] = useState("")
-  const [newLinkUrl, setNewLinkUrl] = useState("")
-  const [newLinks, setNewLinks] = useState<Array<{ label: string; url: string }>>([])
   const [formError, setFormError] = useState<string | null>(null)
+  const [startDateOpen, setStartDateOpen] = useState(false)
+  const [endDateOpen, setEndDateOpen] = useState(false)
+  const [formSnapshot, setFormSnapshot] = useState<{ title: string; objective: string; status: string; startDate: string; endDate: string; color: string } | null>(null)
 
   // Module state
   const [view, setView] = useState<"list" | "timeline">("list")
@@ -160,88 +174,60 @@ export function ProjectsModule() {
     setEditingId(null)
     setTitle("")
     setObjective("")
-    setWeeklyOutcome("")
     setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
     setStartDate(defaultWeekRange.start)
     setEndDate(defaultWeekRange.end)
     setMilestones("")
-    setNewLinkLabel("")
-    setNewLinkUrl("")
-    setNewLinks([])
     setFormError(null)
+    setFormSnapshot(null)
     setOpen(true)
   }
 
   function openEditDialog(project: Project) {
+    const s = getProjectStatus(project)
+    const c = normalizeProjectColor(project.color)
     setEditingId(project.id)
     setTitle(project.title)
     setObjective(project.objective)
-    setWeeklyOutcome(project.weeklyOutcome ?? "")
-    setStatus(getProjectStatus(project))
-    setColor(normalizeProjectColor(project.color))
+    setStatus(s)
+    setColor(c)
     setStartDate(project.weekStartISO)
     setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
-    setNewLinkLabel("")
-    setNewLinkUrl("")
-    setNewLinks(getProjectLinks(project))
     setFormError(null)
+    setFormSnapshot({ title: project.title, objective: project.objective, status: s, startDate: project.weekStartISO, endDate: project.weekEndISO, color: c })
     setOpen(true)
-  }
-
-  function addStagedLink() {
-    const url = normalizeUrl(newLinkUrl)
-    if (!url) return
-    const label = newLinkLabel.trim() || "Link"
-    setNewLinks((prev) => [...prev, { label, url }])
-    setNewLinkLabel("")
-    setNewLinkUrl("")
   }
 
   function saveProject() {
     if (!title.trim()) return
-    const normalizedOutcome = weeklyOutcome.trim()
-    if (status === "active" && !normalizedOutcome) {
-      setFormError("Active projects must have exactly one weekly outcome.")
-      return
-    }
-    const draftUrl = normalizeUrl(newLinkUrl)
-    const draftLinks = draftUrl
-      ? [...newLinks, { label: newLinkLabel.trim() || "Link", url: draftUrl }]
-      : newLinks
-    const normalizedLinks = draftLinks
-      .map((link) => ({ label: link.label.trim() || "Link", url: normalizeUrl(link.url) }))
-      .filter((link) => Boolean(link.url))
     const selectedColor = normalizeProjectColor(color)
-
     const weekStartISO = startDate || defaultWeekRange.start
     const weekEndISO = endDate || defaultWeekRange.end
+    if (weekStartISO > weekEndISO) {
+      setFormError("End date must be on or after start date.")
+      return
+    }
     if (!editingId) {
       addProject({
         title: title.trim(),
         objective: objective.trim() || "Project objective",
         showOnTimeline: true,
-        weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
         weekStartISO,
         weekEndISO,
         color: selectedColor,
-        url: normalizedLinks[0]?.url,
-        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
         milestones: parseMilestones(milestones),
       })
     } else {
       updateProject(editingId, {
         title: title.trim(),
         objective: objective.trim() || "Project objective",
-        weeklyOutcome: normalizedOutcome || undefined,
         status: status ?? "active",
         weekStartISO,
         weekEndISO,
         color: selectedColor,
-        url: normalizedLinks[0]?.url,
-        links: normalizedLinks.length > 0 ? normalizedLinks : undefined,
       })
     }
     setFormError(null)
@@ -300,144 +286,164 @@ export function ProjectsModule() {
               <Plus className="h-4 w-4" /> New Project
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Project" : "Create Project"}</DialogTitle>
+          <DialogContent
+            className="flex flex-col gap-0 p-0 sm:max-w-[480px] max-h-[90vh]"
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault()
+                const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                const isValid = !!title.trim() && (startDate <= endDate)
+                if (isValid && (!editingId || isDirty)) saveProject()
+              }
+            }}
+          >
+            <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b border-border">
+              <DialogTitle className="text-base font-semibold">{editingId ? "Edit Project" : "Create Project"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               <div>
-                <Label htmlFor="project-title">Title</Label>
-                <Input id="project-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Label htmlFor="project-title" className="text-sm font-medium">Title</Label>
+                <Input id="project-title" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="project-objective">Objective</Label>
-                <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
+                <Label htmlFor="project-objective" className="text-sm font-medium">Objective</Label>
+                <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="project-weekly-outcome">Weekly Outcome</Label>
-                <Input
-                  id="project-weekly-outcome"
-                  value={weeklyOutcome}
-                  onChange={(e) => setWeeklyOutcome(e.target.value)}
-                  placeholder="One concrete result for this week"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Active projects require exactly one weekly outcome.
-                </p>
+                <Label className="text-sm font-medium">Status</Label>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={status ?? "active"}
+                  onValueChange={(v) => { if (v) setStatus(v as Project["status"]) }}
+                  className="mt-1.5 w-full"
+                >
+                  {STATUS_SECTIONS.map((s) => (
+                    <ToggleGroupItem key={s.id} value={s.id} className="text-xs">
+                      {s.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
               </div>
               <div>
-                <Label>Project Status</Label>
-                <Select value={status ?? "active"} onValueChange={(value) => setStatus(value as Project["status"])}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="paused">Paused</SelectItem>
-                    <SelectItem value="parked">Parked</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Duration</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="flex-1 text-xs"
-                    aria-label="Start date"
-                  />
+                <Label className="text-sm font-medium">Duration</Label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="flex-1 justify-start text-left text-xs font-normal h-9">
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {startDate ? format(parseISO(startDate), "dd MMM yyyy") : "Start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ? parseISO(startDate) : undefined}
+                        onSelect={(date) => {
+                          if (date) { setStartDate(format(date, "yyyy-MM-dd")); setStartDateOpen(false) }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <span className="shrink-0 text-xs text-muted-foreground">→</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="flex-1 text-xs"
-                    aria-label="End date"
-                  />
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="flex-1 justify-start text-left text-xs font-normal h-9">
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {endDate ? format(parseISO(endDate), "dd MMM yyyy") : "End date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? parseISO(endDate) : undefined}
+                        onSelect={(date) => {
+                          if (date) { setEndDate(format(date, "yyyy-MM-dd")); setEndDateOpen(false) }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
+                {formError ? (
+                  <p className="mt-1.5 text-xs text-destructive">{formError}</p>
+                ) : null}
               </div>
               <div>
-                <Label htmlFor="project-color">Card color</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input
-                    id="project-color"
-                    type="color"
-                    value={normalizeProjectColor(color)}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="h-10 w-14 cursor-pointer p-1"
-                    aria-label="Pick project card color"
-                  />
-                  <Input
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    placeholder="#3b82f6"
-                    className="font-mono text-xs"
-                  />
+                <Label className="text-sm font-medium">Color</Label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  {PRESET_COLORS.map((c) => {
+                    const active = normalizeProjectColor(color) === c.value
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        aria-label={c.name}
+                        onClick={() => setColor(c.value)}
+                        className={cn(
+                          "h-6 w-6 rounded-full transition-all",
+                          active ? "ring-2 ring-offset-2 ring-foreground/60" : "hover:scale-110"
+                        )}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    )
+                  })}
                 </div>
-              </div>
-              <div>
-                <Label>Links (optional)</Label>
-                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    value={newLinkLabel}
-                    onChange={(e) => setNewLinkLabel(e.target.value)}
-                    placeholder="Label (e.g. Figma)"
-                    className="sm:w-44 sm:flex-none"
-                  />
-                  <Input
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="min-w-0"
-                  />
-                  <Button type="button" variant="secondary" onClick={addStagedLink} className="sm:flex-none">
-                    Add
-                  </Button>
-                </div>
-                {newLinks.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {newLinks.map((link, index) => (
-                      <div key={`${link.url}-${index}`} className="flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs">
-                        <span className="min-w-0 flex-1 break-all pr-1">
-                          <span className="font-medium">{link.label}:</span> {link.url}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => setNewLinks((prev) => prev.filter((_, i) => i !== index))}
-                          aria-label={`Remove ${link.label} link`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               {!editingId ? (
                 <div>
-                  <Label htmlFor="project-milestones">Milestones (optional)</Label>
+                  <Label htmlFor="project-milestones" className="text-sm font-medium">Milestones (optional)</Label>
                   <Input
                     id="project-milestones"
                     value={milestones}
                     onChange={(e) => setMilestones(e.target.value)}
                     placeholder="Design, Build page, Deploy"
+                    className="mt-1.5"
                   />
                 </div>
               ) : null}
-              {formError ? (
-                <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  {formError}
-                </div>
-              ) : null}
-              <Button onClick={saveProject} className="w-full">
-                {editingId ? "Save Changes" : "Create Project"}
-              </Button>
+            </div>
+            {/* §4 — sticky footer */}
+            <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-4">
+              {editingId ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button type="button" className="text-sm text-destructive/70 hover:text-destructive transition-colors">
+                      Delete project
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete &quot;{title}&quot;?</AlertDialogTitle>
+                      <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => { deleteProject(editingId); setOpen(false) }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={saveProject}
+                  disabled={(() => {
+                    const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                    const isValid = !!title.trim() && (startDate <= endDate)
+                    return !isValid || (!!editingId && !isDirty)
+                  })()}
+                >
+                  {editingId ? "Save" : "Create"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -511,6 +517,7 @@ export function ProjectsModule() {
               project={selectedProject}
               tasks={tasks}
               onEdit={openEditDialog}
+              onUpdateProject={updateProject}
               onStatusChange={(id, nextStatus) => updateProject(id, { status: nextStatus })}
               onDelete={deleteProject}
               editingMilestone={editingMilestone}
@@ -685,6 +692,7 @@ function ProjectDetailPanel({
   project,
   tasks,
   onEdit,
+  onUpdateProject,
   onStatusChange,
   onDelete,
   editingMilestone,
@@ -703,6 +711,7 @@ function ProjectDetailPanel({
   project: Project
   tasks: Task[]
   onEdit: (project: Project) => void
+  onUpdateProject: (id: string, updates: Partial<Project>) => void
   onStatusChange: (id: string, status: ProjectStatus) => void
   onDelete: (id: string) => void
   editingMilestone: { projectId: string; milestoneId: string } | null
@@ -719,6 +728,13 @@ function ProjectDetailPanel({
   onToggleTask: (taskId: string) => void
 }) {
   const [showAddMilestone, setShowAddMilestone] = useState(false)
+  const [showAddLink, setShowAddLink] = useState(false)
+  const [addLinkLabel, setAddLinkLabel] = useState("")
+  const [addLinkUrl, setAddLinkUrl] = useState("")
+  const [editingLinkIdx, setEditingLinkIdx] = useState<number | null>(null)
+  const [editingLinkLabel, setEditingLinkLabel] = useState("")
+  const [editingLinkUrl, setEditingLinkUrl] = useState("")
+  const [deleteLinkIdx, setDeleteLinkIdx] = useState<number | null>(null)
 
   const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
   const completedTasks = projectTasks.filter((t) => t.completed).length
@@ -735,11 +751,39 @@ function ProjectDetailPanel({
   const weeklyLines = project.weeklyOutcome?.trim()
     ? project.weeklyOutcome.trim().split("\n").filter((l) => l.trim())
     : []
-  const links = getProjectLinks(project)
 
   function commitAddMilestone() {
     handleAddMilestone(project.id)
     setShowAddMilestone(false)
+  }
+
+  const projectLinks = getProjectLinks(project)
+
+  function commitAddLink() {
+    const url = normalizeUrl(addLinkUrl)
+    if (!url) return
+    const label = addLinkLabel.trim() || "Link"
+    const next = [...projectLinks, { label, url }]
+    onUpdateProject(project.id, { links: next, url: next[0]?.url })
+    setAddLinkLabel("")
+    setAddLinkUrl("")
+    setShowAddLink(false)
+  }
+
+  function commitEditLink(idx: number) {
+    const url = normalizeUrl(editingLinkUrl)
+    if (!url) return
+    const next = projectLinks.map((l, i) =>
+      i === idx ? { label: editingLinkLabel.trim() || "Link", url } : l
+    )
+    onUpdateProject(project.id, { links: next, url: next[0]?.url })
+    setEditingLinkIdx(null)
+  }
+
+  function commitDeleteLink(idx: number) {
+    const next = projectLinks.filter((_, i) => i !== idx)
+    onUpdateProject(project.id, { links: next.length > 0 ? next : undefined, url: next[0]?.url })
+    setDeleteLinkIdx(null)
   }
 
   return (
@@ -1037,26 +1081,155 @@ function ProjectDetailPanel({
           )
         })() : null}
 
-        {/* Links */}
-        {links.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
+        {/* Links — inline editable */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
             <p className="text-xs font-medium">Links</p>
-            <div className="flex flex-col gap-1">
-              {links.map((link, i) => (
-                <a
-                  key={`${link.url}-${i}`}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{link.label || "Link"}</span>
-                </a>
-              ))}
-            </div>
+            {!showAddLink ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAddLink(true)}
+              >
+                <Plus className="h-3 w-3" /> Add
+              </Button>
+            ) : null}
           </div>
-        ) : null}
+
+          {showAddLink ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-1.5">
+                <Input
+                  value={addLinkLabel}
+                  onChange={(e) => setAddLinkLabel(e.target.value)}
+                  placeholder="Label"
+                  className="h-7 text-xs"
+                />
+                <Input
+                  value={addLinkUrl}
+                  onChange={(e) => setAddLinkUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="h-7 flex-1 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitAddLink()
+                    if (e.key === "Escape") setShowAddLink(false)
+                  }}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-1.5">
+                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink}>
+                  Save
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddLink(false); setAddLinkLabel(""); setAddLinkUrl("") }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {projectLinks.length === 0 && !showAddLink ? (
+            <p className="text-xs text-muted-foreground">No links yet — add one.</p>
+          ) : null}
+
+          <div className="flex flex-col gap-1">
+            {projectLinks.map((link, i) => (
+              <div key={`${link.url}-${i}`} className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-muted/40">
+                {editingLinkIdx === i ? (
+                  <>
+                    <Input
+                      value={editingLinkLabel}
+                      onChange={(e) => setEditingLinkLabel(e.target.value)}
+                      className="h-6 w-24 shrink-0 text-xs"
+                    />
+                    <Input
+                      value={editingLinkUrl}
+                      onChange={(e) => setEditingLinkUrl(e.target.value)}
+                      className="h-6 min-w-0 flex-1 text-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEditLink(i)
+                        if (e.key === "Escape") setEditingLinkIdx(null)
+                      }}
+                      autoFocus
+                    />
+                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => commitEditLink(i)}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setEditingLinkIdx(null)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-w-0 flex-1 truncate text-xs hover:underline"
+                        >
+                          {link.label || "Link"}
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{link.url}</TooltipContent>
+                    </Tooltip>
+                    <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5"
+                        onClick={() => { setEditingLinkIdx(i); setEditingLinkLabel(link.label); setEditingLinkUrl(link.url) }}
+                        aria-label={`Edit ${link.label} link`}
+                      >
+                        <Pencil className="h-2.5 w-2.5" />
+                      </Button>
+                      {deleteLinkIdx === i ? (
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5 text-destructive"
+                            onClick={() => commitDeleteLink(i)}
+                            aria-label="Confirm delete"
+                          >
+                            <Check className="h-2.5 w-2.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => setDeleteLinkIdx(null)}
+                            aria-label="Cancel delete"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5 text-destructive"
+                          onClick={() => setDeleteLinkIdx(i)}
+                          aria-label={`Delete ${link.label} link`}
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Footer actions */}

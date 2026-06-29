@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-06-29 — Edit Project modal identity strip (session 1)
+
+### Changed
+- Edit Project modal stripped to identity-only fields: Title, Objective, Duration, Color, Status
+- Weekly Outcome field removed from modal (field retained on type for session-2 migration)
+- Links section removed from modal; moved to detail Sheet as inline-editable block
+- Date pickers: native `<input type="date">` → shadcn `Calendar + Popover`, format `DD MMM YYYY`, end-date-after-start validation
+- Color picker: hex input + native color input → row of 8 preset swatches with ring-on-active selection
+- Status: `Select` dropdown → `ToggleGroup` segmented control (Active / Paused / Parked / Completed)
+- Modal footer: sticky `Delete project` (muted red text) · `Cancel` · `Save`; Save disabled when pristine or invalid; Escape closes; Cmd/Ctrl+Enter saves
+
+### Added
+- ADR-007 in `docs/DECISIONS_LOG.md`: project data model decision (milestones-only, sprint as separate object)
+- Links block on detail Sheet: `+ Add`, inline edit, inline delete confirm, URL tooltip on hover
+
+---
+
 ## [Unreleased] - 2026-06-26 — Schedule block editor improvements
 
 ### Added

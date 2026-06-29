@@ -111,3 +111,24 @@ Architecture Decision Records (ADR-style). Each entry explains a real choice mad
 - The WORKFLOW_AUTOMATION_PLAYBOOK.md is now the primary artifact — the app itself is the worked example.
 
 **Revisit trigger:** Never, unless the project changes hands or purpose.
+
+---
+
+## ADR-007: Project data model — milestones only, sprint as separate object
+
+**Date:** 2026-06-29
+**Status:** Accepted
+
+**Context:** The detail Sheet shows both "tasks" and "milestones" counts; the Edit modal shows neither, only a free-text "Weekly Outcome" field. Vocabulary is split across surfaces, blocking any coherent UI for progress tracking. The Edit modal conflated three cadences (identity, lifecycle, weekly operations) in one form, making every weekly edit scroll past rarely-changed identity fields.
+
+**Decision:**
+- Project hierarchy: **Project → Milestones** (no tasks layer). A Milestone is a binary done/not-done outcome with an optional target date. Type: `{ id, title, done, targetDate?, completedAt? }`.
+- Sprint is a **separate object**, soft-linked from sprint outcomes to milestones via optional `linked_milestone?: string`. Sprint data model and persistence are deferred to session 2; this session does not introduce it.
+- "Tasks" vocabulary is removed from all UI surfaces targeting the projects domain. Existing fields that conceptually represent tasks are either renamed to milestones or left untouched pending session 3 (the milestones UI session).
+
+**Consequences:**
+- Session 1 (this session): removes Weekly Outcome from Edit modal, moves Links to the detail Sheet, strips Edit modal to identity-only fields (Title, Objective, Duration, Color, Status).
+- Session 2: introduces Sprint type + persistence + Sheet block.
+- Session 3: milestones UI overhaul + vocabulary cleanup across surfaces.
+
+**Revisit trigger:** Sprint data model introduced in session 2 conflicts with this structure, or session 3 vocabulary cleanup reveals that the `Project → Milestones` hierarchy is insufficient for the actual tracking workflow.
