@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -139,6 +140,7 @@ export function ProjectsModule() {
   const [formError, setFormError] = useState<string | null>(null)
   const [startDateOpen, setStartDateOpen] = useState(false)
   const [endDateOpen, setEndDateOpen] = useState(false)
+  const [formSnapshot, setFormSnapshot] = useState<{ title: string; objective: string; status: string; startDate: string; endDate: string; color: string } | null>(null)
 
   // Module state
   const [view, setView] = useState<"list" | "timeline">("list")
@@ -178,19 +180,23 @@ export function ProjectsModule() {
     setEndDate(defaultWeekRange.end)
     setMilestones("")
     setFormError(null)
+    setFormSnapshot(null)
     setOpen(true)
   }
 
   function openEditDialog(project: Project) {
+    const s = getProjectStatus(project)
+    const c = normalizeProjectColor(project.color)
     setEditingId(project.id)
     setTitle(project.title)
     setObjective(project.objective)
-    setStatus(getProjectStatus(project))
-    setColor(normalizeProjectColor(project.color))
+    setStatus(s)
+    setColor(c)
     setStartDate(project.weekStartISO)
     setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
     setFormError(null)
+    setFormSnapshot({ title: project.title, objective: project.objective, status: s, startDate: project.weekStartISO, endDate: project.weekEndISO, color: c })
     setOpen(true)
   }
 
@@ -280,18 +286,28 @@ export function ProjectsModule() {
               <Plus className="h-4 w-4" /> New Project
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Project" : "Create Project"}</DialogTitle>
+          <DialogContent
+            className="flex flex-col gap-0 p-0 sm:max-w-[480px] max-h-[90vh]"
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault()
+                const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                const isValid = !!title.trim() && (startDate <= endDate)
+                if (isValid && (!editingId || isDirty)) saveProject()
+              }
+            }}
+          >
+            <DialogHeader className="px-5 pt-5 pb-4 shrink-0 border-b border-border">
+              <DialogTitle className="text-base font-semibold">{editingId ? "Edit Project" : "Create Project"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               <div>
-                <Label htmlFor="project-title">Title</Label>
-                <Input id="project-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Label htmlFor="project-title" className="text-sm font-medium">Title</Label>
+                <Input id="project-title" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1.5" />
               </div>
               <div>
-                <Label htmlFor="project-objective">Objective</Label>
-                <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
+                <Label htmlFor="project-objective" className="text-sm font-medium">Objective</Label>
+                <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} className="mt-1.5" />
               </div>
               <div>
                 <Label className="text-sm font-medium">Status</Label>
@@ -348,6 +364,9 @@ export function ProjectsModule() {
                     </PopoverContent>
                   </Popover>
                 </div>
+                {formError ? (
+                  <p className="mt-1.5 text-xs text-destructive">{formError}</p>
+                ) : null}
               </div>
               <div>
                 <Label className="text-sm font-medium">Color</Label>
@@ -372,23 +391,59 @@ export function ProjectsModule() {
               </div>
               {!editingId ? (
                 <div>
-                  <Label htmlFor="project-milestones">Milestones (optional)</Label>
+                  <Label htmlFor="project-milestones" className="text-sm font-medium">Milestones (optional)</Label>
                   <Input
                     id="project-milestones"
                     value={milestones}
                     onChange={(e) => setMilestones(e.target.value)}
                     placeholder="Design, Build page, Deploy"
+                    className="mt-1.5"
                   />
                 </div>
               ) : null}
-              {formError ? (
-                <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  {formError}
-                </div>
-              ) : null}
-              <Button onClick={saveProject} className="w-full">
-                {editingId ? "Save Changes" : "Create Project"}
-              </Button>
+            </div>
+            {/* §4 — sticky footer */}
+            <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-4">
+              {editingId ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button type="button" className="text-sm text-destructive/70 hover:text-destructive transition-colors">
+                      Delete project
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete &quot;{title}&quot;?</AlertDialogTitle>
+                      <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => { deleteProject(editingId); setOpen(false) }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={saveProject}
+                  disabled={(() => {
+                    const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                    const isValid = !!title.trim() && (startDate <= endDate)
+                    return !isValid || (!!editingId && !isDirty)
+                  })()}
+                >
+                  {editingId ? "Save" : "Create"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
