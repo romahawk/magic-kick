@@ -972,6 +972,7 @@ function EditPanel({
   onRemoveFromSchedule,
   onClose,
 }: EditPanelProps) {
+  const storeUpdateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
   const [localNotes, setLocalNotes] = useState(block.notes ?? "")
@@ -979,7 +980,9 @@ function EditPanel({
 
   function saveNotes() {
     const trimmed = localNotes.trim()
-    onUpdateTimeBlock({ notes: trimmed || undefined })
+    if (block.sourceType === "time-block") {
+      storeUpdateTimeBlock(block.id, { notes: trimmed || undefined })
+    }
     setNotesMode(trimmed ? "view" : "edit")
   }
 
