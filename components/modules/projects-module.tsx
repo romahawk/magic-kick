@@ -9,15 +9,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
-import { AlertTriangle, Check, ChevronRight, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import { AlertTriangle, CalendarIcon, Check, ChevronRight, ExternalLink, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 
@@ -29,6 +31,17 @@ const LEGACY_COLOR_MAP: Record<string, string> = {
   "bg-chart-4": "#f97316",
   "bg-chart-5": "#a855f7",
 }
+
+const PRESET_COLORS = [
+  { name: "blue",   value: "#3b82f6" },
+  { name: "purple", value: "#8b5cf6" },
+  { name: "yellow", value: "#eab308" },
+  { name: "green",  value: "#22c55e" },
+  { name: "pink",   value: "#ec4899" },
+  { name: "orange", value: "#f97316" },
+  { name: "red",    value: "#ef4444" },
+  { name: "slate",  value: "#64748b" },
+]
 
 const STATUS_SECTIONS: Array<{ id: ProjectStatus; label: string }> = [
   { id: "active", label: "Active" },
@@ -123,6 +136,8 @@ export function ProjectsModule() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [startDateOpen, setStartDateOpen] = useState(false)
+  const [endDateOpen, setEndDateOpen] = useState(false)
 
   // Module state
   const [view, setView] = useState<"list" | "timeline">("list")
@@ -183,6 +198,10 @@ export function ProjectsModule() {
     const selectedColor = normalizeProjectColor(color)
     const weekStartISO = startDate || defaultWeekRange.start
     const weekEndISO = endDate || defaultWeekRange.end
+    if (weekStartISO > weekEndISO) {
+      setFormError("End date must be on or after start date.")
+      return
+    }
     if (!editingId) {
       addProject({
         title: title.trim(),
@@ -274,56 +293,80 @@ export function ProjectsModule() {
                 <Input id="project-objective" value={objective} onChange={(e) => setObjective(e.target.value)} />
               </div>
               <div>
-                <Label>Project Status</Label>
-                <Select value={status ?? "active"} onValueChange={(value) => setStatus(value as Project["status"])}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="paused">Paused</SelectItem>
-                    <SelectItem value="parked">Parked</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-sm font-medium">Status</Label>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={status ?? "active"}
+                  onValueChange={(v) => { if (v) setStatus(v as Project["status"]) }}
+                  className="mt-1.5 w-full"
+                >
+                  {STATUS_SECTIONS.map((s) => (
+                    <ToggleGroupItem key={s.id} value={s.id} className="text-xs">
+                      {s.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
               </div>
               <div>
-                <Label>Duration</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="flex-1 text-xs"
-                    aria-label="Start date"
-                  />
+                <Label className="text-sm font-medium">Duration</Label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="flex-1 justify-start text-left text-xs font-normal h-9">
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {startDate ? format(parseISO(startDate), "dd MMM yyyy") : "Start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ? parseISO(startDate) : undefined}
+                        onSelect={(date) => {
+                          if (date) { setStartDate(format(date, "yyyy-MM-dd")); setStartDateOpen(false) }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <span className="shrink-0 text-xs text-muted-foreground">→</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="flex-1 text-xs"
-                    aria-label="End date"
-                  />
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="flex-1 justify-start text-left text-xs font-normal h-9">
+                        <CalendarIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {endDate ? format(parseISO(endDate), "dd MMM yyyy") : "End date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? parseISO(endDate) : undefined}
+                        onSelect={(date) => {
+                          if (date) { setEndDate(format(date, "yyyy-MM-dd")); setEndDateOpen(false) }
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
               <div>
-                <Label htmlFor="project-color">Card color</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input
-                    id="project-color"
-                    type="color"
-                    value={normalizeProjectColor(color)}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="h-10 w-14 cursor-pointer p-1"
-                    aria-label="Pick project card color"
-                  />
-                  <Input
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    placeholder="#3b82f6"
-                    className="font-mono text-xs"
-                  />
+                <Label className="text-sm font-medium">Color</Label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  {PRESET_COLORS.map((c) => {
+                    const active = normalizeProjectColor(color) === c.value
+                    return (
+                      <button
+                        key={c.name}
+                        type="button"
+                        aria-label={c.name}
+                        onClick={() => setColor(c.value)}
+                        className={cn(
+                          "h-6 w-6 rounded-full transition-all",
+                          active ? "ring-2 ring-offset-2 ring-foreground/60" : "hover:scale-110"
+                        )}
+                        style={{ backgroundColor: c.value }}
+                      />
+                    )
+                  })}
                 </div>
               </div>
               {!editingId ? (
