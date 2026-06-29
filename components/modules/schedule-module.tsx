@@ -975,12 +975,15 @@ function EditPanel({
   const storeUpdateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
-  const [localNotes, setLocalNotes] = useState(block.notes ?? "")
-  const [notesMode, setNotesMode] = useState<"view" | "edit">(block.notes ? "view" : "edit")
+  const savedNotes = linkedTask ? linkedTask.notes : block.notes
+  const [localNotes, setLocalNotes] = useState(savedNotes ?? "")
+  const [notesMode, setNotesMode] = useState<"view" | "edit">(savedNotes ? "view" : "edit")
 
   function saveNotes() {
     const trimmed = localNotes.trim()
-    if (block.sourceType === "time-block") {
+    if (linkedTask) {
+      onUpdateTask({ notes: trimmed || undefined })
+    } else if (block.sourceType === "time-block") {
       storeUpdateTimeBlock(block.id, { notes: trimmed || undefined })
     }
     setNotesMode(trimmed ? "view" : "edit")
