@@ -25,6 +25,7 @@ export interface Task extends SyncFields {
   completedAt?: string
   linkedProjectId?: string
   xpValue: number
+  notes?: string
 }
 
 export interface Goal extends SyncFields {

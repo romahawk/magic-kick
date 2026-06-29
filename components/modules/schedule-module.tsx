@@ -799,6 +799,7 @@ export function ScheduleModule() {
         <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
           {editBlock ? (
             <EditPanel
+              key={editBlock.id}
               block={editBlock}
               linkedTask={editTask}
               project={projects.find((p) => p.id === editBlock.projectId)}
@@ -971,8 +972,22 @@ function EditPanel({
   onRemoveFromSchedule,
   onClose,
 }: EditPanelProps) {
+  const storeUpdateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
+  const savedNotes = linkedTask ? linkedTask.notes : block.notes
+  const [localNotes, setLocalNotes] = useState(savedNotes ?? "")
+  const [notesMode, setNotesMode] = useState<"view" | "edit">(savedNotes ? "view" : "edit")
+
+  function saveNotes() {
+    const trimmed = localNotes.trim()
+    if (linkedTask) {
+      onUpdateTask({ notes: trimmed || undefined })
+    } else if (block.sourceType === "time-block") {
+      storeUpdateTimeBlock(block.id, { notes: trimmed || undefined })
+    }
+    setNotesMode(trimmed ? "view" : "edit")
+  }
 
   function updateTimes(nextStart: string, nextEnd: string) {
     if (linkedTask) {
@@ -1021,16 +1036,7 @@ function EditPanel({
               <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
             ) : null}
             {linkedTask.dueDate ? (
-              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                Due {linkedTask.dueDate}
-                <button
-                  onClick={() => { onUpdateTask({ dueDate: undefined }, { clearTimeSlot: true }); onClose() }}
-                  className="ml-0.5 rounded hover:text-foreground"
-                  title="Remove due date and unschedule"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </span>
+              <span className="text-[10px] text-muted-foreground">Due {linkedTask.dueDate}</span>
             ) : null}
           </div>
         ) : null}
@@ -1053,6 +1059,29 @@ function EditPanel({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        ) : null}
+
+        {linkedTask ? (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Due date</Label>
+            <div className="flex gap-1.5">
+              <Input
+                type="date"
+                value={linkedTask.dueDate ?? ""}
+                onChange={(e) => onUpdateTask({ dueDate: e.target.value || undefined })}
+                className="flex-1"
+              />
+              {linkedTask.dueDate ? (
+                <button
+                  onClick={() => { onUpdateTask({ dueDate: undefined }, { clearTimeSlot: true }); onClose() }}
+                  className="flex items-center rounded-md border border-input px-2 text-muted-foreground hover:text-foreground"
+                  title="Remove due date and unschedule"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1138,14 +1167,38 @@ function EditPanel({
         ) : null}
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Notes</Label>
-          <Textarea
-            value={block.notes ?? ""}
-            onChange={(e) => onUpdateTimeBlock({ notes: e.target.value })}
-            placeholder="Add notes…"
-            rows={3}
-            className="resize-none text-xs"
-          />
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Notes</Label>
+            {notesMode === "view" ? (
+              <button
+                onClick={() => setNotesMode("edit")}
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Edit
+              </button>
+            ) : null}
+          </div>
+          {notesMode === "view" ? (
+            <div className="min-h-[4.5rem] rounded-md border border-input bg-background px-3 py-2 text-xs whitespace-pre-wrap">
+              {localNotes}
+            </div>
+          ) : (
+            <>
+              <Textarea
+                value={localNotes}
+                onChange={(e) => setLocalNotes(e.target.value)}
+                placeholder="Add notes…"
+                rows={3}
+                className="resize-none text-xs"
+                autoFocus={notesMode === "edit" && Boolean(block.notes)}
+              />
+              {localNotes.trim() ? (
+                <Button size="sm" variant="secondary" className="w-full" onClick={saveNotes}>
+                  Save notes
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
 
         {isRecurring ? (
