@@ -186,7 +186,9 @@ function createInitialData() {
     streakDays: 0,
     xpWeekKey: format(new Date(), "yyyy-MM-dd"),
     deleted: false,
-    clientUpdatedAt: now(),
+    // Fresh browser origins must not look newer than an existing remote profile.
+    // The timestamp is set when the user actually completes onboarding or edits profile data.
+    clientUpdatedAt: undefined,
   }
   return {
     profile,
