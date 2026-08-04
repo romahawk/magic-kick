@@ -48,6 +48,14 @@ function mergeCollection<T extends { id: string; clientUpdatedAt?: number; updat
 
 function mergeProfile(local: Profile, remote: Profile | null) {
   if (!remote) return { profile: local, remoteWon: false }
+  const localIsBlankOnboardingProfile =
+    !local.onboardingCompleted &&
+    local.name.trim().toLowerCase() === "new player" &&
+    local.xpTotal === 0 &&
+    local.xpThisWeek === 0
+  if (localIsBlankOnboardingProfile && remote.onboardingCompleted) {
+    return { profile: remote, remoteWon: true }
+  }
   const winner = compareRemoteVsLocal(local.clientUpdatedAt, remote.clientUpdatedAt, local.updatedAt, remote.updatedAt)
   return {
     profile: winner === "remote" ? remote : local,
