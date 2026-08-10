@@ -132,3 +132,155 @@ Architecture Decision Records (ADR-style). Each entry explains a real choice mad
 - Session 3: milestones UI overhaul + vocabulary cleanup across surfaces.
 
 **Revisit trigger:** Sprint data model introduced in session 2 conflicts with this structure, or session 3 vocabulary cleanup reveals that the `Project → Milestones` hierarchy is insufficient for the actual tracking workflow.
+
+---
+
+## ADR-008: Unfreeze read-only Google Calendar metadata
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Google Calendar remains the source of truth for time commitments, but the current freeze list blocks all external connector work until Track 7. The next integration step needs only local connection metadata so Magic Kick can model selected calendars, sync cursors, and connection status before any event ingestion, webhook, OAuth scope expansion, or calendar writes are introduced.
+
+**Decision:** Unfreeze **read-only Google Calendar metadata only**. This permits data model and persistence work for calendar connection state, selected calendar identifiers, sync cursor/token placeholders, last-sync timestamps, status/error fields, and display preferences. It does not permit reading Google Calendar events, creating OAuth flows beyond what is required to store metadata placeholders, adding webhooks, adding n8n or connector runtimes, importing events, exporting Magic Kick blocks, or writing to Google Calendar.
+
+**Consequences:**
+- Magic Kick can prepare a narrow, reviewable data boundary for a future read-only Calendar integration.
+- The general external connector freeze remains in force.
+- Event ingestion remains blocked until a separate ADR or Track 7 decision explicitly unfreezes it.
+- Calendar writes remain out of scope; Google Calendar continues to own time commitments.
+
+**Revisit trigger:** Metadata needs real Google API access, event import, webhook renewal, OAuth refresh-token storage, or any write capability.
+
+---
+
+## ADR-009: Unfreeze Google event to external block mapper
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** The next Calendar integration step is to define how a Google Calendar event would be represented inside Magic Kick without yet reading from Google APIs or rendering imported events. The mapper can be developed and tested as pure local code using the documented Google Calendar Events resource shape.
+
+**Decision:** Unfreeze a **pure Google event to external calendar block mapper only**. This permits local TypeScript types for the subset of Google event fields Magic Kick needs and a deterministic mapper into an external calendar block model. It does not permit OAuth, Google API calls, event import jobs, Firestore persistence of imported events, webhooks, rendering external blocks in Schedule, feeding imported blocks into AI routes, or writing to Google Calendar.
+
+**Consequences:**
+- Magic Kick gets a stable data boundary for future read-only event ingestion.
+- The mapper can be verified independently before any connector code exists.
+- Cancelled or malformed events can be handled consistently before they reach UI or sync.
+- External event rendering and AI scheduling remain separate future steps.
+
+**Revisit trigger:** The mapper needs real API access, stored imported events, Schedule rendering, conflict detection integration, or any write/export behavior.
+
+---
+
+## ADR-010: Unfreeze read-only external calendar block rendering
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Magic Kick now has read-only Calendar metadata and a pure Google event mapper, but the Schedule view cannot yet display external calendar commitments. Rendering already-present external blocks is useful before implementing OAuth or import jobs because it proves the visual and state boundary between Calendar-owned commitments and Magic Kick-owned planning blocks.
+
+**Decision:** Unfreeze **read-only Schedule rendering of already-present external calendar blocks only**. This permits an `externalCalendarBlocks` synced collection, store actions for adding or tombstoning external blocks, Firestore rules/shared collection definitions, and read-only display in `ScheduleModule`. It does not permit OAuth, Google API calls, event import jobs, webhooks, AI route integration, or writing/exporting to Google Calendar.
+
+**Consequences:**
+- External calendar commitments can be visually tested without connecting to Google.
+- Google-owned blocks remain non-editable and visually distinct from Magic Kick planning blocks.
+- Future import work has a persistence target and display path ready.
+- AI scheduling and Google writes remain separate future decisions.
+
+**Revisit trigger:** Rendering needs live Google API access, automatic import/sync, conflict-detection integration, AI route input, or any write/export capability.
+
+---
+
+## ADR-011: Unfreeze external busy blocks for schedule suggestions
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** External calendar blocks can now be represented and rendered read-only, but AI schedule suggestions still only consider Magic Kick `TimeBlock` records. To keep scheduling useful, already-present external blocks that actually block time should be projected into the existing busy-block input shape for the existing `/api/ai/schedule-suggest` route and client-side conflict detection.
+
+**Decision:** Unfreeze **external busy block input for the existing schedule-suggest flow only**. This permits projecting already-present `externalCalendarBlocks` into the existing `existingBlocks` request payload and using the same projected list for client conflict detection. It does not permit new AI routes, prompt expansion beyond busy context, OAuth, Google API calls, import jobs, webhooks, or calendar writes.
+
+**Consequences:**
+- AI scheduling can avoid already-present Calendar-owned commitments.
+- No new AI surface or Google integration is introduced.
+- The route contract remains stable because external blocks are reduced to date/start/end busy intervals.
+- Calendar-owned event details are not sent beyond what the scheduler needs.
+
+**Revisit trigger:** AI needs event titles/details, live Google data, automatic imports, prompt changes beyond busy intervals, or write/export behavior.
+
+---
+
+## ADR-012: Unfreeze read-only Google Calendar discovery
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Calendar metadata can be edited manually, but selecting real calendar IDs by hand is brittle. Google Calendar's CalendarList API can return the user's calendar list with a narrow read-only scope, and Google Identity Services can provide a transient browser access token for that scope from a user-triggered consent flow.
+
+**Decision:** Unfreeze **read-only Google Calendar discovery only**. This permits requesting a Google Calendar read-only scope, using a transient access token in the browser to call CalendarList `list`, showing discovered calendars in the existing metadata dialog, and saving selected calendar IDs into existing profile metadata. It does not permit importing events during discovery, storing OAuth access or refresh tokens, webhooks, AI changes, or calendar writes.
+
+**Consequences:**
+- Calendar IDs can be selected from real Google Calendar data instead of typed manually.
+- The app still stores only metadata, not OAuth tokens or event data.
+- Event ingestion remains blocked until a separate ADR.
+- Users may see a Google consent screen for calendar-list read-only access.
+
+**Revisit trigger:** Discovery needs event reads, token persistence/refresh, server-side OAuth, imports, webhooks, or write/export behavior.
+
+---
+
+## ADR-013: Unfreeze bounded read-only Google event import
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Magic Kick can discover calendar IDs and can render/schedule around already-present external calendar blocks, but there is still no manual path to populate those blocks from real Google events. The next useful step is a bounded, user-triggered import that reads upcoming events from selected calendars, maps them through the existing pure mapper, and stores them as `externalCalendarBlocks`.
+
+**Decision:** Unfreeze **bounded manual read-only Google event import only**. This permits requesting a Google Calendar read-only scope, using a transient browser access token to call Events `list` for selected calendars, importing a fixed upcoming window, mapping events into `ExternalCalendarBlock`, saving them locally/Firestore via the existing collection, and updating metadata status/last sync/error fields. It does not permit background sync, token storage/refresh, webhooks, incremental sync automation, AI prompt changes, or calendar writes.
+
+**Consequences:**
+- The full read-only path can be tested manually end to end.
+- Imported Google commitments appear in Schedule and are considered by schedule suggestions through existing external busy projection.
+- OAuth tokens remain transient and are not persisted.
+- Stale imported events may remain until the next manual bounded import; background sync is still a separate decision.
+
+**Revisit trigger:** The import needs background scheduling, token refresh, webhook renewal, deletion reconciliation beyond the bounded window, AI detail prompts, or write/export behavior.
+
+---
+
+## ADR-014: Use Google Identity Services for Calendar read tokens
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Firebase Auth sign-in can authenticate the user but did not reliably return a Google Calendar OAuth access token after redirect/popup flows in the local browser. Discovery and manual import need a short-lived Calendar API bearer token, not another Firebase identity session.
+
+**Decision:** Use Firebase's existing Google provider as the primary transient access-token source for Calendar discovery and manual event import, and allow Google Identity Services' browser token client as an optional fallback when `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` is configured. Both paths request only `https://www.googleapis.com/auth/calendar.readonly` from a user-triggered button click, use the returned token immediately for Calendar REST calls, and never store the token.
+
+**Consequences:**
+- Calendar discovery/import use the existing Firebase Google sign-in configuration by default.
+- A separate Google OAuth Web Client ID with the local origin configured can be added as a fallback, but is not required for the default path.
+- Tokens remain transient; the integration is still manual and read-only.
+- Google app verification may still show a warning until the OAuth consent screen is verified or the account is added as a test user.
+
+**Revisit trigger:** The integration needs server-side OAuth, refresh tokens, background sync, webhooks, or any Calendar write/export capability.
+
+---
+
+## ADR-015: Browser-only Calendar auto-sync while token is live
+
+**Date:** 2026-08-10
+**Status:** Accepted
+
+**Context:** Manual event import proves the read-only Calendar path, but Google Calendar edits are stale in Magic Kick until the user clicks Import again. Full automatic sync would normally require stored refresh tokens, a server-side OAuth flow, and/or Google push notification channels, which is beyond the current read-only browser integration.
+
+**Decision:** Add browser-only Calendar auto-sync for the existing bounded import window. After a successful user-triggered Calendar authorization, Magic Kick caches the short-lived access token in memory only and uses it to poll selected calendars while Schedule is open. The same reconciler is used for manual Import and auto-sync: returned events are mapped/upserted, cancelled events are tombstoned, and previously imported Google blocks missing from the selected 14-day window are tombstoned. No token is persisted.
+
+**Consequences:**
+- Google Calendar edits can update Magic Kick automatically while the app is open and the access token remains valid.
+- Auto-sync stops after page reload or token expiry until the user performs another Discover/Import action.
+- No refresh tokens, background workers, webhooks, or Calendar writes are introduced.
+- The imported window remains intentionally bounded to the next 14 days.
+
+**Revisit trigger:** The user needs sync after page reload without interaction, long-running background sync, webhook latency, or one-way export/write behavior.

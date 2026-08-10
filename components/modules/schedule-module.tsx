@@ -12,22 +12,25 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock, Sparkles } from "lucide-react"
-import type { ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
+import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 import { auth } from "@/lib/firebase/client"
 import { isAiEnabled } from "@/lib/ai/flags"
 import { detectConflicts, dayIndexToISO } from "@/lib/ai/conflict"
 import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel"
+import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
+import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 const HOUR_PX = 64
-const DAY_START = 6
+const DAY_START = 5
 const DAY_END = 23
 const SNAP_MIN = 15
 const TOTAL_HOURS = DAY_END - DAY_START
 const GRID_HEIGHT = TOTAL_HOURS * HOUR_PX
+const AUTO_CALENDAR_SYNC_INTERVAL_MS = 60_000
 
 function toMin(time: string) {
   const [h, m] = time.split(":").map(Number)
@@ -93,6 +96,63 @@ function blockStyle(color: string) {
   }
 }
 
+function externalBlockStyle(blocksTime: boolean) {
+  return blocksTime
+    ? {
+        backgroundColor: "rgba(14, 165, 233, 0.12)",
+        borderColor: "rgba(14, 165, 233, 0.7)",
+        color: "rgb(2, 132, 199)",
+      }
+    : {
+        backgroundColor: "rgba(148, 163, 184, 0.12)",
+        borderColor: "rgba(148, 163, 184, 0.7)",
+        color: "rgb(100, 116, 139)",
+      }
+}
+
+function externalBlockDateParts(block: ExternalCalendarBlock, dateISO: string) {
+  if (block.allDay) {
+    const startDay = block.startISO?.slice(0, 10)
+    if (startDay !== dateISO) return null
+    return { dateISO, startTime: toTime(DAY_START * 60), endTime: toTime(DAY_END * 60) }
+  }
+  if (!block.startISO || !block.endISO) return null
+  try {
+    const start = parseISO(block.startISO)
+    const end = parseISO(block.endISO)
+    const blockDateISO = format(start, "yyyy-MM-dd")
+    if (blockDateISO !== dateISO) return null
+    return {
+      dateISO: blockDateISO,
+      startTime: format(start, "HH:mm"),
+      endTime: format(end, "HH:mm"),
+    }
+  } catch {
+    return null
+  }
+}
+
+function externalBlockToBusyBlock(block: ExternalCalendarBlock, weekDays: Array<{ iso: string }>): TimeBlock[] {
+  if (block.deleted || block.status === "cancelled" || !block.blocksTime) return []
+  return weekDays.flatMap((day) => {
+    const parts = externalBlockDateParts(block, day.iso)
+    if (!parts) return []
+    return [
+      {
+        id: block.id,
+        weekPlanId: "external-calendar",
+        dateISO: parts.dateISO,
+        startTime: parts.startTime,
+        endTime: parts.endTime,
+        taskDescription: block.title,
+        plannedHours: calculateTimeBlockHours(parts.startTime, parts.endTime),
+        status: "planned" as const,
+        deleted: false,
+      },
+    ]
+  })
+}
+
 interface DragState {
   blockId: string
   mode: "move" | "resize"
@@ -118,9 +178,14 @@ interface HoverSlot {
 
 interface DisplayBlock {
   id: string
-  sourceType: "time-block" | "recurring-task"
+  sourceType: "time-block" | "recurring-task" | "external-calendar"
   linkedTaskId?: string
   projectId?: string
+  externalSource?: string
+  externalCalendarId?: string
+  externalHtmlLink?: string
+  blocksTime?: boolean
+  allDay?: boolean
   dateISO: string
   startTime: string
   endTime: string
@@ -139,12 +204,19 @@ export function ScheduleModule() {
   const scheduleItems = useAppStore((s) => s.schedule)
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const timeBlocks = useAppStore((s) => s.timeBlocks)
+  const allExternalCalendarBlocks = useAppStore((s) => s.externalCalendarBlocks)
+  const externalCalendarBlocks = allExternalCalendarBlocks.filter((block) => !block.deleted && block.status !== "cancelled")
+  const googleCalendarMetadata = useAppStore((s) => s.profile.googleCalendar)
+  const displayExternalBlocks = useAppStore((s) => s.profile.googleCalendar?.displayExternalBlocks ?? true)
   const executionLogs = useAppStore((s) => s.executionLogs)
   const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
   const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const updateTask = useAppStore((s) => s.updateTask)
   const toggleTaskOccurrence = useAppStore((s) => s.toggleTaskOccurrence)
   const deleteTimeBlock = useAppStore((s) => s.deleteTimeBlock)
+  const saveExternalCalendarBlock = useAppStore((s) => s.saveExternalCalendarBlock)
+  const deleteExternalCalendarBlock = useAppStore((s) => s.deleteExternalCalendarBlock)
+  const setGoogleCalendarMetadata = useAppStore((s) => s.setGoogleCalendarMetadata)
   const ensureWeeklyPlan = useAppStore((s) => s.ensureWeeklyPlan)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
@@ -164,13 +236,25 @@ export function ScheduleModule() {
   const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(new Set())
 
   const dragRef = useRef<DragState | null>(null)
+  const externalCalendarBlocksRef = useRef(allExternalCalendarBlocks)
+
+  useEffect(() => {
+    externalCalendarBlocksRef.current = allExternalCalendarBlocks
+  }, [allExternalCalendarBlocks])
 
   const weekStartISO = useMemo(() => getCurrentWeekStartISO(parseISO(`${selectedDateISO}T00:00:00`)), [selectedDateISO])
   const activePlan = getActiveWeeklyPlan(weeklyPlans, weekStartISO)
-  const weekDays = getWeekDates(weekStartISO)
+  const weekDays = useMemo(() => getWeekDates(weekStartISO), [weekStartISO])
   const dayIndex = Math.max(0, weekDays.findIndex((d) => d.iso === selectedDateISO))
   const visibleDays = view === "week" ? weekDays : [weekDays[dayIndex]]
   const activeProjects = projects.filter((p) => (p.status ?? "active") === "active")
+  const busyBlocks = useMemo(
+    () => [
+      ...timeBlocks,
+      ...externalCalendarBlocks.flatMap((block) => externalBlockToBusyBlock(block, weekDays)),
+    ],
+    [externalCalendarBlocks, timeBlocks, weekDays]
+  )
 
   useEffect(() => {
     function tick() {
@@ -183,6 +267,60 @@ export function ScheduleModule() {
     const id = setInterval(tick, 30_000)
     return () => clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    const calendarIds = googleCalendarMetadata?.enabled ? googleCalendarMetadata.selectedCalendarIds : []
+    if (calendarIds.length === 0) return
+
+    let syncing = false
+    let cancelled = false
+
+    async function syncFromCachedToken() {
+      if (syncing || cancelled) return
+      const token = getCachedGoogleCalendarAccessToken()
+      if (!token) return
+
+      syncing = true
+      try {
+        await syncGoogleCalendarEvents({
+          accessToken: token,
+          calendarIds,
+          existingBlocks: externalCalendarBlocksRef.current,
+          saveExternalCalendarBlock,
+          deleteExternalCalendarBlock,
+        })
+        setGoogleCalendarMetadata({
+          status: "connected",
+          lastError: undefined,
+          lastSyncedAt: Date.now(),
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Google Calendar auto-sync failed."
+        setGoogleCalendarMetadata({ status: "error", lastError: message })
+      } finally {
+        syncing = false
+      }
+    }
+
+    void syncFromCachedToken()
+    const intervalId = window.setInterval(syncFromCachedToken, AUTO_CALENDAR_SYNC_INTERVAL_MS)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void syncFromCachedToken()
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [
+    deleteExternalCalendarBlock,
+    googleCalendarMetadata?.enabled,
+    googleCalendarMetadata?.selectedCalendarIds,
+    saveExternalCalendarBlock,
+    setGoogleCalendarMetadata,
+  ])
 
   const weekBlocks = selectTimeBlocksForDates(timeBlocks, weekDays.map((d) => d.iso))
 
@@ -259,7 +397,34 @@ export function ScheduleModule() {
         }))
     })
 
-    return [...persistedBlocks, ...recurringBlocks]
+    const externalBlocks: DisplayBlock[] = displayExternalBlocks
+      ? externalCalendarBlocks.flatMap((block) =>
+          weekDays.flatMap((day) => {
+            const parts = externalBlockDateParts(block, day.iso)
+            if (!parts) return []
+            return [
+              {
+                id: block.id,
+                sourceType: "external-calendar" as const,
+                externalSource: block.source,
+                externalCalendarId: block.externalCalendarId,
+                externalHtmlLink: block.htmlLink,
+                blocksTime: block.blocksTime,
+                allDay: block.allDay,
+                dateISO: parts.dateISO,
+                startTime: parts.startTime,
+                endTime: parts.endTime,
+                taskDescription: block.title,
+                plannedHours: calculateTimeBlockHours(parts.startTime, parts.endTime),
+                status: "planned" as const,
+                notes: block.location,
+              },
+            ]
+          })
+        )
+      : []
+
+    return [...externalBlocks, ...persistedBlocks, ...recurringBlocks]
   })()
 
   const editBlock = displayBlocks.find((block) => block.id === editId) ?? null
@@ -478,7 +643,7 @@ export function ScheduleModule() {
                   fetch("/api/ai/schedule-suggest", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ tasks, projects, existingBlocks: timeBlocks }),
+                    body: JSON.stringify({ tasks, projects, existingBlocks: busyBlocks }),
                   })
                     .then((r) => r.json())
                     .then((res) => { if (res.ok) setSuggestions(res.data.suggestions ?? []) })
@@ -518,7 +683,7 @@ export function ScheduleModule() {
             new Set(
               detectConflicts(
                 suggestions.filter((s) => !rejectedTaskIds.has(s.taskId)),
-                timeBlocks,
+                busyBlocks,
                 weekStartISO
               ).map((c) => c.suggestion.taskId)
             )
@@ -651,8 +816,9 @@ export function ScheduleModule() {
                           const displayDay = isPreview ? preview.dateISO : block.dateISO
                           if (displayDay !== day.iso) return null
 
+                          const isExternal = block.sourceType === "external-calendar"
                           const project = projects.find((p) => p.id === block.projectId)
-                          const style = blockStyle(project?.color ?? "#6366f1")
+                          const style = isExternal ? externalBlockStyle(block.blocksTime ?? true) : blockStyle(project?.color ?? "#6366f1")
                           const isEditing = editId === block.id
 
                           return (
@@ -660,6 +826,7 @@ export function ScheduleModule() {
                               key={block.id}
                               className={cn(
                                 "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs",
+                                isExternal && "border border-dashed",
                                 isEditing && "ring-2 ring-primary ring-offset-1",
                                 isPreview && "opacity-90"
                               )}
@@ -667,11 +834,18 @@ export function ScheduleModule() {
                                 top: toY(displayStart),
                                 height: blockH(displayStart, displayEnd),
                                 ...style,
-                                cursor: "grab",
+                                cursor: isExternal ? "default" : "grab",
                               }}
-                              onMouseDown={(e) => blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "move")}
+                              onMouseDown={(e) => {
+                                if (isExternal) {
+                                  e.stopPropagation()
+                                  return
+                                }
+                                blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "move")
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation()
+                                if (isExternal) return
                                 setEditId(editId === block.id ? null : block.id)
                                 setCreating(null)
                               }}
@@ -684,6 +858,11 @@ export function ScheduleModule() {
                               <p className="truncate opacity-75">
                                 {displayStart}–{displayEnd}
                               </p>
+                              {isExternal ? (
+                                <p className="mt-0.5 truncate text-[10px] opacity-75">
+                                  {block.allDay ? "All day" : block.blocksTime ? "Google Calendar" : "Free calendar event"}
+                                </p>
+                              ) : null}
                               {block.repeat && block.repeat !== "none" ? (
                                 <p className="mt-0.5 text-[10px] opacity-75">
                                   {block.repeat === "custom"
@@ -695,13 +874,15 @@ export function ScheduleModule() {
                                 <p className="mt-0.5 text-[10px] font-semibold text-amber-400">{fmtOverrun(block.actualHours - block.plannedHours)} over</p>
                               ) : null}
                               {block.status === "done" ? <CheckCircle2 className="absolute right-1 top-1 h-3 w-3 text-green-500" /> : null}
-                              <div
-                                className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
-                                onMouseDown={(e) => {
-                                  e.stopPropagation()
-                                  blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "resize")
-                                }}
-                              />
+                              {!isExternal ? (
+                                <div
+                                  className="absolute inset-x-0 bottom-0 h-2 cursor-s-resize"
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation()
+                                    blockMouseDown(e, { ...block, startTime: displayStart, endTime: displayEnd, dateISO: displayDay }, "resize")
+                                  }}
+                                />
+                              ) : null}
                             </div>
                           )
                         })}
