@@ -23,6 +23,23 @@ service cloud.firestore {
         isNumber(data.clientUpdatedAt);
     }
 
+    function isSyncCollection(collectionId) {
+      return collectionId in [
+        "goals",
+        "tasks",
+        "projects",
+        "achievements",
+        "schedule",
+        "weeklyPlans",
+        "timeBlocks",
+        "externalCalendarBlocks",
+        "executionLogs",
+        "weeklyReviews",
+        "resources",
+        "journal"
+      ];
+    }
+
     match /users/{uid} {
       allow read, write: if false;
 
@@ -46,14 +63,14 @@ service cloud.firestore {
 
       match /{collectionId}/{docId} {
         allow read: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+          isSyncCollection(collectionId);
 
         allow create, update: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"] &&
+          isSyncCollection(collectionId) &&
           hasSyncFields(request.resource.data);
 
         allow delete: if isOwner(uid) &&
-          collectionId in ["goals", "tasks", "projects", "achievements", "schedule", "resources", "journal"];
+          isSyncCollection(collectionId);
       }
     }
 

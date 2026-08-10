@@ -5,6 +5,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-08-10 - Firestore sync rules alignment
+
+### Fixed
+- Firestore rules now allow the existing weekly planning and execution sync collections: `weeklyPlans`, `timeBlocks`, `executionLogs`, and `weeklyReviews`.
+
+---
+
+## [Unreleased] - 2026-08-10 - Google Calendar metadata unfreeze
+
+### Added
+- Profile-level Google Calendar metadata fields and store actions for read-only connection state, selected calendars, sync token placeholders, status, errors, and display preference.
+- Manual Calendar metadata dialog in the avatar menu for editing the read-only metadata fields without connecting to Google APIs.
+- ADR-009 and a pure Google Calendar event mapper that converts documented event JSON into `ExternalCalendarBlock` objects without calling Google APIs.
+- ADR-010, synced `externalCalendarBlocks`, and read-only Schedule rendering for already-present external calendar blocks.
+- ADR-011 and external busy block projection for the existing AI schedule-suggest flow and client conflict detection.
+- ADR-012 and read-only Google Calendar discovery from the metadata dialog using transient OAuth access only.
+- ADR-013 and bounded manual read-only import of upcoming Google events into `externalCalendarBlocks`.
+- ADR-015 and browser-only Calendar auto-sync while a transient access token remains live in memory.
+
+### Changed
+- ADR-008 unfreezes read-only Google Calendar metadata only, while keeping event ingestion, webhooks, connector runtimes, and calendar writes frozen.
+- Schedule now starts at 05:00 instead of 06:00.
+- Google Calendar API failures now surface the provider error message, and auth popups use a popup-friendly opener policy.
+- Calendar discovery/import now request the unified Google Calendar read-only scope with explicit consent and show full multi-line errors.
+- Calendar discovery/import now use Firebase Google provider tokens by default, with optional Google Identity Services fallback, keeping Calendar tokens transient and unstored.
+- Manual import and auto-sync now share one reconciler that updates changed events and tombstones removed events in the selected 14-day window.
+
+### Fixed
+- Firestore sync writes now strip nested `undefined` values before batching, preventing Calendar metadata/import state from breaking sync.
+
+---
+
 ## [Unreleased] - 2026-06-29 — Edit Project modal identity strip (session 1)
 
 ### Changed

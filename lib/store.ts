@@ -5,7 +5,10 @@ import type {
   Achievement,
   CoachingMessage,
   ExecutionLog,
+  ExternalCalendarBlock,
   Goal,
+  GoogleCalendarMetadata,
+  GoogleCalendarSyncStatus,
   Insight,
   JournalEntry,
   ModuleId,
@@ -51,6 +54,13 @@ const DEFAULT_TASK_CATEGORY_COLORS: Record<string, string> = {
   Hobby: "#a855f7",
   Travel: "#f59e0b",
 }
+const DEFAULT_GOOGLE_CALENDAR_METADATA: GoogleCalendarMetadata = {
+  enabled: false,
+  selectedCalendarIds: [],
+  syncTokenByCalendarId: {},
+  status: "disconnected",
+  displayExternalBlocks: true,
+}
 
 function colorFromCategoryName(name: string) {
   const source = name.trim().toLowerCase()
@@ -68,6 +78,29 @@ function buildCategoryColors(categories: string[], existing?: Record<string, str
     result[category] = existing?.[category] ?? DEFAULT_TASK_CATEGORY_COLORS[category] ?? colorFromCategoryName(category)
   }
   return result
+}
+
+function normalizeGoogleCalendarMetadata(input?: Partial<GoogleCalendarMetadata>): GoogleCalendarMetadata {
+  const selectedCalendarIds = Array.from(
+    new Set((input?.selectedCalendarIds ?? []).filter((id): id is string => typeof id === "string" && id.trim().length > 0).map((id) => id.trim()))
+  )
+  const syncTokenByCalendarId = Object.fromEntries(
+    Object.entries(input?.syncTokenByCalendarId ?? {}).filter(
+      (entry): entry is [string, string] => typeof entry[0] === "string" && entry[0].trim().length > 0 && typeof entry[1] === "string"
+    )
+  )
+  const validStatuses: GoogleCalendarSyncStatus[] = ["disconnected", "connected", "syncing", "error"]
+  const status = input?.status && validStatuses.includes(input.status) ? input.status : DEFAULT_GOOGLE_CALENDAR_METADATA.status
+  return {
+    ...DEFAULT_GOOGLE_CALENDAR_METADATA,
+    ...input,
+    selectedCalendarIds,
+    syncTokenByCalendarId,
+    lastSyncedAt: typeof input?.lastSyncedAt === "number" ? input.lastSyncedAt : undefined,
+    status,
+    lastError: input?.lastError?.trim() || undefined,
+    displayExternalBlocks: input?.displayExternalBlocks ?? DEFAULT_GOOGLE_CALENDAR_METADATA.displayExternalBlocks,
+  }
 }
 
 function inferScheduleBlockTypeId(
@@ -92,6 +125,7 @@ const ENTITY_COLLECTIONS: Exclude<SyncCollection, "profile">[] = [
   "schedule",
   "weeklyPlans",
   "timeBlocks",
+  "externalCalendarBlocks",
   "executionLogs",
   "weeklyReviews",
   "resources",
@@ -107,6 +141,7 @@ type LocalEntity =
   | ScheduleItem
   | WeeklyPlan
   | TimeBlock
+  | ExternalCalendarBlock
   | ExecutionLog
   | WeeklyReview
   | Resource
@@ -142,6 +177,7 @@ function createEmptyPending(): PendingRecord {
     schedule: {},
     weeklyPlans: {},
     timeBlocks: {},
+    externalCalendarBlocks: {},
     executionLogs: {},
     weeklyReviews: {},
     resources: {},
@@ -180,6 +216,7 @@ function createInitialData() {
     taskCategories: DEFAULT_TASK_CATEGORIES,
     taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
     systemConfig: normalizeSystemConfig(),
+    googleCalendar: normalizeGoogleCalendarMetadata(),
     level: 1,
     xpTotal: 0,
     xpThisWeek: 0,
@@ -199,6 +236,7 @@ function createInitialData() {
     schedule: [] as ScheduleItem[],
     weeklyPlans: [] as WeeklyPlan[],
     timeBlocks: [] as TimeBlock[],
+    externalCalendarBlocks: [] as ExternalCalendarBlock[],
     executionLogs: [] as ExecutionLog[],
     weeklyReviews: [] as WeeklyReview[],
     resources: [] as Resource[],
@@ -217,6 +255,7 @@ function buildPendingFromState(
     | "schedule"
     | "weeklyPlans"
     | "timeBlocks"
+    | "externalCalendarBlocks"
     | "executionLogs"
     | "weeklyReviews"
     | "resources"
@@ -304,6 +343,7 @@ export interface AppState {
   schedule: ScheduleItem[]
   weeklyPlans: WeeklyPlan[]
   timeBlocks: TimeBlock[]
+  externalCalendarBlocks: ExternalCalendarBlock[]
   executionLogs: ExecutionLog[]
   weeklyReviews: WeeklyReview[]
   resources: Resource[]
@@ -315,6 +355,9 @@ export interface AppState {
   completeOnboarding: (name: string) => void
   updateSystemConfig: (updates: Partial<NonNullable<Profile["systemConfig"]>>) => void
   setFocusedProject: (projectId?: string) => void
+  setGoogleCalendarMetadata: (updates: Partial<GoogleCalendarMetadata>) => void
+  disconnectGoogleCalendarMetadata: () => void
+  setGoogleCalendarSyncStatus: (status: GoogleCalendarSyncStatus, error?: string) => void
   addCategory: (name: string) => void
   renameCategory: (from: string, to: string) => void
   deleteCategory: (name: string) => void
@@ -361,6 +404,8 @@ export interface AppState {
   saveTimeBlock: (block: Omit<TimeBlock, "id" | "plannedHours"> & { id?: string; plannedHours?: number }) => void
   updateTimeBlock: (id: string, updates: Partial<Omit<TimeBlock, "id" | "deleted" | "clientUpdatedAt">>) => void
   deleteTimeBlock: (id: string) => void
+  saveExternalCalendarBlock: (block: ExternalCalendarBlock) => void
+  deleteExternalCalendarBlock: (id: string) => void
   saveExecutionLog: (log: Omit<ExecutionLog, "id"> & { id?: string }) => void
   saveWeeklyReview: (review: Omit<WeeklyReview, "id"> & { id?: string }) => void
   toggleMilestone: (projectId: string, milestoneId: string) => void
@@ -420,6 +465,7 @@ export const useAppStore = create<AppState>()(
           taskCategories: DEFAULT_TASK_CATEGORIES,
           taskCategoryColors: DEFAULT_TASK_CATEGORY_COLORS,
           systemConfig: normalizeSystemConfig(seedProfile.systemConfig),
+          googleCalendar: normalizeGoogleCalendarMetadata(),
           deleted: false,
           clientUpdatedAt: ts,
           createdAt: ts,
@@ -438,6 +484,7 @@ export const useAppStore = create<AppState>()(
           schedule: seedSchedule.map((s) => ({ ...s, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
           weeklyPlans: [],
           timeBlocks: [],
+          externalCalendarBlocks: [],
           executionLogs: [],
           weeklyReviews: [],
           resources: seedResources.map((r, index) => ({ ...r, order: r.order ?? index + 1, deleted: false, clientUpdatedAt: ts, createdAt: ts, updatedAt: ts })),
@@ -1335,6 +1382,70 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
+      setGoogleCalendarMetadata: (updates) => {
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            googleCalendar: normalizeGoogleCalendarMetadata({
+              ...s.profile.googleCalendar,
+              ...updates,
+            }),
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
+      disconnectGoogleCalendarMetadata: () => {
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            googleCalendar: normalizeGoogleCalendarMetadata(),
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
+      setGoogleCalendarSyncStatus: (status, error) => {
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            googleCalendar: normalizeGoogleCalendarMetadata({
+              ...s.profile.googleCalendar,
+              status,
+              lastError: error,
+            }),
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
       updateGoal: (id, updates) => {
         const ts = now()
         const completedAtISO = format(new Date(), "yyyy-MM-dd")
@@ -2028,6 +2139,45 @@ export const useAppStore = create<AppState>()(
         })
       },
 
+      saveExternalCalendarBlock: (block) => {
+        const ts = now()
+        const item = touchEntity({
+          ...block,
+          deleted: Boolean(block.deleted),
+        })
+        set((s) => ({
+          externalCalendarBlocks: s.externalCalendarBlocks.some((entry) => entry.id === item.id)
+            ? s.externalCalendarBlocks.map((entry) => (entry.id === item.id ? item : entry))
+            : [...s.externalCalendarBlocks, item],
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              externalCalendarBlocks: {
+                ...s.sync.pending.externalCalendarBlocks,
+                [item.id]: item.clientUpdatedAt ?? ts,
+              },
+            },
+          },
+        }))
+      },
+
+      deleteExternalCalendarBlock: (id) => {
+        const ts = now()
+        set((s) => ({
+          externalCalendarBlocks: s.externalCalendarBlocks.map((block) =>
+            block.id === id ? { ...block, deleted: true, clientUpdatedAt: ts } : block
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              externalCalendarBlocks: { ...s.sync.pending.externalCalendarBlocks, [id]: ts },
+            },
+          },
+        }))
+      },
+
       saveExecutionLog: (log) => {
         const ts = now()
         const id = log.id ?? `${log.weekPlanId}:${log.projectId}:${log.dateISO}`
@@ -2154,6 +2304,7 @@ export const useAppStore = create<AppState>()(
             schedule: { ...s.sync.pending.schedule },
             weeklyPlans: { ...s.sync.pending.weeklyPlans },
             timeBlocks: { ...s.sync.pending.timeBlocks },
+            externalCalendarBlocks: { ...s.sync.pending.externalCalendarBlocks },
             executionLogs: { ...s.sync.pending.executionLogs },
             weeklyReviews: { ...s.sync.pending.weeklyReviews },
             resources: { ...s.sync.pending.resources },
@@ -2197,7 +2348,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 9,
+      version: 11,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -2252,6 +2403,7 @@ export const useAppStore = create<AppState>()(
           })(),
           focusedProjectId: merged.profile?.focusedProjectId || undefined,
           systemConfig: normalizedConfig,
+          googleCalendar: normalizeGoogleCalendarMetadata(merged.profile?.googleCalendar),
           deleted: false,
           clientUpdatedAt: merged.profile?.clientUpdatedAt ?? now(),
         }
@@ -2331,6 +2483,14 @@ export const useAppStore = create<AppState>()(
               : calculateTimeBlockHours(block.startTime, block.endTime),
           status: block.status ?? "planned",
         }))
+        const externalCalendarBlocks = normalizeCollection(merged.externalCalendarBlocks).map((block) => ({
+          ...block,
+          source: block.source ?? "google-calendar",
+          title: block.title?.trim() || "Untitled event",
+          allDay: Boolean(block.allDay),
+          blocksTime: Boolean(block.blocksTime),
+          status: block.status ?? "confirmed",
+        }))
         const executionLogs = normalizeCollection(merged.executionLogs).map((log) => ({
           ...log,
           plannedHours: Number(log.plannedHours) || 0,
@@ -2368,6 +2528,7 @@ export const useAppStore = create<AppState>()(
           schedule,
           weeklyPlans,
           timeBlocks,
+          externalCalendarBlocks,
           executionLogs,
           weeklyReviews,
           resources,

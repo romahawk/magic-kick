@@ -174,6 +174,27 @@ export interface ScheduleItem extends SyncFields {
   linkedMilestoneId?: string
 }
 
+export type ExternalCalendarSource = "google-calendar"
+export type ExternalCalendarBlockStatus = "confirmed" | "tentative" | "cancelled"
+
+export interface ExternalCalendarBlock extends SyncFields {
+  id: string
+  source: ExternalCalendarSource
+  externalCalendarId: string
+  externalEventId: string
+  externalRecurringEventId?: string
+  externalICalUID?: string
+  externalEtag?: string
+  title: string
+  startISO?: string
+  endISO?: string
+  allDay: boolean
+  blocksTime: boolean
+  status: ExternalCalendarBlockStatus
+  htmlLink?: string
+  location?: string
+}
+
 export interface Resource extends SyncFields {
   id: string
   category: string
@@ -200,6 +221,18 @@ export interface JournalEntry extends SyncFields {
   gratitude?: string
 }
 
+export type GoogleCalendarSyncStatus = "disconnected" | "connected" | "syncing" | "error"
+
+export interface GoogleCalendarMetadata {
+  enabled: boolean
+  selectedCalendarIds: string[]
+  syncTokenByCalendarId: Record<string, string>
+  lastSyncedAt?: number
+  status: GoogleCalendarSyncStatus
+  lastError?: string
+  displayExternalBlocks: boolean
+}
+
 export interface Profile extends SyncFields {
   name: string
   onboardingCompleted: boolean
@@ -207,6 +240,7 @@ export interface Profile extends SyncFields {
   taskCategoryColors?: Record<string, string>
   focusedProjectId?: string
   systemConfig?: SystemConfig
+  googleCalendar?: GoogleCalendarMetadata
   level: number
   xpTotal: number
   xpThisWeek: number
@@ -223,6 +257,7 @@ export type SyncCollection =
   | "schedule"
   | "weeklyPlans"
   | "timeBlocks"
+  | "externalCalendarBlocks"
   | "executionLogs"
   | "weeklyReviews"
   | "resources"

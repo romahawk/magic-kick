@@ -62,6 +62,22 @@ function hydrateDoc<T extends DocumentData>(data: T): T {
   }
 }
 
+function stripUndefined(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stripUndefined)
+  }
+  if (!value || typeof value !== "object") {
+    return value
+  }
+
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "undefined") continue
+    cleaned[key] = stripUndefined(item)
+  }
+  return cleaned
+}
+
 export async function pullUserSnapshot(uid: string, since: number | null): Promise<RemoteSnapshot> {
   const profileSnap = await getDoc(profileRef(uid))
   const profile = profileSnap.exists() ? (hydrateDoc(profileSnap.data()) as Profile) : null
@@ -75,6 +91,7 @@ export async function pullUserSnapshot(uid: string, since: number | null): Promi
     schedule: [] as CollectionEntityMap["schedule"][],
     weeklyPlans: [] as CollectionEntityMap["weeklyPlans"][],
     timeBlocks: [] as CollectionEntityMap["timeBlocks"][],
+    externalCalendarBlocks: [] as CollectionEntityMap["externalCalendarBlocks"][],
     executionLogs: [] as CollectionEntityMap["executionLogs"][],
     weeklyReviews: [] as CollectionEntityMap["weeklyReviews"][],
     resources: [] as CollectionEntityMap["resources"][],
@@ -96,6 +113,7 @@ export async function pullUserSnapshot(uid: string, since: number | null): Promi
       if (name === "schedule") entities.schedule.push(data as CollectionEntityMap["schedule"])
       if (name === "weeklyPlans") entities.weeklyPlans.push(data as CollectionEntityMap["weeklyPlans"])
       if (name === "timeBlocks") entities.timeBlocks.push(data as CollectionEntityMap["timeBlocks"])
+      if (name === "externalCalendarBlocks") entities.externalCalendarBlocks.push(data as CollectionEntityMap["externalCalendarBlocks"])
       if (name === "executionLogs") entities.executionLogs.push(data as CollectionEntityMap["executionLogs"])
       if (name === "weeklyReviews") entities.weeklyReviews.push(data as CollectionEntityMap["weeklyReviews"])
       if (name === "resources") entities.resources.push(data as CollectionEntityMap["resources"])
@@ -128,7 +146,7 @@ export async function pushPendingWrites(uid: string, writes: PendingWrite[]) {
       batch.set(
         profileRef(uid),
         {
-          ...write.data,
+          ...(stripUndefined(write.data) as Record<string, unknown>),
           updatedAt: serverTimestamp(),
           createdAt: write.data.createdAt ?? serverTimestamp(),
         },
@@ -140,7 +158,7 @@ export async function pushPendingWrites(uid: string, writes: PendingWrite[]) {
     batch.set(
       ref,
       {
-        ...write.data,
+        ...(stripUndefined(write.data) as Record<string, unknown>),
         updatedAt: serverTimestamp(),
         createdAt: write.data.createdAt ?? serverTimestamp(),
       },

@@ -1,6 +1,7 @@
 import type {
   Achievement,
   ExecutionLog,
+  ExternalCalendarBlock,
   Goal,
   JournalEntry,
   Profile,
@@ -22,6 +23,7 @@ export interface CollectionEntityMap {
   schedule: ScheduleItem
   weeklyPlans: WeeklyPlan
   timeBlocks: TimeBlock
+  externalCalendarBlocks: ExternalCalendarBlock
   executionLogs: ExecutionLog
   weeklyReviews: WeeklyReview
   resources: Resource
@@ -36,6 +38,7 @@ export const ENTITY_COLLECTIONS: Array<Exclude<SyncCollection, "profile">> = [
   "schedule",
   "weeklyPlans",
   "timeBlocks",
+  "externalCalendarBlocks",
   "executionLogs",
   "weeklyReviews",
   "resources",

@@ -11,6 +11,7 @@ const ENTITY_COLLECTIONS: EntityCollection[] = [
   "schedule",
   "weeklyPlans",
   "timeBlocks",
+  "externalCalendarBlocks",
   "executionLogs",
   "weeklyReviews",
   "resources",

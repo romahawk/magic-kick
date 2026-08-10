@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { QuickAddDialog } from "./quick-add-dialog"
-import { Zap, Flame, Moon, Sun, Menu, RefreshCcw, LogOut } from "lucide-react"
+import { CalendarDays, Zap, Flame, Moon, Sun, Menu, RefreshCcw, LogOut } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { MobileNav } from "./mobile-nav"
+import { CalendarMetadataDialog } from "./calendar-metadata-dialog"
 
 // §4 — Top bar stripped to: workspace mark · sync · avatar menu · Quick Add
 // XP, streak, email, theme toggle, logout moved into avatar dropdown
@@ -23,6 +24,7 @@ export function TopBar() {
   const syncStatus = useAppStore((s) => s.sync.status)
   const profile = useAppStore((s) => s.profile)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false)
 
   return (
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 md:flex-nowrap md:gap-3 md:px-6 md:py-0">
@@ -90,6 +92,14 @@ export function TopBar() {
             </div>
           </div>
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              setCalendarDialogOpen(true)
+            }}
+          >
+            <CalendarDays className="mr-2 h-4 w-4" />
+            Calendar metadata
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? (
               <Sun className="mr-2 h-4 w-4" />
@@ -111,6 +121,8 @@ export function TopBar() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <CalendarMetadataDialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen} />
 
       {/* Quick add */}
       <QuickAddDialog />
