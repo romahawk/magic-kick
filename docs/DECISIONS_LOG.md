@@ -284,3 +284,169 @@ Architecture Decision Records (ADR-style). Each entry explains a real choice mad
 - The imported window remains intentionally bounded to the next 14 days.
 
 **Revisit trigger:** The user needs sync after page reload without interaction, long-running background sync, webhook latency, or one-way export/write behavior.
+
+---
+
+## ADR-016: Project → Tasks, with milestone as an optional grouping field
+
+**Date:** 2026-08-09
+**Status:** Accepted
+**Blocks:** Edit Project modal, `InboxItem.projectId`, `InboxItem.suggestedTask`, Today Command Brief aggregation
+
+### Context
+
+Three candidate hierarchies were open:
+
+- **A** — Project → Milestones
+- **B** — Project → Milestones → Tasks
+- **C** — Project → Tasks
+
+This decision had been deferred while UI work proceeded, which blocked the Edit Project modal and would have forced a retrofit of any Inbox entity referencing a project.
+
+Constraints that shaped the choice: a maximum of three active strategic initiatives; design principles favouring progressive disclosure and one control per row; a single user with no delegation needs; the product goal of reducing rather than adding structural overhead.
+
+### Decision
+
+Adopt **C — Project → Tasks**, flat. A task belongs directly to a project.
+
+Add an **optional** `milestone` field on the task (string label, nullable). It is a grouping affordance, not an entity: no separate collection, no lifecycle, no completion state, no dedicated CRUD surface.
+
+### Rationale
+
+- Option B adds a mandatory intermediate level that must be created and maintained for every project. With three active projects this is overhead without payoff.
+- Option A cannot represent atomic next actions, which the operating loop requires ("every task has a next action").
+- Option C plus an optional label delivers the grouping benefit of B at near-zero maintenance cost.
+- **Upgrade path preserved:** if milestone labels prove genuinely load-bearing after real use, they can be promoted to a first-class entity by migrating distinct label values into documents and converting the field to a foreign key. Choosing B now cannot be reversed as cheaply.
+
+### Consequences
+
+- Edit Project modal is unblocked; it edits project metadata and task membership only.
+- `InboxItem.projectId` and `suggestedTask` map directly onto existing task creation with no intermediate resolution step.
+- Milestone-level progress rollups are not available. Accepted — project-level progress is sufficient at this scale.
+- If milestone labels are unused after 30 days of real use, remove the field.
+
+### Alternatives rejected
+
+- **B (three levels)** — rejected on maintenance cost and irreversibility.
+- **A (milestones only)** — rejected; incompatible with the next-action requirement.
+
+---
+
+## ADR-017: Drifted AI routes: retained, parked behind feature flag, frozen
+
+**Date:** 2026-08-09
+**Status:** Accepted
+
+### Context
+
+Four AI API routes and supporting library modules were shipped outside the planned Phase 0 scope, which was governance and documentation only:
+
+- `/api/ai/weekly-summary`
+- `/api/ai/schedule-suggest`
+- `/api/ai/coaching`
+- `/api/ai/retro-summary`
+
+Plus AI utility areas: cognitive load, task scoring, conflict detection, risk detection, retrospective patterns.
+
+This code contradicts the Freeze List in `docs/ROADMAP.md`. A subsequent planning document treated these routes as baseline "existing capabilities", which would have laundered the drift into the foundation and made the next occurrence invisible.
+
+A separate defect was identified: some AI routes accept application state from the browser rather than loading and validating authoritative state server-side.
+
+### Decision
+
+1. **Retain** the code. Deleting working code to satisfy a process rule is waste.
+2. **Park** it behind its existing feature flag, **default off**.
+3. **Freeze** it: the routes may be read and maintained, not extended. No new AI route until the Track 5 gate is passed.
+4. **Record** the drift explicitly in `docs/ROADMAP.md` rather than silently reclassifying it as planned work.
+5. **Defer** the server-side validation fix to Track 2 as its own issue. Acceptable risk for a single-user private prototype; not acceptable before any external ingestion endpoint exists.
+
+### Rationale
+
+Scope drift is a recurring failure mode on this project. The corrective pattern is to surface it explicitly and resolve it before proceeding, not to renegotiate the plan to match what was shipped. Parking behind a flag makes the drift visible and reversible without discarding effort.
+
+### Consequences
+
+- The Freeze List in `docs/ROADMAP.md` and `CLAUDE.md` §6 regain accuracy.
+- AI features are unavailable by default until deliberately re-enabled.
+- Track 2 gains one issue: server-side state validation for existing AI routes.
+
+---
+
+## ADR-018: Personal OS automation plan: partially adopted, phases 4–6 deferred
+
+**Date:** 2026-08-09
+**Status:** Accepted
+
+### Context
+
+A canonical handoff document (`MAGIC_KICK_PERSONAL_OS_HANDOFF.md`) proposed converting Magic Kick into a full ingestion, triage and orchestration platform across six phases, with a stated three-day prototype and fourteen-day pilot.
+
+Assessment found the estimate understated by roughly an order of magnitude (realistically 5–6 weeks part-time), and found the plan conflicted with existing project state: it treated drifted AI routes as baseline, assumed a data hierarchy that had not been decided, introduced a fourth canonical planning surface, and did not account for in-flight redesign work.
+
+### Decision
+
+**Adopt:**
+- The source-of-truth hierarchy (§5) and operating rules.
+- The constraint set (§7), specifically: AI proposes, never silently commits; every item has a source; important decisions require human approval; prefer reversible actions and visible audit trails.
+- The exclusion list (§7) in full.
+- Idempotency via `source + sourceId`.
+- Issue-based decomposition (§13) — no tool implements the whole loop in one operation.
+- The `InboxItem` and `AutomationRun` shapes as starting points, subject to ADR-016.
+
+**Reject:**
+- The ChatGPT Project as canonical strategy surface. Superseded by Claude + `docs/DECISIONS_LOG.md` + GitHub Issues.
+- The stated three-day and fourteen-day timelines.
+- The ten-metric pilot measurement set — unresolved instrumentation, and manual tracking would add the friction the product exists to remove.
+
+**Defer behind a usage gate:**
+- AI triage and approval queue (Track 5).
+- Today Command Brief (Track 6).
+- n8n, Gmail label ingestion, read-only Calendar ingestion, Weekly Strategist (Track 7).
+
+### Gate definition
+
+A **dumb Inbox** ships first (Track 4): manual capture, list view, convert-to-task. No AI, no triage, no connectors, no approval state machine. It is used for 14 consecutive days.
+
+- **Pass:** ~10 or more items captured per week without external prompting → proceed to Track 5.
+- **Fail:** below that threshold → stop, reinstate the WIP limit, reassess. A triage layer cannot rescue an unused inbox; it only makes it more expensive.
+
+### Rationale
+
+The plan's core hypothesis is that centralised capture reduces planning friction. That hypothesis is testable without AI, connectors or orchestration. Testing it cheaply first avoids building a 5–6 week automation stack on an unvalidated premise.
+
+### Consequences
+
+- The handoff document is retained as reference, not as an execution plan.
+- n8n is deliberately the last dependency added, not the fifth: it is a new runtime, new secret material and a new failure surface.
+
+---
+
+## ADR-019: WIP limit suspended until 2026-09-20
+
+**Date:** 2026-08-09
+**Status:** Accepted
+**Expires:** 2026-09-20 (automatic)
+
+### Context
+
+The standing limit is three active projects: AlphaRhythm, FlowLogix, LiveSurgery POC. Magic Kick sat deliberately outside that limit as a personal tool and AI-SDLC sandbox.
+
+Concentrating effort on Magic Kick workflow optimisation requires temporarily exceeding the limit. The original framing — "until all workflows are optimised" — had no exit condition and would in practice have deleted the limit rather than suspended it.
+
+### Decision
+
+Suspend the three-project WIP limit until **2026-09-20**.
+
+- Dormant during suspension: **AlphaRhythm**, **FlowLogix**.
+- Explicitly **not** dormant: **LiveSurgery POC** — external dependencies continue regardless.
+- The expiry is a calendar deadline, not a conditional one. It does not extend because work is unfinished.
+- On expiry the limit reinstates automatically and Magic Kick returns to sandbox status unless superseded by a new ADR.
+
+### Rationale
+
+Lifting the WIP limit buys throughput, not sequencing — it does not license skipping ADRs or reordering dependent tracks. An unbounded suspension for the one project with no commercial path would invert the priority order the limit exists to protect.
+
+### Consequences
+
+- Two projects go dormant for approximately six weeks. Cost accepted and recorded here rather than left implicit.
+- 2026-09-20 coincides with the end of the Track 4 usage-gate window, so expiry and gate assessment happen together.
