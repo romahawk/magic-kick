@@ -57,6 +57,11 @@ A single block above the existing tabs, composed from data that already exists:
 4. Zero new top-level modules; zero new store collections.
 5. `npm run build`, `lint`, `typecheck` pass.
 
+**Reference mock (2026-09-24):** a design canvas with three artboards — desktop Command Center with
+the block above the tabs, mobile, and the clear state: https://claude.ai/artifact/TTUFxXzG7RZa4TomcpU1dN
+It settles layout, copy and row anatomy. It is a reference, not a spec change — where the mock and the
+acceptance criteria above disagree, the criteria win.
+
 **Out of scope:** AI, agents, new data model, redesigning the Week/Plan/Review tabs.
 
 ---
