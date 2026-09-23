@@ -3,6 +3,36 @@
 **Version:** 1.1  
 **Date:** 2026-03-08
 
+## System Role — Execution Control Plane (2026-09-23, ADR-020)
+
+Magic Kick is the **execution control plane** of the wider operating architecture, canonically
+described in `AI-Business-OS/00_HOME/ai-operating-system.md`.
+
+```text
+AI-Business-OS  -> KNOW / DECIDE    strategy, decisions, governance, system roadmap
+Magic Kick      -> SEE / REVIEW / APPROVE / DO
+                   tasks, agent jobs, approvals, execution results, operational state
+Project repos   -> BUILD STATE      code, STATE.md / NEXT_SESSION_START.md, ADRs
+Providers       -> reasoning (OpenAI, Anthropic) · execution (Grok Bots, Claude Code) · deterministic (APIs, MCP, scripts)
+```
+
+Rules this imposes on the codebase:
+
+1. **No vendor in the core.** The domain model names capabilities, never providers. Any provider
+   integration arrives as an adapter behind the generic `AgentJob` / `AgentResult` contract
+   (`AI-Business-OS/10_AUTOMATION/agent-job-contract.md`, ADR-020). The existing `/api/ai/*` routes are
+   an application feature (ADR-017), not the agent boundary.
+2. **Magic Kick owns operational state, never strategy.** Goals, priorities and positioning are read
+   from the OS; they are not re-decided here.
+3. **Magic Kick never writes to the OS autonomously** (OS MK-DEC-006). Writes are human-initiated.
+4. **AI proposes, never silently commits** (ADR-018). Every proposal carries its source and an
+   approval step; irreversible or external actions always require explicit confirmation.
+5. If Magic Kick disappeared, AI-Business-OS must remain usable.
+
+Sequencing of control-plane capability (approval/result model, adapters) stays behind ADR-018's Inbox
+usage gate and the OS roadmap stages AOS-2 / AOS-4 / AOS-6 / AOS-7. This section states the role; it
+does not authorize building the machinery.
+
 ## Execution OS Diagram
 
 ```text
