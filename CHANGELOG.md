@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-09-24 - Command Center attention block (P1)
+
+### Added
+- A "Now" block at the top of the Command Center, above the Week / Month / Quarter tabs: today's Focus tasks (up to the daily focus limit, completable in place) and a "Needs attention" list of overdue weekly outcomes, overdue tasks, active projects with no weekly outcome, and over-capacity load. Each row has one action that opens the module that resolves it; at most 6 rows are shown.
+
+---
+
 ## [Unreleased] - 2026-08-10 - Firestore sync rules alignment
 
 ### Fixed
