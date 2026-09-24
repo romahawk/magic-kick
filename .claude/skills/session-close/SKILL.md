@@ -65,7 +65,8 @@ Update, do not append blindly:
 - **Open items** — remove items that are done (check merged PRs), add new ones. Keep dates absolute.
 
 The handoff is per branch. Commit it on the branch named in `Resume on`; if other branches carry
-an older copy, say so in the report.
+an older copy, say so in the report. If `Resume on` is `main`, never commit to `main` directly:
+commit on `docs/session-close-YYYY-MM-DD` from `origin/main` and open a PR into `main`.
 
 ## 5. OS write-back
 
