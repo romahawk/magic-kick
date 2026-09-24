@@ -97,4 +97,6 @@ Closes #<n>                         (when an issue exists)
   section is not.
 - Paste the real gate output (the last lines of each command with its exit code), not "passes".
 - Say what is **not** verified. A UI change without screenshots says so.
-- For stacked PRs, name the base PR and the merge order.
+- For stacked PRs, name the base PR and the merge order. After the base PR merges, delete its
+  branch or retarget the stacked PRs to `main` **before** merging them. Otherwise they merge into
+  the already-merged branch and never reach `main` (this happened with #118 and #120 on 2026-09-24).
