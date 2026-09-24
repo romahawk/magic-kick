@@ -67,6 +67,7 @@ Every Claude Code session must be framed as an experiment:
 - Branch: `exp/<experiment-name>` or `fix/<issue-number>-<slug>`.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
 - One PR per issue. PR description states: issue link, what changed, what was verified, what was **not** verified.
+- Commit bodies, push reports and PR bodies follow root `CLAUDE.md` → "Commit, Push and PR Descriptions".
 - Never commit directly to `main`.
 - Before opening a PR: `lint`, `typecheck`, `test` (if present), `build` must all pass locally. Paste the actual output into the PR, not a claim that they passed.
 

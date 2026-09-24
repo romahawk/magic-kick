@@ -2,6 +2,7 @@
 
 ## Start of Day
 
+- Run `/session-start` (it covers the steps below and checks the last handoff)
 - Pull latest changes from `main`
 - Name the itch or experiment for this session (if neither can be named, stop and work on a different repo)
 - Confirm the working branch is not `main`
@@ -17,5 +18,6 @@
 
 ## End of Day
 
+- Run `/session-close` to rewrite `docs/NEXT_SESSION_START.md` from the actual git state
 - Push the working branch or stash local changes cleanly
 - Log what was learned in `docs/DECISIONS_LOG.md` if this was an experiment

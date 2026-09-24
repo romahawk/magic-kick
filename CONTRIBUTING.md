@@ -46,6 +46,8 @@ Examples:
 3. UI changes require a screenshot or GIF in the PR description
 4. Maximum 400 lines changed per PR (split larger work into smaller PRs)
 5. Self-review before requesting merge — read your own diff first
+6. Commit messages, push reports and the PR body follow `CLAUDE.md` → "Commit, Push and PR
+   Descriptions": what changed, why, gate output pasted, and what was **not** verified
 
 ---
 

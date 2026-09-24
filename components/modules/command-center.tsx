@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils"
 import { auth } from "@/lib/firebase/client"
 import { isAiEnabled } from "@/lib/ai/flags"
 import { detectAnomalies } from "@/lib/ai/insights"
+import { AttentionBlock } from "@/components/modules/attention-block"
 import { InsightList } from "@/components/ai/InsightCard"
 import { CoachingBanner, CoachingBannerSkeleton } from "@/components/ai/CoachingBanner"
 import type { CoachingMessage, Insight } from "@/lib/types"
@@ -218,6 +219,8 @@ export function CommandCenter() {
             : "Set your weekly plan before the week decides itself for you."}
         </p>
       </div>
+
+      <AttentionBlock />
 
       <Tabs defaultValue="week" className="w-full">
         <TabsList className="grid w-full max-w-sm grid-cols-3">
