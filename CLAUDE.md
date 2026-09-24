@@ -15,6 +15,8 @@
 - Net new files per experiment: keep small; prefer refactors over additions.
 - Every session must start by naming the experiment or the itch.
   If neither can be named, stop and work on a different repo.
+- Start every session with `/session-start` and end it with `/session-close`
+  (`.claude/skills/`). `docs/NEXT_SESSION_START.md` is the handoff between sessions.
 
 ---
 

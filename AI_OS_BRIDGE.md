@@ -23,7 +23,8 @@ D:\MazurykOS\01_Projects\IT-Projects-dev\AI-Business-OS
 
 ## Session Start Protocol
 
-Read in this order before doing anything:
+Run it with `/session-start` (`.claude/skills/session-start/SKILL.md`), which also checks git
+state against the handoff and runs the gates. Read in this order before doing anything:
 
 1. `AI-Business-OS/01_CONTEXT/current-focus.md` — confirm this project is active; check execution allocation
 2. `AI-Business-OS/01_CONTEXT/decision-rules.md` — authority model and priority hierarchy
@@ -104,8 +105,11 @@ Full authority model: `AI-Business-OS/01_CONTEXT/decision-rules.md`
 
 ## End of Session Protocol
 
-1. Update `AI-Business-OS/02_PROJECTS/magic-kick/context.md` — state, blockers, next actions
+Run it with `/session-close` (`.claude/skills/session-close/SKILL.md`).
+
+1. If code was changed: confirm `build` and `lint` pass before closing
 2. Update `docs/NEXT_SESSION_START.md` in this repo — branch, last action, what is next
-3. If code was changed: confirm `build` and `lint` pass before closing
+3. Update `AI-Business-OS/02_PROJECTS/magic-kick/context.md` only if something strategic changed
+   (see "After every session" above)
 4. Surface any carry-forward items that belong in the next Daily Command Center run
 
