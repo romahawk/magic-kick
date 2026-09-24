@@ -38,7 +38,23 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
+**Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
+vocabulary, and it is the only thing to edit when an item moves:
+
+| Value | Meaning |
+|---|---|
+| `open` | Being worked now. **At most one item may be `open`** (DEC-2026-09-24-001, WIP = 1). |
+| `queued` | Ranked, not started. |
+| `done` | Shipped and merged. |
+| `gated` | Cannot start until its stated gate clears. |
+| `decision` | Blocked on a ruling from Roman, not on work. |
+
+`10_AUTOMATION/scripts/generate-roadmap-view.js` in the OS repo reads these lines; the generated
+view is wrong the moment one is stale.
+
 ### P1 — Attention block at the top of Command Center · M
+
+**Status:** open
 
 **Why:** F1, F3. The control plane's first answer must be on screen without a click.
 
@@ -68,6 +84,8 @@ acceptance criteria above disagree, the criteria win.
 
 ### P2 — Resolve the duplicate planning layer · S
 
+**Status:** queued
+
 **Why:** F2. Two sources of the same derivation is the "no duplicate state" anti-goal inside one repo.
 
 Decide per selector: wire it into P1, or delete it. `calculateCognitiveLoad` stays (used by insights).
@@ -82,6 +100,8 @@ Record the outcome as a one-paragraph ADR (ADR-022) — including anything delet
 ---
 
 ### P3 — "Waiting on you" queue · M
+
+**Status:** queued
 
 **Why:** F4. The approval loop is the control plane's core, and it can be proven with today's data —
 before any agent exists.
@@ -104,6 +124,8 @@ unreviewed finished week, overdue outcome needing continue/adjust/remove, projec
 
 ### P4 — Provenance fields on Task and Project · S
 
+**Status:** queued
+
 **Why:** F5. Prerequisite for any agent result ever landing in Magic Kick, and cheap now.
 
 Optional `source` (`"manual" | "agent" | "import"`) and `sourceId` on `Task` and `Project`, defaulting
@@ -121,6 +143,8 @@ to `"manual"` in the store migration. Surface as a small label only where non-ma
 
 ### P5 — Navigation weight · S
 
+**Status:** queued
+
 **Why:** F6. Reference surfaces should not compete with execution surfaces.
 
 Group the existing eight items: **Execution** (Command Center, Schedule, ToDo, Projects) and
@@ -137,6 +161,8 @@ no new modules, no routing change. Mobile bottom nav keeps its five, ordered by 
 
 ### P6 — Gamification placement · decision first, then S
 
+**Status:** decision
+
 **Why:** F7. Roman's OS explicitly rejects streak/score mechanics; Magic Kick puts them above navigation.
 
 **Decision needed before code** (Roman, L4): keep as is · demote to the avatar dropdown and the
@@ -148,6 +174,8 @@ reachable in Achievements and the avatar menu; no store or XP-engine changes.
 ---
 
 ### P7 — OS context strip · L, gated
+
+**Status:** gated
 
 **Why:** F8. Showing current focus and allocation inside the control plane closes the loop between
 "what to prioritize" and "what needs attention".
