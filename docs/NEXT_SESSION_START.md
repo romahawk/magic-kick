@@ -42,19 +42,21 @@ Changed on `exp/session-handoff-skills`:
   end-of-session OS update is now conditional ("only if strategic"), matching its own
   "After every session" rule. Previously the two contradicted each other.
 
-**Branch map** (all three pushed at session close; no PRs opened yet):
+**Branch map** (all pushed; PRs open as of session close):
 
-| Branch | Head | Base |
+| Branch | Head | PR → base |
 |---|---|---|
-| `docs/control-plane-boundary` | `411cf5f` | `origin/main` at `9b7d232` (PR #117) |
-| `feat/attention-block` | this commit | `docs/control-plane-boundary` |
-| `exp/session-handoff-skills` | `1046ba0` | `docs/control-plane-boundary` |
+| `docs/control-plane-boundary` | `411cf5f` | **#119** → `main` (CI green: lint/type-check/build, policy, Vercel) |
+| `feat/attention-block` | this commit | **#118** → `docs/control-plane-boundary` (hold: see Open items) |
+| `exp/session-handoff-skills` | `9aa26e4` | **#120** → `docs/control-plane-boundary` |
 
-Merge order: `docs/control-plane-boundary` first, then the other two (independent of each other).
-The docs branch was rebased onto `origin/main` at close, which dropped `e7e2e9d`, the unsquashed
-duplicate of PR #117, and force-pushed. After the docs PR merges, rebase the other two onto `main`
-so their PRs show only their own commits. If the docs PR is squash-merged, use
-`git rebase --onto origin/main 411cf5f <branch>`.
+Merge order: #119 first, then #118 and #120 in either order. The docs branch was rebased onto
+`origin/main` at close and force-pushed, which dropped `e7e2e9d`, the unsquashed duplicate of #117.
+When #119 merges and its branch is deleted, GitHub moves #118 and #120 onto `main`. If #119 is
+squash-merged, first run `git rebase --onto origin/main 411cf5f <branch>` on each of them.
+The CI workflow only triggers on PRs into `main`. #118 passed CI while it still targeted `main`. New
+pushes to #118, and all of #120, get CI only after the PRs move to `main`. Vercel previews build for
+every push either way.
 
 **Verified (confirmed):**
 - typecheck, lint and build pass on `feat/attention-block` (2026-09-24).
@@ -102,10 +104,13 @@ holding 4 GB, `next dev`), not the code. Stop `next dev` before building.
 
 ## Open items
 
-- **Verify P1 in a browser** (desktop + ~390px mobile), settle the load-status gap, then open the
-  PR. Mark P1 `done` only after merge (`done` = shipped and merged).
-- **Open the PR for `docs/control-plane-boundary`** (already rebased and pushed, see branch map). Until it merges, `main` has
-  ADR-016…ADR-019 (PR #117) but not ADR-020/021, the UI spec or `AI_OS_BRIDGE.md`.
+- **Verify P1 in a browser** (desktop + ~390px mobile), and settle the load-status gap. #118
+  says not to merge until both are done; add screenshots to it. Mark P1 `done` only after #118
+  merges (`done` = shipped and merged). The Vercel preview for `feat/attention-block` works for this
+  with **Try Demo**, even though preview logins are broken.
+- **Review and merge #119**, then #118 and #120. Until #119 merges, `main` has ADR-016…ADR-019
+  (#117) but not ADR-020/021, the UI spec or `AI_OS_BRIDGE.md`. Until #120 merges,
+  `/session-start` and `/session-close` exist only on `exp/session-handoff-skills`.
 - **Seed/test logins fail in dev and preview** (reported 2026-09-24, not investigated). The repo
   creates no accounts; auth is Firebase. Check which Firebase project each environment's
   `NEXT_PUBLIC_FIREBASE_*` points to, and the authorized domains for preview.
