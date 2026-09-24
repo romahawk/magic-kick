@@ -19,6 +19,29 @@
 
 ---
 
+## Where we left off (2026-09-24) — P1 written, gates not yet run
+
+**Uncommitted in the working tree.** Typecheck passes (`npm run typecheck` exit 0). `npm run lint`
+and `npm run build` were NOT run: the session that wrote this had a 180-second shell limit and both
+exceed it on that machine. **Run both before committing** — `CLAUDE.md` gates still apply.
+
+```bash
+npm run lint && npm run build && git add lib/execution-os.ts components/modules/attention-block.tsx components/modules/command-center.tsx docs/NEXT_SESSION_START.md && git commit -m "feat(command-center): attention block — focus and what needs attention above the fold"
+```
+
+Changed:
+- `lib/execution-os.ts` — new `selectAttentionItems()` (+ `selectOverdueTasks`, `AttentionItem`,
+  `AttentionKind`, `ATTENTION_LIMIT`). One derivation for "what is wrong now": overdue weekly
+  outcomes, overdue tasks, active projects with no weekly outcome, over-capacity load. Each item
+  carries `{id, kind, severity, title, detail, module, actionLabel}` — P3 adds agent proposals as
+  one more `kind` without touching the component.
+- `components/modules/attention-block.tsx` — new component, render only, no derivation.
+- `components/modules/command-center.tsx` — two lines: import, and `<AttentionBlock />` above the tabs.
+
+Not done: P1's acceptance criterion "above the fold on desktop and mobile" is unverified — nobody
+has looked at it in a browser yet. Do that first, then mark P1 `done` in
+`docs/CONTROL_PLANE_UI_SPEC.md` (its Status line is what the OS roadmap view reads).
+
 ## Where we left off (2026-09-23)
 
 **Session summary:** control-plane boundary documented. No code changed.

@@ -1,6 +1,6 @@
 import { isBefore, parseISO } from "date-fns"
-import type { ExecutionBlockTemplate, Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
-import { isDueToday, isDueThisWeek } from "@/lib/game-utils"
+import type { ExecutionBlockTemplate, ModuleId, Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
+import { isDueToday, isDueThisWeek, isOverdue } from "@/lib/game-utils"
 
 export const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
   {
@@ -202,4 +202,102 @@ export function calculateCognitiveLoad(input: {
     overload,
     overCapacity: overload > 0,
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Attention — "what requires attention now?"
+ *
+ * One derivation, used by the Command Center's attention block. Every
+ * item is a thing that is wrong or missing right now, never an FYI, and
+ * every item names the module that can resolve it. Agent proposals will
+ * arrive later as one more `kind` (see CONTROL_PLANE_UI_SPEC P3) — the
+ * shape is deliberately provider-neutral.
+ * ------------------------------------------------------------------ */
+
+export type AttentionKind = "outcome-overdue" | "task-overdue" | "outcome-missing" | "load"
+
+export interface AttentionItem {
+  id: string
+  kind: AttentionKind
+  severity: "high" | "medium"
+  title: string
+  detail: string
+  module: ModuleId
+  actionLabel: string
+}
+
+export const ATTENTION_LIMIT = 6
+
+export function selectOverdueTasks(tasks: Task[]) {
+  return tasks
+    .filter((task) => !task.deleted && !task.completed && isOverdue(task.dueDate))
+    .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
+}
+
+function daysSince(dateISO?: string) {
+  if (!dateISO) return 0
+  const diff = Date.now() - parseISO(dateISO).getTime()
+  return Math.max(0, Math.floor(diff / 86_400_000))
+}
+
+export function selectAttentionItems(input: {
+  projects: Project[]
+  tasks: Task[]
+  config?: Partial<SystemConfig>
+}): AttentionItem[] {
+  const rules = normalizeSystemConfig(input.config)
+  const items: AttentionItem[] = []
+
+  for (const outcome of selectWeeklyOutcomes(input.projects, rules)) {
+    if (!outcome.overdue || outcome.completed) continue
+    items.push({
+      id: "outcome-overdue:" + outcome.projectId,
+      kind: "outcome-overdue",
+      severity: "high",
+      title: "Weekly outcome overdue — " + outcome.projectTitle,
+      detail: outcome.title,
+      module: "projects",
+      actionLabel: "Decide",
+    })
+  }
+
+  for (const task of selectOverdueTasks(input.tasks)) {
+    const days = daysSince(task.dueDate)
+    items.push({
+      id: "task-overdue:" + task.id,
+      kind: "task-overdue",
+      severity: "high",
+      title: "Task overdue — " + task.title,
+      detail: days === 1 ? "1 day past due" : days + " days past due",
+      module: "todo",
+      actionLabel: "Open",
+    })
+  }
+
+  for (const project of selectActiveProjectsMissingWeeklyOutcome(input.projects)) {
+    items.push({
+      id: "outcome-missing:" + project.id,
+      kind: "outcome-missing",
+      severity: "medium",
+      title: "No weekly outcome — " + project.title,
+      detail: "Active project with nothing to prove this week",
+      module: "projects",
+      actionLabel: "Set",
+    })
+  }
+
+  const load = calculateCognitiveLoad({ projects: input.projects, tasks: input.tasks, config: rules })
+  if (load.overCapacity) {
+    items.push({
+      id: "load:over-capacity",
+      kind: "load",
+      severity: "medium",
+      title: "Over capacity — " + load.activeProjects + " active projects, limit " + rules.maxActiveProjects,
+      detail: "Load: " + load.status,
+      module: "projects",
+      actionLabel: "Review",
+    })
+  }
+
+  return items.slice(0, ATTENTION_LIMIT)
 }
