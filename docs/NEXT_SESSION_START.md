@@ -1,43 +1,53 @@
 # Next Session Start
 
-**Last updated:** 2026-09-22
-**Current branch:** `fix/close-phase-1-adrs` (branched from `origin/main` at `8570bd9`, Merge PR #116)
-**Build status:** passing — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
-**Typecheck status:** passing — `npm run typecheck` exit 0
-**Lint status:** passing — `npm run lint` exit 0
+**Last updated:** 2026-09-23
+**Current branch:** `fix/close-phase-1-adrs` → new work on `docs/control-plane-boundary`
+**Build status:** passing as of 2026-09-22 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Typecheck status:** passing as of 2026-09-22 — `npm run typecheck` exit 0
+**Lint status:** passing as of 2026-09-22 — `npm run lint` exit 0
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
+**Note:** the 2026-09-23 session changed documentation only — no code, no dependency changes.
 
 ---
 
 ## Start here
 
-1. `git status`: note the current branch and any uncommitted changes
-2. `npm run build`: must exit 0 before any commit
-3. `npm run lint` and `npm run typecheck`: must exit 0 before any commit
-4. Read `docs/DECISIONS_LOG.md` ADR-016 to ADR-019 before starting Inbox or AI work
+1. `git status`: note the branch and any uncommitted changes
+2. Read `docs/CONTROL_PLANE_UI_SPEC.md` — it is the work queue; start at the top unranked-unfinished item
+3. Read ADR-020 and ADR-021 in `docs/DECISIONS_LOG.md` before any control-plane or scope decision
+4. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit
 
 ---
 
-## Where we left off (2026-09-22)
+## Where we left off (2026-09-23)
 
-**Session summary:** Closed out the Phase 1 ADRs. No code changed.
+**Session summary:** control-plane boundary documented. No code changed.
 
-- ADR-016 to ADR-019 were appended to `docs/DECISIONS_LOG.md`. They were drafted as ADR-001 to ADR-004 in `docs/DECISIONS_LOG_entries.md`, which has been deleted.
-  - ADR-016: Project → Tasks, with an optional `milestone` label
-  - ADR-017: Drifted AI routes kept, behind a feature flag (default off), frozen
-  - ADR-018: Personal OS automation plan partly adopted. A basic Inbox (Track 4) with a 14-day usage gate comes before any triage, connectors or n8n.
-  - ADR-019: WIP limit suspended until 2026-09-20
-- ADR-016 to ADR-019 are dated 2026-08-09 but sit after ADR-015 (2026-08-10), so the log is not strictly in date order.
+- `docs/ARCHITECTURE.md` — new **System Role** section: Magic Kick is the execution control plane;
+  no vendor in the core; agents arrive through the generic `AgentJob` / `AgentResult` contract.
+- `docs/DECISIONS_LOG.md` — **ADR-020** (control-plane role + agent boundary) and **ADR-021**
+  (ADR-019 expiry recorded; Track 4 gate recorded as *not assessed*; scoped active build).
+- `docs/CONTROL_PLANE_UI_SPEC.md` — audit of the current UI against the control-plane workflow plus a
+  ranked work queue (P1–P7) with acceptance criteria.
+- `AI_OS_BRIDGE.md` — write-back rule narrowed: build state stays in this repo; only strategic
+  changes go to the OS.
+- Previously untracked governance files committed: `AGENTS.md`, `AI_OS_BRIDGE.md`,
+  `docs/OPERATING_CADENCE.md`, `docs/MAGIC_KICK_PERSONAL_OS_HANDOFF.md`, `docs/SESSION_0_PROMPT.md`,
+  `.claude/settings.json`.
 
-**Not committed on this branch:** these untracked or local files came over from the previous branch:
-- `.claude/settings.local.json` (modified), `.claude/settings.json`
-- `AGENTS.md`, `AI_OS_BRIDGE.md`
-- `docs/MAGIC_KICK_PERSONAL_OS_HANDOFF.md`, `docs/OPERATING_CADENCE.md`, `docs/SESSION_0_PROMPT.md`
+**OS side (AI-Business-OS repo, branch `docs/ai-operating-architecture`):**
+`DEC-2026-09-22-001` (operating architecture), `DEC-2026-09-22-002` (Grok validated outside MK),
+`DEC-2026-09-23-001` (this repo raised to a scoped active build).
 
 ---
 
 ## Open items
 
-- **ADR-019 expired on 2026-09-20.** Under its own terms the three-project WIP limit is back in force and Magic Kick is back in sandbox status, unless a new ADR says otherwise. TBD: record the outcome.
-- **The Track 4 usage gate (ADR-018)** was due for assessment at the same time. Pass means about 10 or more Inbox items captured per week over 14 days. TBD: result not recorded.
-- **Track 2:** validate state server-side in the existing AI routes (from ADR-017).
+- **Merge the Phase 1 PR** (`fix/close-phase-1-adrs` → `main`), then this branch. Until then `main`
+  does not have ADR-016…ADR-021.
+- **ADR-016…ADR-019 are dated 2026-08-09** but sit after ADR-015 (2026-08-10); the log is not in
+  strict date order. Cosmetic; leave unless the log gets an index.
+- **Track 2 (from ADR-017):** validate state server-side in the existing AI routes.
+- **P6 in the UI spec needs a decision from Roman before code** (gamification placement).
+- **Allocation reverts to `limited` on 2026-10-21** unless the control-plane scope is delivered
+  first or a new ADR lands (ADR-021).

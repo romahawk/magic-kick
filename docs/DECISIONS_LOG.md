@@ -450,3 +450,92 @@ Lifting the WIP limit buys throughput, not sequencing — it does not license sk
 
 - Two projects go dormant for approximately six weeks. Cost accepted and recorded here rather than left implicit.
 - 2026-09-20 coincides with the end of the Track 4 usage-gate window, so expiry and gate assessment happen together.
+
+---
+
+## ADR-020: Magic Kick is the execution control plane; agents arrive through a generic contract
+
+**Date:** 2026-09-23
+**Status:** Accepted
+
+### Context
+
+AI-Business-OS adopted a provider-agnostic operating architecture on 2026-09-22 (OS
+`DEC-2026-09-22-001`): the OS owns strategy and decisions, Magic Kick owns execution state, and AI
+vendors are interchangeable capability providers — reasoning (OpenAI, Anthropic), execution (Grok
+Bots for computer/browser work, Claude Code for engineering), deterministic (APIs, MCP, scripts).
+Magic Kick had no recorded position on that role, and the drifted `/api/ai/*` routes (ADR-017) are
+the only agent-shaped code in the repo — close enough to be mistaken for the agent boundary.
+
+### Decision
+
+1. Magic Kick's architectural role is the **execution control plane**: tasks, agent jobs, approvals,
+   execution results, operational state. Recorded in `docs/ARCHITECTURE.md`.
+2. When agent execution is built, it arrives through the provider-neutral `AgentJob` / `AgentResult`
+   contract specified in `AI-Business-OS/10_AUTOMATION/agent-job-contract.md`. No provider-specific
+   fields in the domain model; provider code lives in `adapters/<provider>/` only.
+3. The existing `/api/ai/*` routes remain what ADR-017 made them — an application feature behind a
+   feature flag, frozen. They are not the agent boundary and are not extended to become one.
+4. Strategy stays in the OS. Magic Kick reads goals, priorities and allocation; it never re-decides them.
+
+### Not decided here
+
+Timing. Building the approval / execution-result model stays behind ADR-018's Inbox usage gate and
+the OS roadmap stages AOS-4 / AOS-6 / AOS-7. This ADR fixes the shape, not the schedule.
+
+### Rationale
+
+The cheapest moment to prevent vendor lock-in is before any adapter exists. Naming the contract now
+costs one document; retrofitting it after a Grok-specific integration costs a rewrite of the core.
+
+### Consequences
+
+- A Grok (or any other) integration is refused unless it is an adapter behind the generic contract.
+- `docs/ARCHITECTURE.md` gains a System Role section; `AI_OS_BRIDGE.md` narrows what is written back
+  to the OS (build state stays in this repo).
+- The 9-module ceiling in `CLAUDE.md` / `AGENTS.md` is unchanged: control-plane work happens inside
+  existing modules.
+
+**Revisit trigger:** the first real `AgentJob` execution, or a proposal to give any provider write
+access to Magic Kick data.
+
+---
+
+## ADR-021: ADR-019 expiry recorded; Magic Kick raised to a scoped active build
+
+**Date:** 2026-09-23
+**Status:** Accepted
+**Supersedes for this scope:** ADR-019 (expired 2026-09-20)
+
+### Context
+
+ADR-019 suspended the WIP limit until 2026-09-20 and returned Magic Kick to sandbox status on expiry.
+The expiry passed with no outcome recorded, and the Track 4 Inbox usage gate (ADR-018), due for
+assessment in the same window, was also left unrecorded. Meanwhile ADR-020 made Magic Kick the
+control plane of the operating architecture, and four OS roadmap stages (AOS-2, AOS-4, AOS-6, AOS-7)
+now run through this repo — none of which is possible at stabilize-only.
+
+### Decision
+
+1. **Record ADR-019's outcome:** it expired on schedule. The suspension is over and is not renewed.
+2. **Record the Track 4 gate outcome: not assessed.** No Inbox was shipped in the window, so the gate
+   never ran. It is *not* a pass. Triage, brief, connector and n8n work stay deferred under ADR-018
+   until a dumb Inbox ships and is used for 14 consecutive days.
+3. **Allocation:** per OS `DEC-2026-09-23-001`, Magic Kick moves from `limited` to an active build in
+   the Infrastructure lane, **scoped to**: merging the Phase 1 close-out, the control-plane boundary
+   docs (ADR-020), and UI work that adapts existing surfaces to the control-plane workflow
+   (`docs/CONTROL_PLANE_UI_SPEC.md`). Reverts to `limited` when that scope is delivered or on
+   2026-10-21, whichever comes first.
+
+### Rationale
+
+An expiry nobody records is how a limit quietly stops existing. Writing down "expired, and the gate
+never ran" costs nothing now and prevents a later claim that the gate passed. The new allocation is
+scoped and dated for the same reason.
+
+### Consequences
+
+- No new modules, connectors, agent runtime or n8n under this allocation — the 9-module ceiling holds.
+- The next unscoped feature request is refused by default until the revert date passes or a new ADR lands.
+
+**Revisit trigger:** 2026-10-21, or the control-plane scope being delivered, or a dumb Inbox shipping.
