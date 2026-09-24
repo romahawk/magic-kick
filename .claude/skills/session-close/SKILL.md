@@ -78,9 +78,17 @@ Never edit `current-focus.md` or `decision-rules.md`.
 ## 6. Commit and report
 
 Commit the handoff (and CHANGELOG, if changed) as `docs: session close YYYY-MM-DD`, only after
-the gates pass. Stage files by name, never `git add -A`.
+the gates pass. Stage files by name, never `git add -A`. Every commit, push and PR follows root
+`CLAUDE.md` → "Commit, Push and PR Descriptions": the body says why, what changed, verified and
+not verified. Pass multi-line messages with `git commit -F <file>`; PowerShell 5.1 breaks quotes
+in `-m`.
 
-Do not push without asking. Report on one screen:
+Do not push without asking. When approved, list per branch the base and the commits going up
+before pushing, and never force-push without explicit approval for that push. If a PR is
+opened, fill every section of `.github/PULL_REQUEST_TEMPLATE.md` from the diff and the real gate
+output (`gh pr create --body-file <file>`).
+
+Report on one screen:
 
 - what was committed where
 - gates with exit codes
