@@ -188,6 +188,52 @@ Read-only strip sourced from `AI-Business-OS/01_CONTEXT/current-focus.md` throug
 
 ---
 
+### P8 — Enforce the commit gates with a hook · S
+
+**Status:** queued
+
+**Why:** `CLAUDE.md` line 52 says no commit may be created if `npm run build` or `npm run lint` fails.
+That rule is prose: an agent that skips it commits anyway, and this repo's own history (AI routes
+shipped outside scope, governance files untracked across branches) is what an unenforced rule looks
+like. A hook moves the rule from the prompt into the environment.
+
+A `PreToolUse` hook in `.claude/settings.json` matching `Bash(git commit …)` that runs the gates and
+blocks on a non-zero exit. Verify the event name and matcher syntax against the official Claude Code
+docs before writing it — do not copy them from a third-party cheat sheet.
+
+**Acceptance criteria**
+
+1. A commit attempted with a failing `lint` or `build` is blocked, and the message names which gate failed.
+2. A commit with both passing proceeds with no extra prompt.
+3. The hook lives in `.claude/settings.json` (shared, committed), not `settings.local.json`.
+4. Gate runtime is stated in `docs/NEXT_SESSION_START.md`; if the pair takes minutes, the hook runs
+   `typecheck` + `lint` and the full build stays a pre-PR step, recorded here as the reason.
+5. `CLAUDE.md` line 52 gains one line: the rule is now enforced by a hook, prose is the fallback.
+
+**Out of scope:** formatting hooks, `rm -rf` blocking, any other event. One hook, one rule.
+
+---
+
+### P9 — One governance file, not two · S
+
+**Status:** queued
+
+**Why:** `CLAUDE.md` (102 lines) and `AGENTS.md` (57) carry the same governing rule, working
+agreement and anti-pattern table with the agent's name swapped. Two copies of one rule set means the
+next rule change updates one of them.
+
+Keep `AGENTS.md` as the canonical text (it is the cross-tool file — Codex, Cursor and Copilot read it
+too) and reduce `CLAUDE.md` to Claude-specific additions plus a pointer, or the reverse. Either
+direction is fine; two full copies is not.
+
+**Acceptance criteria**
+
+1. A rule appears once. The other file points at it.
+2. Both files still open with the governing rule, so a session that reads either one is governed.
+3. No rule is lost in the merge — diff the two before collapsing.
+
+---
+
 ## Explicitly not in this queue
 
 New modules · agent runtime · connectors (Gmail, Calendar beyond what exists) · n8n · triage or
