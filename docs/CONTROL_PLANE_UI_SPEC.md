@@ -38,6 +38,9 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
+**Working order (OS `DEC-2026-09-27-001`):** P1 → P7 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
+
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
 
@@ -72,6 +75,13 @@ A single block above the existing tabs, composed from data that already exists:
 3. Empty state is a single calm line ("Nothing needs attention"), not an empty card grid.
 4. Zero new top-level modules; zero new store collections.
 5. `npm run build`, `lint`, `typecheck` pass.
+6. **Usage gate (the real exit).** After the browser check, run Magic Kick on real projects, real
+   tasks and real weekly outcomes for seven days. **Pass = opened on 5 of 7 days AND at least one
+   task changed state on each of those days.** Fail = stop building Magic Kick, keep the files, and
+   record the verdict in `docs/DECISIONS_LOG.md`. P1 is not `done` until this resolves either way.
+7. **Known spec gap to rule on first:** the spec says show load status "when not `Stable`", but
+   `selectAttentionItems` only emits a load item when active projects exceed `maxActiveProjects`.
+   Widen the code or narrow this criterion before marking P1 done.
 
 **Reference mock (2026-09-24):** a design canvas with three artboards — desktop Command Center with
 the block above the tabs, mobile, and the clear state: https://claude.ai/artifact/TTUFxXzG7RZa4TomcpU1dN
@@ -159,33 +169,68 @@ no new modules, no routing change. Mobile bottom nav keeps its five, ordered by 
 
 ---
 
-### P6 — Gamification placement · decision first, then S
+### P6 — Gamification placement · S
 
-**Status:** decision
+**Status:** queued
 
-**Why:** F7. Roman's OS explicitly rejects streak/score mechanics; Magic Kick puts them above navigation.
+**Decided 2026-09-27 (OS `DEC-2026-09-27-001`): demote.** Progress on the daily surface measures
+evidence shipped, not activity logged. `lifeos-architecture.md` §0 rule 5 stands — no streaks, no
+scores, no guilt mechanics where you look every day.
 
-**Decision needed before code** (Roman, L4): keep as is · demote to the avatar dropdown and the
-Achievements module · remove entirely. Recommendation: demote — the data stays, the daily prompt goes.
+**Acceptance criteria**
 
-**Acceptance criteria (if demoted):** sidebar profile card shows name only; XP/level/streak remain
-reachable in Achievements and the avatar menu; no store or XP-engine changes.
+1. The sidebar profile card shows name only.
+2. XP, level and streak remain reachable in Achievements and the avatar menu.
+3. No store, XP-engine or achievement logic changes — this is placement, not removal.
+4. Nothing on the Command Center counts days in a row.
+---
+
+### P7 — Read the OS context feed · M
+
+**Status:** queued
+
+**Why:** the brain is invisible from the deployed app. Everything Magic Kick shows today is what was
+typed into Magic Kick. Until it can read OS context, "accessible everywhere on any device" gets you a
+task app with your own data in it, and goal 1's LLM-agnostic claim is true only for a session with
+disk access.
+
+**Shape.** The OS generates a versioned, read-only **context feed** (a script, same pattern as
+`generate-roadmap-view.js` — no new state store there, no duplicate state here). Magic Kick reads it
+server-side through the GitHub API per MK-DEC-006, with a fine-grained PAT in a Vercel env var,
+caches it, and renders it read-only. Never writes back.
+
+**First slice:** today's plan and current focus. Nothing else until those two are on screen.
+
+**Acceptance criteria**
+
+1. A server route fetches the feed; the token never reaches the browser.
+2. The deployed app shows today's plan and current allocation without the laptop being involved.
+3. Stale or unreachable feed renders as a dated "last known" state, never as blank or as fresh.
+4. No feed content is written into Firestore — render only.
+5. The feed's shape is documented in the OS repo, not here.
+
+**Depends on:** the OS side of the feed, and a PAT. Both are week-2 work in `DEC-2026-09-27-001`.
 
 ---
 
-### P7 — OS context strip · L, gated
+### P10 — Evidence-driven progress · M
 
-**Status:** gated
+**Status:** queued
 
-**Why:** F8. Showing current focus and allocation inside the control plane closes the loop between
-"what to prioritize" and "what needs attention".
+**Why:** goal 2 asks for progress bars; the anti-abandonment rule forbids streaks. Evidence resolves
+both — a bar that moves when something ships is worth showing in an interview; a bar that moves when
+you tick a box is not.
 
-Read-only strip sourced from `AI-Business-OS/01_CONTEXT/current-focus.md` through the GitHub API
-(MK-DEC-006), cached, never written back.
+Bars derive from the feed and from Git: AOS stages closed, queue items `done`, artifacts published,
+opportunities qualified, betas released. No activity counters, no day streaks.
 
-**Gate:** not started until P1–P3 ship and the OS confirms the read path (needs a token —
-`current-focus.md` "Waiting / Dependencies" #1). Until then, this gap is named, not filled.
+**Acceptance criteria**
 
+1. Every bar traces to something that shipped, and the source is nameable per bar.
+2. Nothing on the surface counts consecutive days or rewards mere presence.
+3. Values come from the feed, not from hand-entered numbers.
+
+**Depends on:** P7.
 ---
 
 ### P8 — Enforce the commit gates with a hook · S
@@ -231,6 +276,8 @@ direction is fine; two full copies is not.
 1. A rule appears once. The other file points at it.
 2. Both files still open with the governing rule, so a session that reads either one is governed.
 3. No rule is lost in the merge — diff the two before collapsing.
+
+---
 
 ---
 
