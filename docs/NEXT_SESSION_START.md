@@ -143,9 +143,11 @@ at a ~26 MB heap. The cause was system commit memory, not the code. Close heavy 
   ADR-021 records that, but the section was never updated.
 - **OS `current-focus.md`** lists no open magic-kick branches and does not mention the P1 usage gate.
   Write-back is Roman's call (AI_OS_BRIDGE: only strategic changes go to the OS).
-- **Seed/test logins fail in dev and preview** (reported 2026-09-24, not investigated). The repo
-  creates no accounts; auth is Firebase. Check which Firebase project each environment's
-  `NEXT_PUBLIC_FIREBASE_*` points to, and the authorized domains for preview.
+- **Production login works** (Roman, 2026-09-29) on the single production URL
+  https://magic-kick.vercel.app/. The old `magic-kick-kfb8.vercel.app` domain was removed and now
+  returns 404. Production and `.env.local` both use Firebase project `magickick-78983` (confirmed
+  from the deployed bundle). Dev and preview logins (reported failing 2026-09-24) are still not
+  investigated; they do not block the usage gate.
 - **Branch naming:** `docs/CLAUDE.md` §4 requires `exp/…` or `fix/<issue>-…`, but most branches use
   `feat/` or `docs/`. Either the rule or the practice should change. This is Roman's call.
 - **ADR-016…ADR-019 are dated 2026-08-09** but sit after ADR-015 (2026-08-10); the log is not in
