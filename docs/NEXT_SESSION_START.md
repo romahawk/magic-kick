@@ -1,22 +1,63 @@
 # Next Session Start
 
-**Last updated:** 2026-09-24 (session close, after all merges)
-**Resume on:** `main` at `3a4e3c0` (PR #121). Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-09-24 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
-**Typecheck status:** passing as of 2026-09-24 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
-**Lint status:** passing as of 2026-09-24 — `npm run lint` exit 0
+**Last updated:** 2026-09-29 (P1 usage gate started; queue and load fix on `main`)
+**Resume on:** `main` after the `docs/p1-usage-gate` PR merges (until then, `main` at `5622c6d`, PR #124). Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-09-29 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Typecheck status:** passing as of 2026-09-29 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
+**Lint status:** passing as of 2026-09-29 — `npm run lint` exit 0
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** the 2026-09-24 session shipped code (P1 attention block) and workflow tooling (session skills, description standard). No dependency changes.
+**Note:** no dependency changes since 2026-09-24.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the experiment name.
-2. Next item: **verify P1 in a browser**, then decide on the load-status gap (see Open items).
-   `docs/CONTROL_PLANE_UI_SPEC.md` is the work queue; P1 is `open`.
-3. Read ADR-020 and ADR-021 in `docs/DECISIONS_LOG.md` before any control-plane or scope decision.
-4. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
+2. **P1 is `open` and in its usage gate, 2026-09-29 → 2026-10-06.** Use Magic Kick on real projects,
+   tasks and weekly outcomes. Pass = opened on 5 of 7 days AND a task changed state on each of those
+   days. Nothing else in the queue opens until the gate resolves (WIP = 1). The day count is kept by
+   Roman; the repo does not record it.
+3. On 2026-10-06: record the verdict in `docs/DECISIONS_LOG.md`. Pass → P1 `done`, next item per the
+   working order (P7). Fail → stop building Magic Kick (P1 criterion 6).
+4. Before 2026-10-06, rule on the **Proposed** entry at the end of `docs/DECISIONS_LOG.md`
+   (P8 before P7 while P7 is blocked; P8 also checks commit messages).
+5. Read ADR-020 and ADR-021 before any control-plane or scope decision.
+6. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
+
+---
+
+## Where we left off (2026-09-29) — P1 code complete, usage gate running
+
+**Merged to `main` today (by Roman, on GitHub):**
+- **#123** `fix(p1): show load in attention block whenever status is not Stable` (`d910882`) —
+  `lib/execution-os.ts`, `CHANGELOG.md`. Settles P1 criterion 7 by widening the code.
+- **#124** `Docs/queue p8 p9` (`5622c6d`) — `docs/CONTROL_PLANE_UI_SPEC.md`: working order
+  P1 → P7 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5 (OS `DEC-2026-09-27-001`), P1 usage gate
+  (criterion 6), P6 decided, P7 reshaped as the OS context feed reader, P8, P9, P10 added.
+
+**This branch (`docs/p1-usage-gate`):** P1 note "code complete; usage gate running
+2026-09-29 → 2026-10-06"; criterion 7 recorded as settled; the Proposed decision entry; this note.
+
+**Verified (confirmed):**
+- lint, typecheck and build exit 0 on the tree that became #123 (run 2026-09-29).
+- The load change cannot produce an empty detail line: `calculateCognitiveLoad` has three pressure
+  sources, so any non-`Stable` status without over-capacity has a named cause.
+
+**Not verified:**
+- P1 in a browser by this session. Roman reported it working on 2026-09-29; devices and viewport
+  were not stated, so criterion 1 (desktop + mobile above the fold) rests on that report.
+- The load row with real pressure (tasks due today over the focus limit, or a missed outcome).
+
+**Process notes:**
+- A Cowork session and this Claude Code session shared one checkout on 2026-09-29, and the Cowork
+  session committed on a branch under the other's feet. Roman confirmed it has stopped. One session
+  per checkout; use a worktree if two must run.
+- #123 and #124 merged with squash messages that lack `Verified:` / `Not verified:` and with PR
+  bodies not filled in. The PR bodies were filled in after the merge; commit messages on `main`
+  are not rewritten (that needs a force-push to `main`).
+- Local branches `docs/queue-p8-p9` and `fix/p1-load-status` hold reworded copies of the same
+  content as #123/#124 and can be deleted; the remote `fix/p1-load-status` and `docs/queue-p8-p9`
+  branches are merged and can be deleted too.
 
 ---
 
@@ -93,9 +134,15 @@ at a ~26 MB heap. The cause was system commit memory, not the code. Close heavy 
 
 ## Open items
 
-- **Verify P1 in a browser** (desktop + ~390px mobile) and settle the load-status gap. #118 was
-  merged before either was done. P1's Status line in `docs/CONTROL_PLANE_UI_SPEC.md` stays `open`
-  until both are settled; marking it `done` is Roman's call.
+- **P1 usage gate** runs 2026-09-29 → 2026-10-06 (see Start here). The load-status gap is settled
+  (#123). P1's Status stays `open` until the gate resolves; marking it `done` is Roman's call.
+- **P7 has three outside dependencies:** the OS context feed, a GitHub fine-grained PAT, and an ADR
+  unfreezing a GitHub API server route (`docs/CLAUDE.md` §6). MK-DEC-006, cited by P7, is not in
+  this repo's `docs/DECISIONS_LOG.md`; assumed to live in the OS repo.
+- **`docs/CLAUDE.md` §7** still describes the WIP suspension "until 2026-09-20". It expired and
+  ADR-021 records that, but the section was never updated.
+- **OS `current-focus.md`** lists no open magic-kick branches and does not mention the P1 usage gate.
+  Write-back is Roman's call (AI_OS_BRIDGE: only strategic changes go to the OS).
 - **Seed/test logins fail in dev and preview** (reported 2026-09-24, not investigated). The repo
   creates no accounts; auth is Firebase. Check which Firebase project each environment's
   `NEXT_PUBLIC_FIREBASE_*` points to, and the authorized domains for preview.
@@ -104,6 +151,5 @@ at a ~26 MB heap. The cause was system commit memory, not the code. Close heavy 
 - **ADR-016…ADR-019 are dated 2026-08-09** but sit after ADR-015 (2026-08-10); the log is not in
   strict date order. Cosmetic; leave unless the log gets an index.
 - **Track 2 (from ADR-017):** validate state server-side in the existing AI routes.
-- **P6 in the UI spec needs a decision from Roman before code** (gamification placement).
 - **Allocation reverts to `limited` on 2026-10-21** unless the control-plane scope is delivered
   first or a new ADR lands (ADR-021).
