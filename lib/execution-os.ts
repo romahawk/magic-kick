@@ -286,15 +286,26 @@ export function selectAttentionItems(input: {
     })
   }
 
+  // Load: shown whenever status is not Stable (P1 spec), not only on project over-capacity.
+  // Over capacity keeps its specific wording; any other pressure names its cause.
   const load = calculateCognitiveLoad({ projects: input.projects, tasks: input.tasks, config: rules })
-  if (load.overCapacity) {
+  if (load.status !== "Stable") {
+    const causes: string[] = []
+    if (load.scheduledToday > rules.dailyFocusLimit) {
+      causes.push(load.scheduledToday + " due today, focus limit " + rules.dailyFocusLimit)
+    }
+    if (load.missedWeeklyOutcomes > 0) {
+      causes.push(load.missedWeeklyOutcomes + " weekly outcome" + (load.missedWeeklyOutcomes === 1 ? "" : "s") + " missed")
+    }
     items.push({
-      id: "load:over-capacity",
+      id: "load:" + (load.overCapacity ? "over-capacity" : "pressure"),
       kind: "load",
-      severity: "medium",
-      title: "Over capacity — " + load.activeProjects + " active projects, limit " + rules.maxActiveProjects,
-      detail: "Load: " + load.status,
-      module: "projects",
+      severity: load.status === "Busy" ? "medium" : "high",
+      title: load.overCapacity
+        ? "Over capacity — " + load.activeProjects + " active projects, limit " + rules.maxActiveProjects
+        : "Load: " + load.status,
+      detail: load.overCapacity ? "Load: " + load.status : causes.join(" · "),
+      module: load.overCapacity || load.missedWeeklyOutcomes > 0 ? "projects" : "todo",
       actionLabel: "Review",
     })
   }
