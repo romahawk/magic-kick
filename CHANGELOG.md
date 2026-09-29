@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-09-29 - Attention block shows load when not Stable (P1)
+
+### Fixed
+- The "Needs attention" list now shows a load row whenever load is Busy, Strained or Overloaded, as the P1 spec requires. Before, it appeared only when active projects exceeded the limit. When the cause is not project count, the row names it (tasks due today over the focus limit, missed weekly outcomes).
+
+---
+
 ## [Unreleased] - 2026-09-24 - Command Center attention block (P1)
 
 ### Added
