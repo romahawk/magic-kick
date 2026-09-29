@@ -539,3 +539,47 @@ scoped and dated for the same reason.
 - The next unscoped feature request is refused by default until the revert date passes or a new ADR lands.
 
 **Revisit trigger:** 2026-10-21, or the control-plane scope being delivered, or a dumb Inbox shipping.
+
+---
+
+## Proposed: run P8 before P7 while P7 is blocked; P8 also checks commit messages
+
+**Date:** 2026-09-29
+**Status:** Proposed — not accepted. The working order in `docs/CONTROL_PLANE_UI_SPEC.md` is unchanged
+until Roman rules. Takes the next free ADR number if accepted (ADR-022 is reserved for P2).
+
+### Context
+
+The working order (OS `DEC-2026-09-27-001`) is P1 → P7 → P8 → … and at most one item is `open`.
+P1 stays `open` until its usage gate resolves on 2026-10-06, so the next item can start then, which
+leaves 15 days before the allocation reverts to `limited` on 2026-10-21 (ADR-021).
+
+P7 cannot start in this repo on 2026-10-06 unless three things outside it exist first:
+
+1. The OS-side context feed. It is week-2 work in `DEC-2026-09-27-001`.
+2. A GitHub fine-grained PAT, which is item 1 on the OS waiting list and still open.
+3. An ADR that unfreezes a server route calling the GitHub API. `docs/CLAUDE.md` §6 freezes
+   "any external connector" and P7's route is one.
+
+P8 has no dependency and is size S.
+
+Separately, the commit and PR standard in root `CLAUDE.md` is prose, and prose is skipped. On
+2026-09-29, 13 of the last 15 non-merge commits on `main` had no `Verified:` / `Not verified:`
+lines, and PRs #123 and #124 merged with the template left empty.
+
+### Proposal
+
+1. **Order:** if on 2026-10-06 any of the three P7 dependencies is missing, P8 opens instead and P7
+   follows as soon as they exist. If all three are in place, the order stays as it is.
+2. **Scope of P8:** besides blocking a commit on failed gates, the same hook rejects a commit message
+   without the `Verified:` and `Not verified:` lines. One hook, two checks.
+
+### Tradeoffs
+
+- For (1): the slot does not sit idle waiting on OS work and a token, and P8 makes every later
+  commit safer, P7's included. Against: P7 is what makes the deployed app show OS state, the thing
+  the allocation exists for; each day it slips shortens the time to use it before 2026-10-21.
+- For (2): it enforces the standard that failed on #123 and #124. Against: it widens an item that
+  was written as "one hook, one rule", and a format check can be satisfied with empty words.
+
+**Revisit trigger:** Roman's ruling, or 2026-10-06, whichever comes first.

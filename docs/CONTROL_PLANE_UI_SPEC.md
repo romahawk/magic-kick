@@ -59,6 +59,8 @@ view is wrong the moment one is stale.
 
 **Status:** open
 
+**Note:** code complete; usage gate running 2026-09-29 → 2026-10-06.
+
 **Why:** F1, F3. The control plane's first answer must be on screen without a click.
 
 A single block above the existing tabs, composed from data that already exists:
@@ -79,9 +81,9 @@ A single block above the existing tabs, composed from data that already exists:
    tasks and real weekly outcomes for seven days. **Pass = opened on 5 of 7 days AND at least one
    task changed state on each of those days.** Fail = stop building Magic Kick, keep the files, and
    record the verdict in `docs/DECISIONS_LOG.md`. P1 is not `done` until this resolves either way.
-7. **Known spec gap to rule on first:** the spec says show load status "when not `Stable`", but
-   `selectAttentionItems` only emits a load item when active projects exceed `maxActiveProjects`.
-   Widen the code or narrow this criterion before marking P1 done.
+7. **Spec gap — settled 2026-09-29 by widening the code.** `selectAttentionItems` used to emit a
+   load item only when active projects exceeded `maxActiveProjects`. It now emits one whenever load
+   is not `Stable` and names the cause (PR #123, `d910882` on `main`; branch commit `e0349f0`).
 
 **Reference mock (2026-09-24):** a design canvas with three artboards — desktop Command Center with
 the block above the tabs, mobile, and the clear state: https://claude.ai/artifact/TTUFxXzG7RZa4TomcpU1dN
