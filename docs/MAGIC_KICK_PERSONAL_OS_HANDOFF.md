@@ -5,7 +5,7 @@ Canonical handoff document for a dedicated ChatGPT Project.
 Status: canonical planning context  
 Scope: Magic Kick and Personal OS automation only  
 Implementation repository: https://github.com/romahawk/magic-kick  
-Live application: https://magic-kick-kfb8.vercel.app/
+Live application: https://magic-kick.vercel.app/
 
 ## 1. Project purpose
 
