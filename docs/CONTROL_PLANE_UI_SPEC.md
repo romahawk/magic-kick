@@ -40,6 +40,8 @@ Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L �
 
 **Working order (OS `DEC-2026-09-27-001`):** P1 → P7 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
+**Exception (ADR-023):** while any of P7's three dependencies is missing (OS context feed, GitHub PAT,
+an ADR unfreezing its GitHub API route), P8 takes P7's place; P7 follows once all three exist.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -248,6 +250,9 @@ A `PreToolUse` hook in `.claude/settings.json` matching `Bash(git commit …)` t
 blocks on a non-zero exit. Verify the event name and matcher syntax against the official Claude Code
 docs before writing it — do not copy them from a third-party cheat sheet.
 
+Per ADR-023 the same hook also rejects a commit message without the `Verified:` and `Not verified:`
+lines required by root `CLAUDE.md` → "Commit, Push and PR Descriptions". One hook, two checks.
+
 **Acceptance criteria**
 
 1. A commit attempted with a failing `lint` or `build` is blocked, and the message names which gate failed.
@@ -256,8 +261,11 @@ docs before writing it — do not copy them from a third-party cheat sheet.
 4. Gate runtime is stated in `docs/NEXT_SESSION_START.md`; if the pair takes minutes, the hook runs
    `typecheck` + `lint` and the full build stays a pre-PR step, recorded here as the reason.
 5. `CLAUDE.md` line 52 gains one line: the rule is now enforced by a hook, prose is the fallback.
+6. A commit whose message lacks a `Verified:` or a `Not verified:` line is blocked, and the message
+   names the missing line. This holds however the message is passed (`-m`, `-F <file>`, heredoc).
 
-**Out of scope:** formatting hooks, `rm -rf` blocking, any other event. One hook, one rule.
+**Out of scope:** formatting hooks, `rm -rf` blocking, any other event. One hook, two checks
+(gates, message lines); it checks that the lines exist, not that they are true.
 
 ---
 

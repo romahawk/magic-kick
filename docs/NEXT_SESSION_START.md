@@ -1,10 +1,10 @@
 # Next Session Start
 
-**Last updated:** 2026-09-29 (P1 usage gate started; queue and load fix on `main`)
-**Resume on:** `main` after the `docs/p1-usage-gate` PR merges (until then, `main` at `5622c6d`, PR #124). Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-09-29 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
-**Typecheck status:** passing as of 2026-09-29 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
-**Lint status:** passing as of 2026-09-29 — `npm run lint` exit 0
+**Last updated:** 2026-10-02 (#126 merged; ADR-023 accepted: P8 before P7 while P7 is blocked)
+**Resume on:** `main` after the `docs/adr-p8-before-p7` PR merges (until then, `main` at `d3535fe`, PR #126). Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-02 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Typecheck status:** passing as of 2026-10-02 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
+**Lint status:** passing as of 2026-10-02 — `npm run lint` exit 0
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
 **Note:** no dependency changes since 2026-09-24.
 
@@ -17,10 +17,12 @@
    tasks and weekly outcomes. Pass = opened on 5 of 7 days AND a task changed state on each of those
    days. Nothing else in the queue opens until the gate resolves (WIP = 1). The day count is kept by
    Roman; the repo does not record it.
-3. On 2026-10-06: record the verdict in `docs/DECISIONS_LOG.md`. Pass → P1 `done`, next item per the
-   working order (P7). Fail → stop building Magic Kick (P1 criterion 6).
-4. Before 2026-10-06, rule on the **Proposed** entry at the end of `docs/DECISIONS_LOG.md`
-   (P8 before P7 while P7 is blocked; P8 also checks commit messages).
+3. On 2026-10-06: record the verdict in `docs/DECISIONS_LOG.md`. Pass → P1 `done`, then check P7's
+   three dependencies (OS context feed, GitHub PAT, ADR unfreezing its GitHub API route): all present →
+   P7 opens; any missing → P8 opens (ADR-023). Record which, and why. Fail → stop building Magic Kick
+   (P1 criterion 6).
+4. ADR-023 (accepted 2026-10-02) also widens P8: the hook checks gates **and** the `Verified:` /
+   `Not verified:` commit-message lines. See P8 in `docs/CONTROL_PLANE_UI_SPEC.md`.
 5. Read ADR-020 and ADR-021 before any control-plane or scope decision.
 6. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
 
