@@ -542,11 +542,10 @@ scoped and dated for the same reason.
 
 ---
 
-## Proposed: run P8 before P7 while P7 is blocked; P8 also checks commit messages
+## ADR-023: Run P8 before P7 while P7 is blocked; P8 also checks commit messages
 
-**Date:** 2026-09-29
-**Status:** Proposed — not accepted. The working order in `docs/CONTROL_PLANE_UI_SPEC.md` is unchanged
-until Roman rules. Takes the next free ADR number if accepted (ADR-022 is reserved for P2).
+**Date:** proposed 2026-09-29, accepted 2026-10-02
+**Status:** Accepted (Roman, 2026-10-02, both parts). ADR-022 stays reserved for P2.
 
 ### Context
 
@@ -567,7 +566,7 @@ Separately, the commit and PR standard in root `CLAUDE.md` is prose, and prose i
 2026-09-29, 13 of the last 15 non-merge commits on `main` had no `Verified:` / `Not verified:`
 lines, and PRs #123 and #124 merged with the template left empty.
 
-### Proposal
+### Decision
 
 1. **Order:** if on 2026-10-06 any of the three P7 dependencies is missing, P8 opens instead and P7
    follows as soon as they exist. If all three are in place, the order stays as it is.
@@ -582,4 +581,12 @@ lines, and PRs #123 and #124 merged with the template left empty.
 - For (2): it enforces the standard that failed on #123 and #124. Against: it widens an item that
   was written as "one hook, one rule", and a format check can be satisfied with empty words.
 
-**Revisit trigger:** Roman's ruling, or 2026-10-06, whichever comes first.
+### Consequences
+
+- `docs/CONTROL_PLANE_UI_SPEC.md`: the working order line carries the P8/P7 condition; P8's scope and
+  acceptance criteria include the commit-message check.
+- On 2026-10-06, if P1 resolves as a pass, check P7's three dependencies; the result decides which
+  item opens. The check and its outcome go in this log with the P1 verdict.
+- The message check only proves the lines exist, not that they are true. Review still has to read them.
+
+**Revisit trigger:** all three P7 dependencies existing (P7 then opens next), or 2026-10-21.
