@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-03 - Load row survives a full attention list (P1)
+
+### Fixed
+- With six or more overdue items, the "Needs attention" list cut the load row, the one row that sums up the pressure. The load row now always keeps the last visible slot.
+- The count next to "Needs attention" shows "6 of 9" when rows are hidden. Before, it showed "6+", including when exactly 6 items existed and nothing was hidden.
+
+---
+
 ## [Unreleased] - 2026-09-29 - Attention block shows load when not Stable (P1)
 
 ### Fixed

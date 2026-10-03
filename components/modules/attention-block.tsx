@@ -3,7 +3,6 @@
 import { format } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
-  ATTENTION_LIMIT,
   TASK_LANE_LABELS,
   selectAttentionItems,
   selectDailyFocus,
@@ -110,19 +109,20 @@ export function AttentionBlock() {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Needs attention
             </h3>
-            {attention.length > 0 ? (
+            {attention.total > 0 ? (
               <span className="text-xs text-muted-foreground">
-                {attention.length}
-                {attention.length === ATTENTION_LIMIT ? "+" : ""}
+                {attention.total > attention.items.length
+                  ? attention.items.length + " of " + attention.total
+                  : attention.total}
               </span>
             ) : null}
           </div>
 
-          {attention.length === 0 ? (
+          {attention.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing needs attention.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-border">
-              {attention.map((item) => (
+              {attention.items.map((item) => (
                 <AttentionRow key={item.id} item={item} onOpen={() => setActiveModule(item.module)} />
               ))}
             </ul>

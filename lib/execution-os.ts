@@ -244,7 +244,7 @@ export function selectAttentionItems(input: {
   projects: Project[]
   tasks: Task[]
   config?: Partial<SystemConfig>
-}): AttentionItem[] {
+}): { items: AttentionItem[]; total: number } {
   const rules = normalizeSystemConfig(input.config)
   const items: AttentionItem[] = []
 
@@ -310,5 +310,12 @@ export function selectAttentionItems(input: {
     })
   }
 
-  return items.slice(0, ATTENTION_LIMIT)
+  // Cap the list, but never drop the load row: it is the one summary of everything else, so with
+  // many overdue items it takes the last visible slot. `total` lets the block say what was cut.
+  const total = items.length
+  if (total <= ATTENTION_LIMIT) return { items, total }
+  const loadItem = items.find((item) => item.kind === "load")
+  const others = items.filter((item) => item.kind !== "load")
+  const visible = loadItem ? [...others.slice(0, ATTENTION_LIMIT - 1), loadItem] : others.slice(0, ATTENTION_LIMIT)
+  return { items: visible, total }
 }
