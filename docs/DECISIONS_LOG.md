@@ -545,7 +545,8 @@ scoped and dated for the same reason.
 ## ADR-023: Run P8 before P7 while P7 is blocked; P8 also checks commit messages
 
 **Date:** proposed 2026-09-29, accepted 2026-10-02
-**Status:** Accepted (Roman, 2026-10-02, both parts). ADR-022 stays reserved for P2.
+**Status:** Accepted (Roman, 2026-10-02, both parts). Point 1 superseded by ADR-024 (2026-10-04);
+point 2 stands. ADR-022 stays reserved for P2.
 
 ### Context
 
@@ -590,3 +591,78 @@ lines, and PRs #123 and #124 merged with the template left empty.
 - The message check only proves the lines exist, not that they are true. Review still has to read them.
 
 **Revisit trigger:** all three P7 dependencies existing (P7 then opens next), or 2026-10-21.
+
+---
+
+## ADR-024: Magic Kick is the UI of AI-Business-OS; limits lifted for that goal
+
+**Date:** 2026-10-04
+**Status:** Accepted (Roman, 2026-10-04)
+**Supersedes:** ADR-023 point 1 (order); its point 2 (P8 also checks commit messages) stands. **Amends:** ADR-018 (connector freeze, for the OS repo only), ADR-021
+(scope), P1 criterion 6, `docs/CLAUDE.md` §1, §3, §4, §5, §6, §7.
+**Related:** OS `DEC-2026-10-03-001`, OS `DEC-2026-09-23-001`, OS `DEC-2026-09-24-001`.
+
+### Context
+
+OS `DEC-2026-10-03-001` (2026-10-03) made Magic Kick the main UI of AI-Business-OS, lifted the
+freeze and put P7 first. It contradicted ADR-023, accepted the day before, because the OS session
+did not read this log. The repo still described itself as "a personal planner and an AI-SDLC
+sandbox" with "no roadmap and no backlog", where every change had to be an itch or an experiment.
+
+On 2026-10-04 Roman asked to remove those limits so that Magic Kick becomes a usable UI of the OS:
+the place where the OS's tasks and context are reached, updated and used. He chose the options
+below from a set of alternatives.
+
+### Decision
+
+1. **Framing.** Magic Kick is the UI of AI-Business-OS and Roman's daily planner: a personal
+   product with a ranked roadmap (`docs/CONTROL_PLANE_UI_SPEC.md`, working order). The sandbox,
+   itch and experiment framing is retired. A session names the roadmap item or the bug it works on.
+2. **Order.** ADR-023's order rule is superseded. P7 (read the OS) comes right after P1, then the new P11
+   (write back to the OS), then P8. Working order: P1 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+3. **WIP stays 1.** One roadmap item is `open` at a time (OS `DEC-2026-09-24-001`).
+4. **The 9-module ceiling stays.** OS content goes inside existing modules: Command Center
+   (today's plan, focus, allocation), Projects (OS project context), Resources (knowledge).
+5. **Write model.** The AI-Business-OS repo stays the source of truth. Magic Kick reads and writes
+   it only through server-side routes that call the GitHub API with a fine-grained PAT held in a
+   Vercel env var. The token never reaches the browser.
+   - **Tasks and day-to-day context:** an edit in Magic Kick is committed directly to the OS repo.
+   - **Strategy files** (focus, allocation, decisions): an edit opens a pull request; nothing
+     changes on the OS `main` until Roman merges it.
+   - A write against a file that changed since it was read is refused, never overwritten.
+   - The exact list of writable paths, and which ones go through a PR, is set in P11. Anything
+     not on the list is refused; when in doubt, a path goes through a PR.
+6. **Freeze lifted for the OS repo only.** Server routes that read and write the AI-Business-OS
+   repo through the GitHub API, as in point 5, are permitted. Still frozen until their own ADR:
+   other connectors (Gmail, Calendar writes, Drive, Notion, webhooks), n8n or any other runtime,
+   new AI routes, multi-user features.
+7. **P1's usage gate is measurement only** (as in OS `DEC-2026-10-03-001`). The verdict is recorded
+   on 2026-10-06 and taken to the weekly review. A fail no longer stops the build.
+8. **Allocation revert.** Roman wants the 2026-10-21 revert to `limited` removed. That date is set
+   by OS `DEC-2026-09-23-001`, so this repo cannot remove it; the request goes to an OS session.
+   Until an OS decision lands, 2026-10-21 stands.
+9. **Unchanged:** the build, lint and typecheck gates, feature branches and PRs, the commit and PR
+   description standard, Firestore rules for every collection, no secrets in the browser.
+
+### Rationale
+
+The limits were written for a sandbox with no users and no direction. Magic Kick now has both: a
+user (Roman, daily) and a direction set at OS level. Keeping the OS repo as the source of truth
+means the OS still works if Magic Kick is down, which the OS's own architecture requires. Splitting
+writes into direct commits and PRs gives a fast daily UI without letting a quick edit on a phone
+rewrite strategy. Keeping the module ceiling and WIP 1 keeps the build focused.
+
+### Consequences
+
+- Governance docs updated in the same change: `CLAUDE.md`, `AGENTS.md`, `docs/CLAUDE.md`,
+  `docs/SANDBOX_RULES.md`, `docs/CONTROL_PLANE_UI_SPEC.md`, `docs/DAILY_CHECKLIST.md`,
+  `.github/ISSUE_TEMPLATE/feature.md`, `.claude/skills/session-start/SKILL.md`, `README.md`.
+- P7's three dependencies shrink to two: the OS context feed and the PAT. This ADR is the third.
+- The PAT needs `Contents` and `Pull requests` read/write on the AI-Business-OS repo only.
+- OS side, for an OS session: record the revert request (point 8), and note in the source-of-truth
+  map and `02_PROJECTS/magic-kick/context.md` that Magic Kick writes to the OS repo as in point 5.
+- `docs/PUBLIC_PRESENTATION.md` and `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` still use the sandbox
+  wording. They are positioning documents and are left for a separate pass.
+- **Rollback:** revert the PR that adds this ADR.
+
+**Revisit trigger:** P11 shipped (the write model in use), or an OS decision on the revert date.

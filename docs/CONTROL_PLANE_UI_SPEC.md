@@ -2,9 +2,10 @@
 
 **Date:** 2026-09-23
 **Status:** spec, not implemented
-**Authority:** ADR-020 (control-plane role), ADR-021 (scoped active build), OS `DEC-2026-09-23-001`
+**Authority:** ADR-020 (control-plane role), ADR-021 (scoped active build), ADR-024 (UI of AI-Business-OS),
+OS `DEC-2026-09-23-001`, OS `DEC-2026-10-03-001`
 **Governing constraints:** `CLAUDE.md` — no new top-level modules, the 9 existing modules are the
-ceiling; one experiment at a time; `npm run build` + `npm run lint` + `npm run typecheck` before any commit.
+ceiling; one roadmap item open at a time; `npm run build` + `npm run lint` + `npm run typecheck` before any commit.
 
 This is the queue a Claude Code session works from. Items are ranked. Do not reorder without a note here.
 
@@ -38,10 +39,9 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (OS `DEC-2026-09-27-001`):** P1 → P7 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+**Working order (ADR-024, OS `DEC-2026-10-03-001`):** P1 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
-**Exception (ADR-023):** while any of P7's three dependencies is missing (OS context feed, GitHub PAT,
-an ADR unfreezing its GitHub API route), P8 takes P7's place; P7 follows once all three exist.
+ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -79,10 +79,11 @@ A single block above the existing tabs, composed from data that already exists:
 3. Empty state is a single calm line ("Nothing needs attention"), not an empty card grid.
 4. Zero new top-level modules; zero new store collections.
 5. `npm run build`, `lint`, `typecheck` pass.
-6. **Usage gate (the real exit).** After the browser check, run Magic Kick on real projects, real
-   tasks and real weekly outcomes for seven days. **Pass = opened on 5 of 7 days AND at least one
-   task changed state on each of those days.** Fail = stop building Magic Kick, keep the files, and
-   record the verdict in `docs/DECISIONS_LOG.md`. P1 is not `done` until this resolves either way.
+6. **Usage gate, measurement only (ADR-024 §7).** Window 2026-09-29 → 2026-10-05. **Pass = opened on
+   5 of 7 days AND at least one task changed state on each of those days**, counted from task
+   `completedAt` dates. The verdict is recorded in `docs/DECISIONS_LOG.md` on 2026-10-06 and taken to
+   the weekly review. A fail no longer stops the build (it did until ADR-024). P1 is `done` once the
+   verdict is recorded.
 7. **Spec gap — settled 2026-09-29 by widening the code.** `selectAttentionItems` used to emit a
    load item only when active projects exceeded `maxActiveProjects`. It now emits one whenever load
    is not `Stable` and names the cause (PR #123, `d910882` on `main`; branch commit `e0349f0`).
@@ -201,7 +202,7 @@ disk access.
 **Shape.** The OS generates a versioned, read-only **context feed** (a script, same pattern as
 `generate-roadmap-view.js` — no new state store there, no duplicate state here). Magic Kick reads it
 server-side through the GitHub API per MK-DEC-006, with a fine-grained PAT in a Vercel env var,
-caches it, and renders it read-only. Never writes back.
+caches it, and renders it read-only. Writing back is P11, not P7.
 
 **First slice:** today's plan and current focus. Nothing else until those two are on screen.
 
@@ -213,7 +214,46 @@ caches it, and renders it read-only. Never writes back.
 4. No feed content is written into Firestore — render only.
 5. The feed's shape is documented in the OS repo, not here.
 
-**Depends on:** the OS side of the feed, and a PAT. Both are week-2 work in `DEC-2026-09-27-001`.
+**Depends on:** the OS side of the feed (OS `DEC-2026-10-03-001` step 2) and a PAT (Roman). The
+route unfreeze is ADR-024 §6.
+
+---
+
+### P11 — Write back to the OS · M
+
+**Status:** queued
+
+**Why:** ADR-024. Reading the OS (P7) makes Magic Kick a window onto it; a usable UI also has to change
+it. Without write-back, every update still needs a laptop session with the repo checked out.
+
+**Shape.** Server-side routes write to the AI-Business-OS repo through the GitHub API, with the same
+PAT as P7 (`Contents` and `Pull requests` read/write, that repo only). The OS repo stays the source of
+truth; nothing written through these routes is kept in Firestore.
+
+- **Tasks and day-to-day context:** committed directly to the OS `main`. The commit message names
+  Magic Kick and the file.
+- **Strategy files** (focus, allocation, decisions): the edit opens a pull request and Magic Kick shows
+  its link. Nothing changes on the OS `main` until Roman merges it.
+- **Writable paths** are an explicit list, kept in one place in code and documented here before the
+  first route ships. Anything not on the list is refused. When in doubt, a path goes through a PR.
+
+**First slice:** check off and re-date items in today's plan. The exact file and line format comes from
+the feed-shape document P7 depends on.
+
+**Acceptance criteria**
+
+1. Checking off an item in Magic Kick produces a commit in the OS repo, and the change shows in the
+   next feed read.
+2. Editing a strategy file opens a PR in the OS repo; the OS `main` is unchanged until it is merged.
+3. A write against a file that changed since it was read is refused and the view reloads; nothing is
+   overwritten.
+4. The token never reaches the browser; the routes reject any request not signed in as Roman.
+5. A path outside the writable list is refused with a clear message.
+6. The OS stays usable without Magic Kick: no state exists only in Magic Kick.
+
+**Out of scope:** writing to any other repository, background jobs, webhooks, AI-generated edits.
+
+**Depends on:** P7 (read path and feed shape).
 
 ---
 

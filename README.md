@@ -1,6 +1,6 @@
 # Magic Kick
 
-> Personal internal-operations system and AI-SDLC sandbox: tasks, goals, projects, schedule, journal, Firebase sync, AI coaching, summaries, and workflow automation.
+> The UI of my AI-Business-OS and my daily planner: tasks, goals, projects, schedule, journal, Firebase sync, AI coaching, summaries, and workflow automation.
 
 Magic Kick is not a commercial product. It is a private-use internal tool that I keep public as implementation proof: a realistic, working system for managing personal execution, project flow, scheduling, reflection, and AI-assisted routines.
 
@@ -79,7 +79,7 @@ Recent work shows this pattern in practice through scoped project and schedule i
 
 ## Current Status
 
-Magic Kick is a personal-use tool and AI-SDLC sandbox.
+Magic Kick is the UI of AI-Business-OS and a personal daily planner (ADR-024). It follows a ranked roadmap in [docs/CONTROL_PLANE_UI_SPEC.md](docs/CONTROL_PLANE_UI_SPEC.md).
 
 The product surface is intentionally capped at the existing modules:
 
@@ -159,7 +159,7 @@ The app is offline-first from the UI perspective. Firestore is the remote sync t
 | [Decisions Log](docs/DECISIONS_LOG.md) | ADR-style record of important design and governance choices |
 | [Firebase Architecture](docs/FIREBASE_ARCHITECTURE.md) | Auth, Firestore, sync, and data-boundary details |
 | [Workflow Automation Playbook](docs/WORKFLOW_AUTOMATION_PLAYBOOK.md) | How AI-assisted workflow experiments are scoped and reviewed |
-| [Sandbox Rules](docs/SANDBOX_RULES.md) | Scope boundary for personal-use fixes and experiments |
+| [Scope Rules](docs/SANDBOX_RULES.md) | Governing rule, module ceiling, and what a change can be |
 | [Daily Checklist](docs/DAILY_CHECKLIST.md) | Daily operating checklist |
 | [Changelog](CHANGELOG.md) | User-facing and proof-of-work history |
 
@@ -230,7 +230,7 @@ The app is public as source code, not as a shared production service.
 Recommended GitHub description:
 
 ```text
-Personal internal-operations system and AI-SDLC sandbox: tasks, goals, projects, schedule, journal, Firebase sync, AI coaching, summaries, and workflow automation.
+The UI of my AI-Business-OS and my daily planner: tasks, goals, projects, schedule, journal, Firebase sync, AI coaching, summaries, and workflow automation.
 ```
 
 Recommended topics:

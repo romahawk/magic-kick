@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Start a Magic Kick work session — check git reality against the last handoff in docs/NEXT_SESSION_START.md, run the gates, read the OS context, and get the experiment or itch named before any work. Use on "/session-start", "start session", "where did we leave off", or at the beginning of any session in this repo.
+description: Start a Magic Kick work session — check git reality against the last handoff in docs/NEXT_SESSION_START.md, run the gates, read the OS context, and get the roadmap item or bug named before any work. Use on "/session-start", "start session", "where did we leave off", or at the beginning of any session in this repo.
 ---
 
 # Session start
@@ -75,9 +75,10 @@ Keep it to one screen:
 - **Carried over** — open items and unverified work from the handoff and the daily review
 - **Suggested next** — the top item from the handoff's queue
 
-Then ask the user to name the session, using the frame in `docs/CLAUDE.md` §3: experiment name
-or itch, learning question, time box (default 90 min), deliverables, out of scope, acceptance
-criteria. If neither an experiment nor an itch can be named, say so and stop (root `CLAUDE.md`).
+Then ask the user to name the session, using the frame in `docs/CLAUDE.md` §3: the roadmap item
+(normally the one that is `open` in `docs/CONTROL_PLANE_UI_SPEC.md`) or the bug, goal, time box
+(default 90 min), deliverables, out of scope, acceptance criteria. If neither a roadmap item nor a
+bug can be named, say so and stop (root `CLAUDE.md`).
 
 If work needs a new branch, propose one from `origin/main` (or stacked on the branch it depends
 on, stated explicitly). Never start feature work on `main`.

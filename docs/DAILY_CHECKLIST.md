@@ -4,7 +4,7 @@
 
 - Run `/session-start` (it covers the steps below and checks the last handoff)
 - Pull latest changes from `main`
-- Name the itch or experiment for this session (if neither can be named, stop and work on a different repo)
+- Name the roadmap item or bug for this session (if neither can be named, stop)
 - Confirm the working branch is not `main`
 - Verify local setup still passes `npm run build`
 
@@ -20,4 +20,4 @@
 
 - Run `/session-close` to rewrite `docs/NEXT_SESSION_START.md` from the actual git state
 - Push the working branch or stash local changes cleanly
-- Log what was learned in `docs/DECISIONS_LOG.md` if this was an experiment
+- Update the item's `**Status:**` line in `docs/CONTROL_PLANE_UI_SPEC.md` if it moved
