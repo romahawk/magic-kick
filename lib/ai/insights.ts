@@ -28,12 +28,12 @@ export function detectAnomalies(input: {
     })
   }
 
-  if (load.missedWeeklyOutcomes > 0) {
+  if (load.projectsPastEnd > 0) {
     insights.push({
       id: nextId(),
       type: "warning",
-      title: `${load.missedWeeklyOutcomes} overdue weekly outcome${load.missedWeeklyOutcomes > 1 ? "s" : ""}`,
-      body: "Some projects have weekly outcomes that are past their end date. Review and adjust in the Command Center.",
+      title: `${load.projectsPastEnd} project${load.projectsPastEnd > 1 ? "s" : ""} past end date`,
+      body: "Some active projects are past their end date. Complete, park or extend them in Projects.",
       createdAt: now,
     })
   }

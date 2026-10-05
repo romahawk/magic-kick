@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
-import { getProjectStatus } from "@/lib/execution-os"
+import { getProjectStatus, selectThisWeekOutcomes } from "@/lib/execution-os"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -109,6 +109,8 @@ function daysLeftInfo(project: Project): { label: string; className: string } {
 export function ProjectsModule() {
   const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
+  const weeklyPlans = useAppStore((s) => s.weeklyPlans)
+  const weekOutcomes = useMemo(() => selectThisWeekOutcomes(weeklyPlans), [weeklyPlans])
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
@@ -465,6 +467,7 @@ export function ProjectsModule() {
           {selectedProject ? (
             <ProjectDetailPanel
               project={selectedProject}
+              weeklyOutcome={weekOutcomes.get(selectedProject.id)}
               tasks={tasks}
               onEdit={openEditDialog}
               onUpdateProject={updateProject}
@@ -628,6 +631,7 @@ function ProjectRow({
 // Detail panel fills SheetContent — header · scrollable body · footer actions
 function ProjectDetailPanel({
   project,
+  weeklyOutcome,
   tasks,
   onEdit,
   onUpdateProject,
@@ -635,6 +639,8 @@ function ProjectDetailPanel({
   onDelete,
 }: {
   project: Project
+  /** This week's outcome from the weekly plan (ADR-022), if the project is in it. */
+  weeklyOutcome?: string
   tasks: Task[]
   onEdit: (project: Project) => void
   onUpdateProject: (id: string, updates: Partial<Project>) => void
@@ -654,9 +660,7 @@ function ProjectDetailPanel({
   const days = daysLeftInfo(project)
   const daysText = days.label === "Overdue" || days.label === "Today" ? days.label : `${days.label} left`
   const statusLine = `${currentStatus.charAt(0).toUpperCase()}${currentStatus.slice(1)} · ${daysText}`
-  const weeklyLines = project.weeklyOutcome?.trim()
-    ? project.weeklyOutcome.trim().split("\n").filter((l) => l.trim())
-    : []
+  const weeklyLines = weeklyOutcome ? weeklyOutcome.split("\n").filter((l) => l.trim()) : []
 
   const projectLinks = getProjectLinks(project)
 

@@ -820,3 +820,63 @@ dates in the browser's store. On 2026-10-05 Roman asked to mark P1 complete and 
 - The small-phone question on P1 criterion 1 (360×800) stays open as a follow-up, not a P1 blocker.
 - The UI findings from the P1 check (overdue tasks in two places, "3 of 3 today" with none due,
   the Friday banner on Saturday) are not fixed by closing P1.
+
+---
+
+## ADR-022: The weekly plan is the only source of a weekly outcome (P2)
+
+**Date:** 2026-10-05 (the number was reserved for P2 on 2026-09-23)
+**Status:** Accepted (Roman, 2026-10-05).
+**Relates to:** F2 in `CONTROL_PLANE_UI_SPEC.md`, ADR-024 (no duplicate state).
+
+### Context
+
+P2 asked to wire or delete each unused selector in `lib/execution-os.ts`. P1 had already wired them
+into the attention block, so every unused export left was an internal helper. The duplication F2
+named was in the data instead. A weekly outcome was stored in two places that never synced:
+
+- `WeeklyPlan.allocations[].weeklyOutcome`, written in the Command Center Plan tab.
+- `Project.weeklyOutcome`, with no editor. The store migration copies `objective` into it. It fed the
+  attention block, the load status and the Projects panel.
+
+Results: "No weekly outcome" could not be cleared for a project created after the migration (its
+"Set" button opened Projects, which has no such field), never fired for older projects, and
+"Weekly outcome overdue" really checked the project's end date (`weekEndISO`).
+
+### Decision
+
+1. **This week's `WeeklyPlan` is the only source.** `selectThisWeekOutcomes(weeklyPlans)` derives a
+   project → outcome map from it. Attention, Daily Focus scoring (+20 for a project in this week's
+   plan) and the Projects panel's "This week" lines all use it. No app code reads
+   `Project.weeklyOutcome`. The store still carries the field through add, update and migration; the
+   data is left alone.
+2. **Attention rows, renamed for what they check:**
+   - "Past end date — X": an active project whose `weekEndISO` has passed (was "Weekly outcome
+     overdue"). Opens Projects.
+   - "No plan for this week": there are active projects and no plan for the current week. One row.
+   - "No weekly outcome — X": a plan exists, but this active project has no outcome in it.
+   - The last two open the Command Center Plan tab, so its tabs are now controlled.
+3. **Load:** `missedWeeklyOutcomes` becomes `projectsPastEnd`, the same count under its real name and
+   with the same weight. The parked AI insight in `lib/ai/insights.ts` follows the rename.
+4. **Deleted:** `selectWeeklyOutcomes`, `hasDefinedWeeklyOutcome`,
+   `selectActiveProjectsMissingWeeklyOutcome` and the `WeeklyOutcomeView` type.
+   **No longer exported (internal only):** `DEFAULT_EXECUTION_BLOCKS`, `selectActiveProjects`,
+   `selectOverdueTasks`, `ATTENTION_LIMIT`, `LoadStatus` and `AttentionKind`.
+
+### Rationale
+
+- The weekly plan is where outcomes are actually written, it is scoped to a week, and it already
+  carries hours and priority. The project field had no editor and a misleading default.
+- Renaming instead of re-deriving "overdue outcome" keeps the load pressure numbers unchanged, so
+  the change does not shift anyone's status by itself.
+
+### Consequences
+
+- Projects that were silently "covered" by their objective now show "No weekly outcome" or "No plan
+  for this week" until a plan exists. That is the intended signal, but the attention list may get
+  longer on first load.
+- `SystemConfig.weeklyOutcomeLimit` is no longer read; the plan's own limit
+  (`MAX_WEEKLY_PLAN_PROJECTS`) applies. It is left in the config to avoid a migration.
+- **Rollback:** revert the P2 PR. No data was written or migrated.
+
+**Revisit trigger:** a need to set outcomes without a weekly plan (for example from the OS feed, P7).

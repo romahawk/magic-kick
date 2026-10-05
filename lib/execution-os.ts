@@ -1,8 +1,9 @@
-import { isBefore, parseISO } from "date-fns"
-import type { ExecutionBlockTemplate, ModuleId, Project, ProjectStatus, SystemConfig, Task, TaskLane } from "@/lib/types"
+import { parseISO } from "date-fns"
+import type { ExecutionBlockTemplate, ModuleId, Project, ProjectStatus, SystemConfig, Task, TaskLane, WeeklyPlan } from "@/lib/types"
 import { isDueToday, isDueThisWeek, isOverdue } from "@/lib/game-utils"
+import { findWeeklyPlanForWeek } from "@/lib/weekly-plan"
 
-export const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
+const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
   {
     id: "deep-work-1",
     title: "Deep Work 1",
@@ -38,20 +39,11 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   xpMode: "standard",
 }
 
-export type LoadStatus = "Stable" | "Busy" | "Strained" | "Overloaded"
+type LoadStatus = "Stable" | "Busy" | "Strained" | "Overloaded"
 export const TASK_LANE_LABELS: Record<TaskLane, string> = {
   "daily-focus": "Daily Focus",
   backlog: "Backlog",
   "parking-lot": "Parking Lot",
-}
-
-export interface WeeklyOutcomeView {
-  projectId: string
-  projectTitle: string
-  status: ProjectStatus
-  title: string
-  completed: boolean
-  overdue: boolean
 }
 
 export function normalizeSystemConfig(config?: Partial<SystemConfig>): SystemConfig {
@@ -84,50 +76,41 @@ export function getProjectStatus(project: Project): ProjectStatus {
   return project.status ?? "active"
 }
 
-export function selectActiveProjects(projects: Project[]) {
+function selectActiveProjects(projects: Project[]) {
   return projects.filter((project) => !project.deleted && getProjectStatus(project) === "active")
 }
 
-export function hasDefinedWeeklyOutcome(project: Project) {
-  return Boolean(project.weeklyOutcome?.trim())
+/**
+ * This week's outcome per project, keyed by project id.
+ *
+ * The weekly outcome has one source: the current week's WeeklyPlan, written in the Command Center
+ * Plan tab (ADR-022). `Project.weeklyOutcome` is legacy data and is not read.
+ */
+export function selectThisWeekOutcomes(weeklyPlans: WeeklyPlan[]): Map<string, string> {
+  const outcomes = new Map<string, string>()
+  for (const allocation of findWeeklyPlanForWeek(weeklyPlans)?.allocations ?? []) {
+    const outcome = allocation.weeklyOutcome.trim()
+    if (allocation.projectId && outcome) outcomes.set(allocation.projectId, outcome)
+  }
+  return outcomes
 }
 
-export function selectActiveProjectsMissingWeeklyOutcome(projects: Project[]) {
-  return selectActiveProjects(projects).filter((project) => !hasDefinedWeeklyOutcome(project))
-}
-
-export function selectWeeklyOutcomes(projects: Project[], config?: Partial<SystemConfig>): WeeklyOutcomeView[] {
-  const rules = normalizeSystemConfig(config)
+/** Active projects whose end date (`weekEndISO`) has passed. */
+function selectProjectsPastEnd(projects: Project[]) {
   return selectActiveProjects(projects)
-    .filter((project) => hasDefinedWeeklyOutcome(project))
-    .map((project) => {
-      const completed = getProjectStatus(project) === "completed"
-      const overdue = !completed && isBefore(parseISO(project.weekEndISO), new Date())
-      return {
-        projectId: project.id,
-        projectTitle: project.title,
-        status: getProjectStatus(project),
-        title: project.weeklyOutcome!.trim(),
-        completed,
-        overdue,
-      }
-    })
-    .sort((a, b) => {
-      if (a.completed !== b.completed) return Number(a.completed) - Number(b.completed)
-      if (a.overdue !== b.overdue) return Number(b.overdue) - Number(a.overdue)
-      return a.projectTitle.localeCompare(b.projectTitle)
-    })
-    .slice(0, rules.weeklyOutcomeLimit)
+    .filter((project) => isOverdue(project.weekEndISO))
+    .sort((a, b) => a.weekEndISO.localeCompare(b.weekEndISO))
 }
 
 export function selectDailyFocus(
   tasks: Task[],
   projects: Project[],
   config?: Partial<SystemConfig>,
-  options?: { focusedProjectId?: string }
+  options?: { focusedProjectId?: string; weeklyPlans?: WeeklyPlan[] }
 ) {
   const rules = normalizeSystemConfig(config)
   const projectById = new Map(projects.filter((project) => !project.deleted).map((project) => [project.id, project]))
+  const weekOutcomes = selectThisWeekOutcomes(options?.weeklyPlans ?? [])
   const explicitFocus = tasks
     .filter((task) => !task.deleted && !task.completed && task.lane === "daily-focus")
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -151,7 +134,7 @@ export function selectDailyFocus(
         (isDueThisWeek(task.dueDate) ? 40 : 0) +
         (task.linkedProjectId && task.linkedProjectId === options?.focusedProjectId ? 80 : 0) +
         (linkedStatus === "active" ? 35 : 0) +
-        (linkedProject && hasDefinedWeeklyOutcome(linkedProject) ? 20 : 0) +
+        (linkedProject && weekOutcomes.has(linkedProject.id) ? 20 : 0) +
         Math.min(task.xpValue, 30)
 
       return {
@@ -181,23 +164,23 @@ export function calculateCognitiveLoad(input: {
   const rules = normalizeSystemConfig(input.config)
   const activeProjects = selectActiveProjects(input.projects).length
   const scheduledToday = input.tasks.filter((task) => !task.deleted && !task.completed && isDueToday(task.dueDate)).length
-  const missedWeeklyOutcomes = selectWeeklyOutcomes(input.projects, rules).filter((outcome) => outcome.overdue && !outcome.completed).length
+  const projectsPastEnd = selectProjectsPastEnd(input.projects).length
 
   let pressure = 0
   if (activeProjects > rules.maxActiveProjects) pressure += 2 + (activeProjects - rules.maxActiveProjects)
   if (scheduledToday > rules.dailyFocusLimit) pressure += 1 + (scheduledToday - rules.dailyFocusLimit)
-  pressure += missedWeeklyOutcomes * 2
+  pressure += projectsPastEnd * 2
 
   const status: LoadStatus =
     pressure <= 1 ? "Stable" : pressure <= 3 ? "Busy" : pressure <= 5 ? "Strained" : "Overloaded"
   const overload = Math.max(0, activeProjects - rules.maxActiveProjects)
-  const focusScore = Math.max(0, 100 - overload * 15 - missedWeeklyOutcomes * 10)
+  const focusScore = Math.max(0, 100 - overload * 15 - projectsPastEnd * 10)
 
   return {
     status,
     activeProjects,
     scheduledToday,
-    missedWeeklyOutcomes,
+    projectsPastEnd,
     focusScore,
     overload,
     overCapacity: overload > 0,
@@ -214,7 +197,7 @@ export function calculateCognitiveLoad(input: {
  * shape is deliberately provider-neutral.
  * ------------------------------------------------------------------ */
 
-export type AttentionKind = "outcome-overdue" | "task-overdue" | "outcome-missing" | "load"
+type AttentionKind = "project-past-end" | "task-overdue" | "plan-missing" | "outcome-missing" | "load"
 
 export interface AttentionItem {
   id: string
@@ -226,9 +209,9 @@ export interface AttentionItem {
   actionLabel: string
 }
 
-export const ATTENTION_LIMIT = 6
+const ATTENTION_LIMIT = 6
 
-export function selectOverdueTasks(tasks: Task[]) {
+function selectOverdueTasks(tasks: Task[]) {
   return tasks
     .filter((task) => !task.deleted && !task.completed && isOverdue(task.dueDate))
     .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
@@ -243,19 +226,20 @@ function daysSince(dateISO?: string) {
 export function selectAttentionItems(input: {
   projects: Project[]
   tasks: Task[]
+  weeklyPlans: WeeklyPlan[]
   config?: Partial<SystemConfig>
 }): { items: AttentionItem[]; total: number } {
   const rules = normalizeSystemConfig(input.config)
   const items: AttentionItem[] = []
 
-  for (const outcome of selectWeeklyOutcomes(input.projects, rules)) {
-    if (!outcome.overdue || outcome.completed) continue
+  for (const project of selectProjectsPastEnd(input.projects)) {
+    const days = daysSince(project.weekEndISO)
     items.push({
-      id: "outcome-overdue:" + outcome.projectId,
-      kind: "outcome-overdue",
+      id: "project-past-end:" + project.id,
+      kind: "project-past-end",
       severity: "high",
-      title: "Weekly outcome overdue — " + outcome.projectTitle,
-      detail: outcome.title,
+      title: "Past end date — " + project.title,
+      detail: days === 1 ? "Ended 1 day ago, still active" : "Ended " + days + " days ago, still active",
       module: "projects",
       actionLabel: "Decide",
     })
@@ -274,16 +258,31 @@ export function selectAttentionItems(input: {
     })
   }
 
-  for (const project of selectActiveProjectsMissingWeeklyOutcome(input.projects)) {
+  // Weekly outcomes live in this week's plan (ADR-022), so both rows send you to the Plan tab.
+  const activeProjects = selectActiveProjects(input.projects)
+  if (activeProjects.length > 0 && !findWeeklyPlanForWeek(input.weeklyPlans)) {
     items.push({
-      id: "outcome-missing:" + project.id,
-      kind: "outcome-missing",
+      id: "plan-missing",
+      kind: "plan-missing",
       severity: "medium",
-      title: "No weekly outcome — " + project.title,
-      detail: "Active project with nothing to prove this week",
-      module: "projects",
-      actionLabel: "Set",
+      title: "No plan for this week",
+      detail: activeProjects.length === 1 ? "1 active project with no weekly outcome" : activeProjects.length + " active projects with no weekly outcome",
+      module: "command-center",
+      actionLabel: "Plan",
     })
+  } else {
+    const weekOutcomes = selectThisWeekOutcomes(input.weeklyPlans)
+    for (const project of activeProjects.filter((p) => !weekOutcomes.has(p.id))) {
+      items.push({
+        id: "outcome-missing:" + project.id,
+        kind: "outcome-missing",
+        severity: "medium",
+        title: "No weekly outcome — " + project.title,
+        detail: "Active project with no outcome in this week's plan",
+        module: "command-center",
+        actionLabel: "Set",
+      })
+    }
   }
 
   // Load: shown whenever status is not Stable (P1 spec), not only on project over-capacity.
@@ -294,8 +293,8 @@ export function selectAttentionItems(input: {
     if (load.scheduledToday > rules.dailyFocusLimit) {
       causes.push(load.scheduledToday + " due today, focus limit " + rules.dailyFocusLimit)
     }
-    if (load.missedWeeklyOutcomes > 0) {
-      causes.push(load.missedWeeklyOutcomes + " weekly outcome" + (load.missedWeeklyOutcomes === 1 ? "" : "s") + " missed")
+    if (load.projectsPastEnd > 0) {
+      causes.push(load.projectsPastEnd + " project" + (load.projectsPastEnd === 1 ? "" : "s") + " past end date")
     }
     items.push({
       id: "load:" + (load.overCapacity ? "over-capacity" : "pressure"),
@@ -305,7 +304,7 @@ export function selectAttentionItems(input: {
         ? "Over capacity — " + load.activeProjects + " active projects, limit " + rules.maxActiveProjects
         : "Load: " + load.status,
       detail: load.overCapacity ? "Load: " + load.status : causes.join(" · "),
-      module: load.overCapacity || load.missedWeeklyOutcomes > 0 ? "projects" : "todo",
+      module: load.overCapacity || load.projectsPastEnd > 0 ? "projects" : "todo",
       actionLabel: "Review",
     })
   }
