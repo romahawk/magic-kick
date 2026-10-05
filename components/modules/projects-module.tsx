@@ -775,13 +775,19 @@ function ProjectDetailPanel({
                   value={addLinkLabel}
                   onChange={(e) => setAddLinkLabel(e.target.value)}
                   placeholder="Label"
-                  className="h-7 text-xs"
+                  aria-label="Link label"
+                  className="h-7 w-28 shrink-0 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitAddLink()
+                    if (e.key === "Escape") setShowAddLink(false)
+                  }}
                 />
                 <Input
                   value={addLinkUrl}
                   onChange={(e) => setAddLinkUrl(e.target.value)}
                   placeholder="https://..."
-                  className="h-7 flex-1 text-xs"
+                  aria-label="Link URL"
+                  className="h-7 min-w-0 flex-1 text-xs"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") commitAddLink()
                     if (e.key === "Escape") setShowAddLink(false)
@@ -790,7 +796,7 @@ function ProjectDetailPanel({
                 />
               </div>
               <div className="flex gap-1.5">
-                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink}>
+                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink} disabled={!normalizeUrl(addLinkUrl)}>
                   Save
                 </Button>
                 <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddLink(false); setAddLinkLabel(""); setAddLinkUrl("") }}>
@@ -801,7 +807,7 @@ function ProjectDetailPanel({
           ) : null}
 
           {projectLinks.length === 0 && !showAddLink ? (
-            <p className="text-xs text-muted-foreground">No links yet — add one.</p>
+            <p className="text-xs text-muted-foreground">No links yet. Add the repo, live app or design file.</p>
           ) : null}
 
           <div className="flex flex-col gap-1">
