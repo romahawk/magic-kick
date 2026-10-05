@@ -1,4 +1,4 @@
-<!-- Standard: CLAUDE.md, "Commit, Push and PR Descriptions". Fill every section; write "N/A" rather than deleting one. -->
+<!-- Standard: AGENTS.md, "Commit, Push and PR Descriptions". Fill every section; write "N/A" rather than deleting one. -->
 
 ## What
 <!-- One or two sentences: what does this PR change, as a user or the next session would see it? -->

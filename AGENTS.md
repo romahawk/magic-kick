@@ -1,5 +1,8 @@
 # AGENTS.md
 
+The governing rules for every agent working in this repository (Claude Code, Codex, Cursor, Copilot
+and others). This is the single copy (P9): `CLAUDE.md` imports it and adds only Claude Code specifics.
+
 ## Governing Rule
 
 > Magic Kick is the UI of AI-Business-OS and Roman's daily planner: the screen where
@@ -16,21 +19,22 @@
 - Keep net new files small; prefer refactors over additions.
 - Every session must start by naming the roadmap item or the bug it works on.
   If neither can be named, stop.
+- `docs/NEXT_SESSION_START.md` is the handoff between sessions.
 
 ---
 
 ## Role Boundary
 
-Codex assists with implementation, debugging, documentation, and review work inside this repository.
+The agent assists with implementation, debugging, documentation, and review work inside this repository.
 
-Codex must not make unilateral decisions about:
+The agent must not make unilateral decisions about:
 - roadmap scope, order or direction
 - governance or policy exceptions
 - deleting major features or changing product direction
 
-For those decisions, the user decides. Codex should surface tradeoffs and ask for direction before changing scope.
+For those decisions, the user decides. The agent should surface tradeoffs and ask for direction before changing scope.
 
-## Anti-Patterns Codex Must Refuse
+## Anti-Patterns the Agent Must Refuse
 
 | Anti-pattern | Required behavior |
 |---|---|
@@ -48,7 +52,7 @@ Before any commit:
 2. Run `npm run lint`
 3. If the change is user-facing, update `CHANGELOG.md`
 
-Codex must not create a commit if either `npm run build` or `npm run lint` fails.
+The agent must not create a commit if either `npm run build` or `npm run lint` fails.
 
 ## Working Rules
 
@@ -56,3 +60,46 @@ Codex must not create a commit if either `npm run build` or `npm run lint` fails
 - Prefer one issue or one concern per PR.
 - Include `Closes #<issue-number>` in commit bodies when an issue exists.
 - Keep README and docs aligned with the shipped behavior.
+
+## Commit, Push and PR Descriptions
+
+Every commit, push and PR says what was done, why, and what was and was not verified. Write it from
+the diff and the gate output, never from memory or intent. This section is the standard;
+`docs/CLAUDE.md` §4, `CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md` follow it.
+
+**Commit message**
+
+```
+<type>(<scope>): <imperative summary, max 72 chars>
+
+<Why: the problem or goal, 1–3 lines.>
+
+<What changed, grouped by file or area, one line each.>
+
+Verified: <gates run and their result; manual checks done>
+Not verified: <anything unchecked, or "nothing outstanding">
+Closes #<n>                         (when an issue exists)
+```
+
+- Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`. The scope is the module or area.
+- A body is required unless the subject says it all (for example a one-line typo fix).
+- Commits written with an AI agent end with a `Co-Authored-By:` trailer naming it.
+
+**Push**
+
+- Before pushing, state the branch, its base (and what it is stacked on), and the commits going up
+  (`git log --oneline origin/<branch>..<branch>`, or `origin/main..` for a new branch).
+- Never force-push without explicit approval for that push. When approved, use
+  `--force-with-lease=<branch>:<expected-remote-sha>` and say why history was rewritten.
+- After pushing, report what went up, where, and the PR link or next step.
+
+**Pull request**
+
+- Title: the same form as a commit subject.
+- Body: fill in every section of `.github/PULL_REQUEST_TEMPLATE.md`. "N/A" is fine; deleting a
+  section is not.
+- Paste the real gate output (the last lines of each command with its exit code), not "passes".
+- Say what is **not** verified. A UI change without screenshots says so.
+- For stacked PRs, name the base PR and the merge order. After the base PR merges, delete its
+  branch or retarget the stacked PRs to `main` **before** merging them. Otherwise they merge into
+  the already-merged branch and never reach `main` (this happened with #118 and #120 on 2026-09-24).

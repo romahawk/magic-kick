@@ -207,7 +207,7 @@ no new modules, no routing change. Mobile bottom nav keeps its five, ordered by 
 
 ### P6 — Gamification placement · S
 
-**Status:** open
+**Status:** done
 
 **Decided 2026-09-27 (OS `DEC-2026-09-27-001`): demote.** Progress on the daily surface measures
 evidence shipped, not activity logged. `lifeos-architecture.md` §0 rule 5 stands — no streaks, no
@@ -375,7 +375,11 @@ the feed-shape document P7 depends on.
 
 ### P10 — Evidence-driven progress · M
 
-**Status:** queued
+**Status:** gated
+
+**Gate (2026-10-05):** P7. Criterion 3 needs values from the OS context feed, which does not exist yet
+(no feed script or feed-shape document in the OS repo, no GitHub token on Vercel). Building bars from
+Magic Kick's own data instead was offered and not chosen.
 
 **Why:** goal 2 asks for progress bars; the anti-abandonment rule forbids streaks. Evidence resolves
 both — a bar that moves when something ships is worth showing in an interview; a bar that moves when
@@ -434,7 +438,7 @@ lines required by root `CLAUDE.md` → "Commit, Push and PR Descriptions". One h
 
 ### P9 — One governance file, not two · S
 
-**Status:** queued
+**Status:** open
 
 **Why:** `CLAUDE.md` (102 lines) and `AGENTS.md` (57) carry the same governing rule, working
 agreement and anti-pattern table with the agent's name swapped. Two copies of one rule set means the
@@ -449,6 +453,15 @@ direction is fine; two full copies is not.
 1. A rule appears once. The other file points at it.
 2. Both files still open with the governing rule, so a session that reads either one is governed.
 3. No rule is lost in the merge — diff the two before collapsing.
+
+**As built (2026-10-05):** `AGENTS.md` is the single copy, tool-neutral ("the agent"). It now also
+holds "Commit, Push and PR Descriptions", which only `CLAUDE.md` had. `CLAUDE.md` keeps the governing
+rule, imports `AGENTS.md` with `@AGENTS.md` (the pattern in the official Claude Code memory docs), and
+adds only Claude Code specifics: the session skills, the P8 hook, a pointer to `docs/CLAUDE.md`.
+References in `CONTRIBUTING.md`, the PR template, `docs/CLAUDE.md`, the session-close skill and the
+commit-gate hook now point at `AGENTS.md`. A line-by-line check of both old files found nothing lost;
+four `CLAUDE.md` lines were reworded, not dropped. `docs/CLAUDE.md` (session governance) is a separate
+file and out of P9's scope.
 
 ---
 

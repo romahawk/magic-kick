@@ -80,7 +80,7 @@ Never edit `current-focus.md` or `decision-rules.md`.
 
 Commit the handoff (and CHANGELOG, if changed) as `docs: session close YYYY-MM-DD`, only after
 the gates pass. Stage files by name, never `git add -A`. Every commit, push and PR follows root
-`CLAUDE.md` → "Commit, Push and PR Descriptions": the body says why, what changed, verified and
+`AGENTS.md` → "Commit, Push and PR Descriptions": the body says why, what changed, verified and
 not verified. Pass multi-line messages with `git commit -F <file>`; PowerShell 5.1 breaks quotes
 in `-m`.
 
