@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - Decisions in the attention block (P3)
+
+### Added
+- A project past its end date can be decided in place: Complete, Park, or Extend (end date moves to 7 days from today).
+- A "Last week not reviewed" row when last week's plan was never reviewed. Review opens the Review tab on that week.
+- Attention rows show since when they have been waiting (end date, due date, or start of the week).
+
+### Changed
+- The Review tab reviews last week's plan while it is unreviewed, then the current week's.
+
+---
+
 ## [Unreleased] - 2026-10-05 - One source for weekly outcomes (P2)
 
 ### Changed

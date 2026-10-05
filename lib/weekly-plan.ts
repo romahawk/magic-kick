@@ -39,6 +39,12 @@ export function getActiveWeeklyPlan(plans: WeeklyPlan[], weekStartISO = getCurre
   return weekPlan
 }
 
+/** Last week's plan while it still needs a review: it has allocations and is not `reviewed`. */
+export function selectWeekAwaitingReview(plans: WeeklyPlan[], now = new Date()) {
+  const plan = findWeeklyPlanForWeek(plans, getCurrentWeekStartISO(addDays(now, -7)))
+  return plan && plan.allocations.length > 0 && plan.status !== "reviewed" ? plan : undefined
+}
+
 export function sumAllocatedHours(allocations: WeeklyAllocation[]) {
   return allocations.reduce((total, allocation) => total + Math.max(0, allocation.hoursAllocated || 0), 0)
 }
