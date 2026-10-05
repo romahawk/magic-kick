@@ -9,7 +9,17 @@ export interface SyncFields {
   updatedAt?: number
 }
 
-export interface Task extends SyncFields {
+/** Where an item came from (P4, ADR-018). Missing means "manual"; read it with `sourceOf()`. */
+export type ItemSource = "manual" | "agent" | "import"
+
+/** Provenance on Task and Project. `source + sourceId` is unique per collection (see lib/provenance.ts). */
+export interface Provenance {
+  source?: ItemSource
+  /** The id in the system that produced the item (agent run, import file row). Unused for manual items. */
+  sourceId?: string
+}
+
+export interface Task extends SyncFields, Provenance {
   id: string
   title: string
   category: TaskCategory
@@ -82,7 +92,7 @@ export interface SystemConfig {
   xpMode: "standard"
 }
 
-export interface Project extends SyncFields {
+export interface Project extends SyncFields, Provenance {
   id: string
   title: string
   objective: string

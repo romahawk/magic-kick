@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { getProjectStatus, selectThisWeekOutcomes } from "@/lib/execution-os"
+import { sourceLabel } from "@/lib/provenance"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -565,6 +566,9 @@ function ProjectRow({
 
       {/* §6 — text-sm for name */}
       <p className="w-36 shrink-0 truncate text-sm font-medium">{project.title}</p>
+      {sourceLabel(project) ? (
+        <Badge variant="outline" className="shrink-0 text-[10px]" title={project.sourceId}>{sourceLabel(project)}</Badge>
+      ) : null}
 
       {/* §6 — text-xs for meta */}
       <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{project.objective}</p>
@@ -698,7 +702,12 @@ function ProjectDetailPanel({
         <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-sm leading-tight">{project.title}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{statusLine}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            {statusLine}
+            {sourceLabel(project) ? (
+              <Badge variant="outline" className="text-[10px]" title={project.sourceId}>{sourceLabel(project)}</Badge>
+            ) : null}
+          </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

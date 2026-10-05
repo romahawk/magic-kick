@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - Provenance on tasks and projects (P4)
+
+### Added
+- Tasks and projects can record where they came from (`manual`, `agent` or `import`). Items created by an agent or an import show a small "Agent" or "Import" label in ToDo and Projects; items you create yourself look the same as before.
+- The same agent or import item is never created twice, even if it is sent again after you deleted it.
+
+---
+
 ## [Unreleased] - 2026-10-05 - Gamification moved off the sidebar (P6)
 
 ### Changed
