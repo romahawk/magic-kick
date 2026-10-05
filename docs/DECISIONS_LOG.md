@@ -752,3 +752,35 @@ tasks, and link Resources to them. Two things stood in the way.
 
 **Revisit trigger:** two devices losing milestone edits in practice, or more than ~20 milestones on a
 project (time to move them into their own documents).
+
+---
+
+## ADR-026: Build P13 while P1 is open
+
+**Date:** 2026-10-05
+**Status:** Accepted (Roman, 2026-10-05).
+**Relates to:** ADR-024 (WIP = 1), ADR-025 (the same exception for P12).
+
+### Context
+
+P13 (ToDo toolbar and Done view) was added to `CONTROL_PLANE_UI_SPEC.md` on 2026-10-05, ranked
+straight after P1. P1 is `open` until its usage verdict is recorded on 2026-10-06. Roman asked to
+start P13 now.
+
+### Decision
+
+1. P13 is built now on `feat/p13-todo-done-view`. P1 stays the only `open` item; P13 stays `queued`.
+2. The P13 PR merges only after P1 is set to `done`, so WIP = 1 holds at merge time.
+
+### Rationale
+
+- P13 is small (S), touches only `components/modules/todo-module.tsx`, and has no data model, store
+  or rules change, so it cannot interfere with P1's usage measurement.
+
+### Consequences
+
+- If P1's verdict leads to rework, that rework goes before the P13 merge.
+- **Rollback:** revert the P13 PR. Nothing is migrated or stored.
+
+**Revisit trigger:** a third exception to WIP = 1. At that point the rule, not the exceptions, needs
+a decision.
