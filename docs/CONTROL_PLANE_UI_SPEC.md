@@ -170,7 +170,7 @@ P3 instead turns attention rows into decisions, in the attention block.
 
 ### P4 — Provenance fields on Task and Project · S
 
-**Status:** open
+**Status:** done
 
 **Why:** F5. Prerequisite for any agent result ever landing in Magic Kick, and cheap now.
 
