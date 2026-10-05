@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAppStore } from "@/lib/store"
-import { levelFromXP } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
-import { Progress } from "@/components/ui/progress"
 import type { ModuleId } from "@/lib/types"
 import {
   LayoutDashboard,
@@ -16,7 +14,6 @@ import {
   BookOpen,
   BookHeart,
   Zap,
-  Flame,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react"
@@ -36,7 +33,6 @@ export function Sidebar() {
   const activeModule = useAppStore((s) => s.activeModule)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
   const profile = useAppStore((s) => s.profile)
-  const xpInfo = levelFromXP(profile.xpTotal)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false
     return window.localStorage.getItem("magic-kick-sidebar-collapsed") === "true"
@@ -73,41 +69,18 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Profile card */}
+      {/* Profile card — name only (P6, OS DEC-2026-09-27-001). XP, level and streak live in
+          Achievements and the avatar menu, not on the surface you look at every day. */}
       <div className={cn("border-b border-sidebar-border", collapsed ? "px-3 py-4" : "p-4")}>
         <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-primary font-serif text-sm font-bold text-sidebar-primary-foreground">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-primary font-serif text-sm font-bold text-sidebar-primary-foreground"
+            title={collapsed ? profile.name : undefined}
+          >
             {profile.name.charAt(0)}
           </div>
-          {!collapsed ? (
-            <div className="flex-1">
-              <p className="text-sm font-medium">{profile.name}</p>
-              <p className="text-xs text-sidebar-foreground/60">Level {xpInfo.level}</p>
-            </div>
-          ) : null}
+          {!collapsed ? <p className="flex-1 truncate text-sm font-medium">{profile.name}</p> : null}
         </div>
-        {!collapsed ? (
-          <div className="mt-3">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1 text-sidebar-foreground/70">
-                <Zap className="h-3 w-3 text-xp" /> {xpInfo.current} / {xpInfo.needed} XP
-              </span>
-              <span className="flex items-center gap-1 text-sidebar-foreground/70">
-                <Flame className="h-3 w-3 text-streak" /> {profile.streakDays}d
-              </span>
-            </div>
-            <Progress value={xpInfo.progress} className="h-2 bg-sidebar-accent [&>div]:bg-sidebar-primary" />
-          </div>
-        ) : (
-          <div className="mt-3 flex flex-col items-center gap-2 text-[10px] text-sidebar-foreground/70">
-            <span className="flex items-center gap-1">
-              <Zap className="h-3 w-3 text-xp" /> {xpInfo.level}
-            </span>
-            <span className="flex items-center gap-1">
-              <Flame className="h-3 w-3 text-streak" /> {profile.streakDays}d
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Nav */}

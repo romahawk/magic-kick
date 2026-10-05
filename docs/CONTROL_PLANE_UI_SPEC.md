@@ -207,7 +207,7 @@ no new modules, no routing change. Mobile bottom nav keeps its five, ordered by 
 
 ### P6 — Gamification placement · S
 
-**Status:** queued
+**Status:** open
 
 **Decided 2026-09-27 (OS `DEC-2026-09-27-001`): demote.** Progress on the daily surface measures
 evidence shipped, not activity logged. `lifeos-architecture.md` §0 rule 5 stands — no streaks, no
@@ -219,6 +219,14 @@ scores, no guilt mechanics where you look every day.
 2. XP, level and streak remain reachable in Achievements and the avatar menu.
 3. No store, XP-engine or achievement logic changes — this is placement, not removal.
 4. Nothing on the Command Center counts days in a row.
+
+**As built (2026-10-05):** the sidebar card shows the avatar initial and the name. The avatar menu shows
+level, XP this week and streak; the Achievements header shows level, total XP and streak. Criterion 4
+already held in the components: no streak or day count is rendered on the Command Center. The
+"Friday with zero done" text noted in the P1 check is not in any component; it most likely comes from
+the parked AI coaching route (feature flag, default off) and is out of P6's scope. The Journal header
+still shows a streak; Journal is a reference module, not the daily surface.
+
 ---
 
 ### P12 — Project roadmap inside Projects · M
@@ -387,7 +395,7 @@ opportunities qualified, betas released. No activity counters, no day streaks.
 
 ### P8 — Enforce the commit gates with a hook · S
 
-**Status:** open
+**Status:** done
 
 **As built (2026-10-05):** `.claude/hooks/commit-gate.mjs`, registered in `.claude/settings.json` for
 the Bash and PowerShell tools with `if: "<Tool>(git commit*)"`, which per the official hooks docs

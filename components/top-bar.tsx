@@ -4,6 +4,7 @@ import { useTheme } from "next-themes"
 import { signOut } from "firebase/auth"
 import { useState } from "react"
 import { useAppStore } from "@/lib/store"
+import { levelFromXP } from "@/lib/game-utils"
 import { auth } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { syncNow } from "@/lib/sync/engine"
@@ -82,6 +83,7 @@ export function TopBar() {
           ) : null}
           <DropdownMenuSeparator />
           <div className="flex items-center gap-4 px-2 py-2">
+            <div className="text-xs">Level {levelFromXP(profile.xpTotal).level}</div>
             <div className="flex items-center gap-1 text-xs">
               <Zap className="h-3 w-3 text-primary" />
               <span>{profile.xpThisWeek} XP</span>
