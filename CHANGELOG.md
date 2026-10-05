@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - Navigation grouped by weight (P5)
+
+### Changed
+- The sidebar and the mobile menu group the eight modules into Execution (Command Center, Schedule, ToDo, Projects) and Reference (Goals, Resources, Journal, Achievements). Reference items are smaller and dimmer. With the sidebar collapsed, a divider separates the groups.
+- The mobile bottom bar keeps the same five items in the same order logic: Home, Schedule, ToDo, Projects, Journal.
+
+---
+
 ## [Unreleased] - 2026-10-05 - Provenance on tasks and projects (P4)
 
 ### Added

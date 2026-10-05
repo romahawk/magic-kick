@@ -11,11 +11,12 @@ import {
   BookHeart,
 } from "lucide-react"
 
+// Same order as the sidebar groups (P5): execution surfaces first, then the one reference surface.
 const BOTTOM_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
   { id: "command-center", label: "Home", icon: LayoutDashboard },
+  { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "todo", label: "ToDo", icon: CheckSquare },
   { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "journal", label: "Journal", icon: BookHeart },
 ]
 

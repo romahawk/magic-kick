@@ -18,15 +18,33 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 
-const NAV_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
-  { id: "command-center", label: "Command Center", icon: LayoutDashboard },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "goals", label: "Goals", icon: Target },
-  { id: "todo", label: "ToDo", icon: CheckSquare },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "resources", label: "Resources", icon: BookOpen },
-  { id: "journal", label: "Journal", icon: BookHeart },
-  { id: "achievements", label: "Achievements", icon: Trophy },
+// Navigation weight (P5): execution surfaces first, reference surfaces grouped below and secondary.
+// Shared with the mobile menu (mobile-nav.tsx) so both list the same eight destinations.
+export const NAV_GROUPS: {
+  id: "execution" | "reference"
+  label: string
+  items: { id: ModuleId; label: string; icon: React.ElementType }[]
+}[] = [
+  {
+    id: "execution",
+    label: "Execution",
+    items: [
+      { id: "command-center", label: "Command Center", icon: LayoutDashboard },
+      { id: "schedule", label: "Schedule", icon: CalendarDays },
+      { id: "todo", label: "ToDo", icon: CheckSquare },
+      { id: "projects", label: "Projects", icon: FolderKanban },
+    ],
+  },
+  {
+    id: "reference",
+    label: "Reference",
+    items: [
+      { id: "goals", label: "Goals", icon: Target },
+      { id: "resources", label: "Resources", icon: BookOpen },
+      { id: "journal", label: "Journal", icon: BookHeart },
+      { id: "achievements", label: "Achievements", icon: Trophy },
+    ],
+  },
 ]
 
 export function Sidebar() {
@@ -84,28 +102,47 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex-1 overflow-y-auto", collapsed ? "p-2" : "p-3")} role="navigation" aria-label="Main navigation">
-        <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.id}>
-              <button
-                onClick={() => setActiveModule(item.id)}
-                className={cn(
-                  "flex w-full items-center rounded-lg text-sm font-medium transition-colors",
-                  collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
-                  activeModule === item.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-                aria-label={item.label}
-                title={item.label}
-              >
-                <item.icon className="h-4 w-4" />
-                {!collapsed ? item.label : null}
-              </button>
-            </li>
-          ))}
-        </ul>
+      <nav className={cn("flex flex-1 flex-col gap-4 overflow-y-auto", collapsed ? "p-2" : "p-3")} role="navigation" aria-label="Main navigation">
+        {NAV_GROUPS.map((group, groupIndex) => {
+          const secondary = group.id === "reference"
+          return (
+            <div key={group.id}>
+              {collapsed ? (
+                groupIndex > 0 ? <div className="mx-2 mb-3 border-t border-sidebar-border" aria-hidden /> : null
+              ) : (
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50" aria-hidden>
+                  {group.label}
+                </p>
+              )}
+              <ul className="flex flex-col gap-1" aria-label={group.label}>
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => setActiveModule(item.id)}
+                      className={cn(
+                        "flex w-full items-center rounded-lg transition-colors",
+                        secondary ? "text-[13px] font-normal" : "text-sm font-medium",
+                        collapsed ? "justify-center px-2" : "gap-3 px-3",
+                        secondary ? "py-2" : "py-2.5",
+                        activeModule === item.id
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : secondary
+                            ? "text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                      aria-label={item.label}
+                      aria-current={activeModule === item.id ? "page" : undefined}
+                      title={item.label}
+                    >
+                      <item.icon className={secondary ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      {!collapsed ? item.label : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </nav>
     </aside>
   )
