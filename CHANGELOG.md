@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - ToDo toolbar and Done view (P13)
+
+### Added
+- A "Done (n)" toggle in the ToDo toolbar. When it is on, a Done view replaces the board, with completed tasks grouped by completion date, newest first: Today, Yesterday, This week, Earlier this month, then one group per month, with "Undated" last.
+- Groups from this week show at once; older groups load one at a time with "Show earlier".
+- A clear button next to the category filter when a category is chosen.
+
+### Changed
+- The board shows open tasks only. Untick a task in the Done view to send it back to its lane.
+- Search and the category filter apply to the Done view, and the Done count follows them.
+
+### Removed
+- The status filter ("Open + Archive" / "Open" / "Completed") and the Archive card at the bottom of the page.
+
+---
+
 ## [Unreleased] - 2026-10-05 - Project roadmap (P12)
 
 ### Added

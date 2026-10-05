@@ -227,6 +227,9 @@ embedded in the Project; `Task.milestoneId`; `resourceIds` on Project and milest
 
 **Status:** queued
 
+**Note:** built on 2026-10-05 while P1 was open, by Roman's explicit exception to WIP = 1 (ADR-026).
+It merges only after P1 is `done`.
+
 **Why:** the ToDo toolbar has a control that barely does anything, and finished tasks pile up in one
 long list. Verified in `components/modules/todo-module.tsx` on 2026-10-05:
 

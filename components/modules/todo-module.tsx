@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import type { ElementType } from "react"
-import { isTomorrow, parseISO } from "date-fns"
+import { differenceInCalendarDays, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS } from "@/lib/execution-os"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
@@ -10,13 +10,13 @@ import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Archive, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Trash2, Zap } from "lucide-react"
+import { Archive, CheckCheck, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react"
 import type { Task, TaskCategory, TaskLane, TaskRepeat } from "@/lib/types"
 
 const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
@@ -42,6 +42,34 @@ function dueGroupOf(task: Task): DueGroup {
   if (isDueToday(task.dueDate)) return "today"
   if (isTomorrow(parseISO(task.dueDate))) return "tomorrow"
   return "later"
+}
+
+// Done view sections, by completion date. Today, Yesterday and This week open expanded;
+// older sections load one at a time on "Show earlier".
+type DoneGroup = { key: string; title: string; recent: boolean; tasks: Task[] }
+
+function doneGroupOf(task: Task, now: Date): { key: string; title: string; recent: boolean } {
+  if (!task.completedAt) return { key: "undated", title: "Undated", recent: false }
+  const done = parseISO(task.completedAt)
+  const daysAgo = differenceInCalendarDays(now, done)
+  if (daysAgo <= 0) return { key: "today", title: "Today", recent: true }
+  if (daysAgo === 1) return { key: "yesterday", title: "Yesterday", recent: true }
+  if (done >= startOfWeek(now, { weekStartsOn: 1 })) return { key: "this-week", title: "This week", recent: true }
+  if (isSameMonth(done, now)) return { key: "this-month", title: "Earlier this month", recent: false }
+  return { key: task.completedAt.slice(0, 7), title: format(done, "MMMM yyyy"), recent: false }
+}
+
+function groupDoneTasks(tasks: Task[], now: Date): DoneGroup[] {
+  const sorted = [...tasks].sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "") || a.title.localeCompare(b.title))
+  const groups: DoneGroup[] = []
+  for (const task of sorted) {
+    const { key, title, recent } = doneGroupOf(task, now)
+    const group = groups.find((g) => g.key === key)
+    if (group) group.tasks.push(task)
+    else groups.push({ key, title, recent, tasks: [task] })
+  }
+  // Newest first; an empty completedAt sorts last, so "Undated" is the last group.
+  return groups
 }
 
 export function TodoModule() {
@@ -82,9 +110,9 @@ export function TodoModule() {
 
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
-  const [filterStatus, setFilterStatus] = useState("all")
   const [sortBy, setSortBy] = useState("date-asc")
-  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [showDone, setShowDone] = useState(false)
+  const [olderGroupsShown, setOlderGroupsShown] = useState(0)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -134,7 +162,9 @@ export function TodoModule() {
   }, [filteredTasks, sortBy, taskTimeSlots])
 
   const openTasks = useMemo(() => sortedTasks.filter((task) => !task.completed), [sortedTasks])
-  const archivedTasks = useMemo(() => sortedTasks.filter((task) => task.completed), [sortedTasks])
+  const doneTasks = useMemo(() => filteredTasks.filter((task) => task.completed), [filteredTasks])
+  const doneGroups = useMemo(() => groupDoneTasks(doneTasks, new Date()), [doneTasks])
+  const hasAnyDone = useMemo(() => tasks.some((task) => task.completed), [tasks])
   const backlogTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "backlog"), [openTasks])
   const dailyFocusTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus"), [openTasks])
   const parkingLotTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "parking-lot"), [openTasks])
@@ -226,7 +256,9 @@ export function TodoModule() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-serif text-2xl font-bold tracking-tight">ToDo</h1>
-        <p className="text-sm text-muted-foreground">{openTasks.length} open tasks across focus, backlog, and parking lot</p>
+        <p className="text-sm text-muted-foreground">
+          {showDone ? `${doneTasks.length} completed tasks, newest first` : `${openTasks.length} open tasks across focus, backlog, and parking lot`}
+        </p>
       </div>
 
       {/* Toolbar */}
@@ -235,83 +267,76 @@ export function TodoModule() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search tasks..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Category" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Open + Archive</SelectItem>
-            <SelectItem value="active">Open</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Sort" /></SelectTrigger>
+        <div className="flex w-full items-center gap-1 sm:w-auto">
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {filterCategory !== "all" ? (
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setFilterCategory("all")} aria-label="Clear category filter" title="Clear category filter">
+              <X className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
+        <Select value={sortBy} onValueChange={setSortBy} disabled={showDone}>
+          <SelectTrigger className="w-full sm:w-40" title={showDone ? "Done is always newest first" : undefined}><SelectValue placeholder="Sort" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="date-asc">Date: earliest</SelectItem>
             <SelectItem value="date-desc">Date: latest</SelectItem>
             <SelectItem value="manual">Manual order</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant={showDone ? "default" : "outline"} className="w-full sm:w-auto" onClick={() => setShowDone((v) => !v)} aria-pressed={showDone}>
+          <CheckCheck className="mr-1 h-4 w-4" />
+          Done ({doneTasks.length})
+        </Button>
       </div>
 
-      {/* Row 1 — Summary cards: Backlog | Daily Focus | Parking Lot */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <LaneSummaryCard title="Backlog" count={backlogTasks.length} badge="Queue" description="Important work waiting for a focus slot." icon={LayoutList} tone="default" />
-        <LaneSummaryCard title="Daily Focus" count={dailyFocusTasks.length} badge={`${dailyFocusLimit} max`} description="Only the few tasks that deserve today." icon={Focus} tone={dailyFocusTasks.length > dailyFocusLimit ? "warning" : "default"} />
-        <LaneSummaryCard title="Parking Lot" count={parkingLotTasks.length} badge="Later" description="Ideas and tasks not needed this month." icon={Archive} tone="muted" />
-      </div>
+      {showDone ? (
+        <DoneView
+          groups={doneGroups}
+          olderGroupsShown={olderGroupsShown}
+          onShowEarlier={() => setOlderGroupsShown((n) => n + 1)}
+          emptyMessage={hasAnyDone ? "No completed tasks match your filters." : "No completed tasks yet."}
+          categoryColors={categoryColors}
+          onToggle={toggleTask}
+          onSelect={openTask}
+        />
+      ) : (
+        <>
+          {/* Row 1 — Summary cards: Backlog | Daily Focus | Parking Lot */}
+          <div className="grid gap-3 md:grid-cols-3">
+            <LaneSummaryCard title="Backlog" count={backlogTasks.length} badge="Queue" description="Important work waiting for a focus slot." icon={LayoutList} tone="default" />
+            <LaneSummaryCard title="Daily Focus" count={dailyFocusTasks.length} badge={`${dailyFocusLimit} max`} description="Only the few tasks that deserve today." icon={Focus} tone={dailyFocusTasks.length > dailyFocusLimit ? "warning" : "default"} />
+            <LaneSummaryCard title="Parking Lot" count={parkingLotTasks.length} badge="Later" description="Ideas and tasks not needed this month." icon={Archive} tone="muted" />
+          </div>
 
-      {/* Row 2 — Kanban columns: Backlog | Daily Focus | Parking Lot */}
-      {filterStatus !== "completed" ? (
-        <div className="grid gap-4 md:grid-cols-3 items-start">
-          {TASK_LANES.map((laneConfig) => {
-            const handlers = makeDragHandlers(laneConfig.id)
-            return (
-              <KanbanColumn
-                key={laneConfig.id}
-                lane={laneConfig.id}
-                tasks={laneTasks[laneConfig.id]}
-                limit={laneConfig.id === "daily-focus" ? dailyFocusLimit : undefined}
-                grouped={sortBy === "date-asc"}
-                categoryColors={categoryColors}
-                taskTimeSlots={taskTimeSlots}
-                onToggle={toggleTask}
-                onSelect={openTask}
-                onQuickEdit={updateTask}
-                {...handlers}
-              />
-            )
-          })}
-        </div>
-      ) : null}
-
-      {/* Archive */}
-      {(filterStatus === "all" || filterStatus === "completed") && archivedTasks.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between text-sm">
-              <span>Archive</span>
-              <Button variant="outline" size="sm" onClick={() => setArchiveOpen((v) => !v)}>
-                <ChevronDown className={cn("mr-1 h-3 w-3 transition-transform", archiveOpen && "rotate-180")} />
-                {archiveOpen ? "Hide" : "Show"} ({archivedTasks.length})
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          {archiveOpen ? (
-            <CardContent className="flex flex-col gap-2">
-              {archivedTasks.map((task) => (
-                <TaskCard key={`arch-${task.id}`} task={task} categoryColor={categoryColors[task.category]} onToggle={toggleTask} onSelect={openTask} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} showLane />
-              ))}
-            </CardContent>
-          ) : null}
-        </Card>
-      ) : null}
+          {/* Row 2 — Kanban columns: Backlog | Daily Focus | Parking Lot */}
+          <div className="grid gap-4 md:grid-cols-3 items-start">
+            {TASK_LANES.map((laneConfig) => {
+              const handlers = makeDragHandlers(laneConfig.id)
+              return (
+                <KanbanColumn
+                  key={laneConfig.id}
+                  lane={laneConfig.id}
+                  tasks={laneTasks[laneConfig.id]}
+                  limit={laneConfig.id === "daily-focus" ? dailyFocusLimit : undefined}
+                  grouped={sortBy === "date-asc"}
+                  categoryColors={categoryColors}
+                  taskTimeSlots={taskTimeSlots}
+                  onToggle={toggleTask}
+                  onSelect={openTask}
+                  onQuickEdit={updateTask}
+                  {...handlers}
+                />
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* Task detail sheet */}
       <Sheet open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
@@ -394,6 +419,44 @@ export function TodoModule() {
           ) : null}
         </SheetContent>
       </Sheet>
+    </div>
+  )
+}
+
+// ── Done view (replaces the board while Done is on) ──────────────────────────
+
+function DoneView({ groups, olderGroupsShown, onShowEarlier, emptyMessage, categoryColors, onToggle, onSelect }: {
+  groups: DoneGroup[]; olderGroupsShown: number; onShowEarlier: () => void; emptyMessage: string
+  categoryColors: Record<string, string>; onToggle: (id: string) => void; onSelect: (task: Task) => void
+}) {
+  if (groups.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+  }
+
+  const recentGroups = groups.filter((g) => g.recent)
+  const olderGroups = groups.filter((g) => !g.recent)
+  const visibleGroups = [...recentGroups, ...olderGroups.slice(0, olderGroupsShown)]
+  const nextGroup = olderGroups[olderGroupsShown]
+
+  return (
+    <div className="flex flex-col gap-4">
+      {recentGroups.length === 0 ? <p className="text-sm text-muted-foreground">Nothing completed this week.</p> : null}
+      {visibleGroups.map((group) => (
+        <section key={group.key} className="flex flex-col gap-2">
+          <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {group.title} · {group.tasks.length}
+          </p>
+          {group.tasks.map((task) => (
+            <TaskCard key={task.id} task={task} categoryColor={categoryColors[task.category]} onToggle={onToggle} onSelect={onSelect} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} showLane />
+          ))}
+        </section>
+      ))}
+      {nextGroup ? (
+        <Button variant="outline" size="sm" className="self-center" onClick={onShowEarlier}>
+          <ChevronDown className="mr-1 h-3 w-3" />
+          Show earlier: {nextGroup.title} ({nextGroup.tasks.length})
+        </Button>
+      ) : null}
     </div>
   )
 }
