@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - Gamification moved off the sidebar (P6)
+
+### Changed
+- The sidebar profile card shows your name only. Level, XP and streak are no longer on it.
+- The avatar menu now also shows your level, next to XP this week and the streak.
+- The Achievements header shows your streak next to level and total XP.
+
+---
+
 ## [Unreleased] - 2026-10-05 - Decisions in the attention block (P3)
 
 ### Added

@@ -37,7 +37,9 @@ export function AchievementsModule() {
             </div>
             <div className="flex-1">
               <p className="text-lg font-bold">Level {xpInfo.level}</p>
-              <p className="text-sm text-muted-foreground">{profile.xpTotal} total XP earned</p>
+              <p className="text-sm text-muted-foreground">
+                {profile.xpTotal} total XP earned · {profile.streakDays}-day streak
+              </p>
               <div className="mt-2">
                 <div className="mb-1 flex justify-between text-xs">
                   <span>{xpInfo.current} XP</span>
