@@ -170,7 +170,7 @@ P3 instead turns attention rows into decisions, in the attention block.
 
 ### P4 — Provenance fields on Task and Project · S
 
-**Status:** queued
+**Status:** open
 
 **Why:** F5. Prerequisite for any agent result ever landing in Magic Kick, and cheap now.
 
@@ -184,6 +184,17 @@ to `"manual"` in the store migration. Surface as a small label only where non-ma
 3. No UI change for manual items.
 
 **Gate:** do not extend this into an `AgentJob` table — that is AOS-4/AOS-6, still behind ADR-018's Inbox gate.
+
+**As built (2026-10-05):** `ItemSource` and an optional `Provenance { source, sourceId }` on `Task` and
+`Project` (`lib/types.ts`); helpers in `lib/provenance.ts`. **No store migration:** untagged items read
+as `manual` through `sourceOf()` instead of a v12 → v13 version bump, which meets criterion 1 without
+rewriting stored data and avoids the version-mismatch rollback hazard noted in ADR-025. `addTask` and
+`addProject` skip a write whose `source + sourceId` already exists, deleted items included, so an
+agent or import cannot bring back something the user deleted; manual items and items without a
+`sourceId` are never deduplicated. A small "Agent" / "Import" label (tooltip: `sourceId`) shows on the
+ToDo task card and the Projects list row and detail header, only for non-manual items. No Firestore
+rules change (the generic sync rule checks only `deleted` and `clientUpdatedAt`). Nothing in the app
+writes a non-manual item yet.
 
 ---
 

@@ -5,6 +5,7 @@ import type { ElementType } from "react"
 import { differenceInCalendarDays, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS } from "@/lib/execution-os"
+import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 import { cn } from "@/lib/utils"
@@ -629,6 +630,7 @@ function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragSta
           {task.category}
         </Badge>
         {showLane ? <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge> : null}
+        {sourceLabel(task) ? <Badge variant="outline" className="text-[10px]" title={task.sourceId}>{sourceLabel(task)}</Badge> : null}
         {(task.repeat ?? "none") !== "none" ? <Badge variant="outline" className="text-[10px]">Repeats {task.repeat}</Badge> : null}
         {timeSlot ? (
           editingField === "time" ? (

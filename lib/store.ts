@@ -34,6 +34,7 @@ import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollb
 import { levelFromXP } from "@/lib/game-utils"
 import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achievement-engine"
 import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence"
+import { findBySource } from "@/lib/provenance"
 import { moveMilestoneInList, nextMilestoneOrder, renumberMilestones, sortMilestones } from "./roadmap"
 import {
   seedAchievements,
@@ -841,6 +842,8 @@ export const useAppStore = create<AppState>()(
       },
 
       addTask: (task) => {
+        // Idempotent for agent and import writes (P4, ADR-018): one task per source + sourceId.
+        if (findBySource(get().tasks, task)) return
         const { timeHHmm, ...taskInput } = task
         const startHHmm = normalizeTimeHHmm(timeHHmm)
         const weekPlanId = taskInput.dueDate && startHHmm
@@ -1586,6 +1589,8 @@ export const useAppStore = create<AppState>()(
       },
 
       addProject: (project) => {
+        // Idempotent for agent and import writes (P4, ADR-018): one project per source + sourceId.
+        if (findBySource(get().projects, project)) return
         const id = generateId()
         const ts = now()
         const milestones = (project.milestones ?? []).map((milestone, index) => ({
@@ -1608,6 +1613,8 @@ export const useAppStore = create<AppState>()(
           url: project.url,
           links: project.links,
           milestones,
+          source: project.source,
+          sourceId: project.sourceId,
           deleted: false,
         })
         set((s) => {
