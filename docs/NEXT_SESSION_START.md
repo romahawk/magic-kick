@@ -38,7 +38,10 @@
    on AI-Business-OS only (Roman). The route unfreeze is ADR-024 §6.
 6. **OS session pending** (prompt drafted in this session; see Open items).
 7. Read ADR-020, ADR-021, ADR-024 and ADR-025 before any control-plane or scope decision.
-8. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
+8. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit. Since P8 a
+   PreToolUse hook enforces this for commits made from Claude Code (`.claude/hooks/commit-gate.mjs`),
+   plus the `Verified:` / `Not verified:` lines. Gate runtime measured 2026-10-05: typecheck 4 s, lint
+   14 s, build 14 s, about 31 s per commit.
 
 ---
 

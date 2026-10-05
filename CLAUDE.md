@@ -51,6 +51,9 @@ Before any commit:
 3. If the change is user-facing, update `CHANGELOG.md`
 
 Claude must not create a commit if either `npm run build` or `npm run lint` fails.
+This is now enforced by a hook (`.claude/hooks/commit-gate.mjs`, P8): a `git commit` from Claude Code
+is blocked unless typecheck, lint and build pass and the message has `Verified:` and `Not verified:`
+lines. This prose is the fallback for anything the hook does not cover.
 
 ## Working Rules
 
