@@ -672,7 +672,8 @@ rewrite strategy. Keeping the module ceiling and WIP 1 keeps the build focused.
 ## ADR-025: Project roadmap inside Projects (P12); amends ADR-016
 
 **Date:** 2026-10-05
-**Status:** Proposed (Roman chose the options on 2026-10-05; accepted when the P12 PR merges)
+**Status:** Accepted (Roman, 2026-10-05). Merged before P1 was `done`, by Roman's explicit exception to
+WIP = 1 on 2026-10-05; the original condition was to merge only after P1 closed.
 **Amends:** ADR-016 (milestone as a label with no CRUD surface). **Relates to:** ADR-024 (queue, WIP = 1, 9-module ceiling).
 
 ### Context

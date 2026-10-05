@@ -192,9 +192,10 @@ scores, no guilt mechanics where you look every day.
 
 ### P12 — Project roadmap inside Projects · M
 
-**Status:** queued
+**Status:** done
 
-**Note:** built on `feat/p12-project-roadmap` while P1 is open; merge only after P1 is `done` (ADR-025).
+**Note:** built while P1 was open and merged on 2026-10-05 before P1 closed, by Roman's explicit
+exception to WIP = 1 (ADR-025). The planned condition was to merge only after P1 is `done`.
 
 **Why:** a project's objective has no visible path to it. Milestones were a flat checklist and project
 tasks a separate list, so "what is the next outcome and what moves it" took reading two lists and
