@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, OS `DEC-2026-10-03-001`):** P1 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, OS `DEC-2026-10-03-001`):** P1 → P12 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 
@@ -188,6 +188,38 @@ scores, no guilt mechanics where you look every day.
 2. XP, level and streak remain reachable in Achievements and the avatar menu.
 3. No store, XP-engine or achievement logic changes — this is placement, not removal.
 4. Nothing on the Command Center counts days in a row.
+---
+
+### P12 — Project roadmap inside Projects · M
+
+**Status:** done
+
+**Note:** built while P1 was open and merged on 2026-10-05 before P1 closed, by Roman's explicit
+exception to WIP = 1 (ADR-025). The planned condition was to merge only after P1 is `done`.
+
+**Why:** a project's objective has no visible path to it. Milestones were a flat checklist and project
+tasks a separate list, so "what is the next outcome and what moves it" took reading two lists and
+ToDo. Ranked before P7 because P7 is blocked on the OS feed and the PAT.
+
+**Shape.** One Roadmap section in the project detail Sheet (no new module, no tab): milestones in
+order on a timeline rail, each with a target date, a definition of done, its tasks and its linked
+Resources; a "No milestone" group for the project's other tasks. Data per ADR-025: milestones stay
+embedded in the Project; `Task.milestoneId`; `resourceIds` on Project and milestone.
+
+**Acceptance criteria**
+
+1. Milestones: create (title, target date, definition of done, resources), edit, complete and reopen,
+   move up / down, delete with confirmation. Deleting moves its tasks to "No milestone".
+2. Tasks: add inline under a milestone or under "No milestone" (Enter adds and keeps focus), rename,
+   move to another milestone, complete, delete with confirmation. They show in ToDo as before.
+3. Resources: link and unlink from the project and from each milestone through a searchable picker;
+   a linked chip opens the resource's first URL. The Resource card lists where it is linked from.
+4. The next open milestone is marked; target dates show as overdue (red), due within 7 days (amber),
+   or neutral. A segmented strip shows per-milestone progress.
+5. Esc inside an inline editor cancels the edit and does not close the Sheet.
+6. Legacy milestones keep their order after the v12 migration; a new milestone is added last.
+7. No new collection, no Firestore rules change, no new module.
+
 ---
 
 ### P7 — Read the OS context feed · M

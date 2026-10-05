@@ -7,8 +7,6 @@ import { getProjectStatus } from "@/lib/execution-os"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -20,10 +18,10 @@ import { Progress } from "@/components/ui/progress"
 import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
-import { AlertTriangle, CalendarIcon, Check, ChevronRight, ExternalLink, Link as LinkIcon, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
-import type { Project, ProjectMilestone, ProjectStatus, Task } from "@/lib/types"
+import { AlertTriangle, CalendarIcon, Check, ExternalLink, Link as LinkIcon, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import type { Project, ProjectStatus, Task } from "@/lib/types"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
+import { ProjectResourceLinks, ProjectRoadmap } from "./project-roadmap"
 
 const DEFAULT_PROJECT_COLOR = "#3b82f6"
 const LEGACY_COLOR_MAP: Record<string, string> = {
@@ -71,10 +69,6 @@ function getProjectLinks(project: { url?: string; links?: Array<{ label: string;
   return []
 }
 
-function sortMilestonesByTitle(milestones: ProjectMilestone[]) {
-  return [...milestones].sort((a, b) => a.title.localeCompare(b.title))
-}
-
 function parseMilestones(input: string) {
   return input
     .split(",")
@@ -118,11 +112,6 @@ export function ProjectsModule() {
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
-  const toggleTask = useAppStore((s) => s.toggleTask)
-  const toggleMilestone = useAppStore((s) => s.toggleMilestone)
-  const addMilestone = useAppStore((s) => s.addMilestone)
-  const updateMilestone = useAppStore((s) => s.updateMilestone)
-  const deleteMilestone = useAppStore((s) => s.deleteMilestone)
 
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
@@ -147,11 +136,6 @@ export function ProjectsModule() {
   const [selectedStatus, setSelectedStatus] = useState<ProjectStatus>("active")
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
-  // Milestone state for the detail sheet
-  const [newMilestoneByProject, setNewMilestoneByProject] = useState<Record<string, { title: string; dayIndex: number }>>({})
-  const [editingMilestone, setEditingMilestone] = useState<{ projectId: string; milestoneId: string } | null>(null)
-  const [editingMilestoneTitle, setEditingMilestoneTitle] = useState("")
-  const [editingMilestoneDayIndex, setEditingMilestoneDayIndex] = useState(0)
 
   const defaultWeekRange = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -232,47 +216,6 @@ export function ProjectsModule() {
     }
     setFormError(null)
     setOpen(false)
-  }
-
-  function getMilestoneDraft(projectId: string) {
-    return newMilestoneByProject[projectId] ?? { title: "", dayIndex: 0 }
-  }
-
-  function updateMilestoneDraft(projectId: string, updates: Partial<{ title: string; dayIndex: number }>) {
-    setNewMilestoneByProject((prev) => ({
-      ...prev,
-      [projectId]: { ...getMilestoneDraft(projectId), ...updates },
-    }))
-  }
-
-  function handleAddMilestone(projectId: string) {
-    const draft = getMilestoneDraft(projectId)
-    if (!draft.title.trim()) return
-    addMilestone(projectId, { title: draft.title.trim(), dayIndex: 0 })
-    updateMilestoneDraft(projectId, { title: "" })
-  }
-
-  function startEditingMilestone(projectId: string, milestone: ProjectMilestone) {
-    setEditingMilestone({ projectId, milestoneId: milestone.id })
-    setEditingMilestoneTitle(milestone.title)
-    setEditingMilestoneDayIndex(milestone.dayIndex)
-  }
-
-  function saveMilestoneEdit() {
-    if (!editingMilestone || !editingMilestoneTitle.trim()) return
-    updateMilestone(editingMilestone.projectId, editingMilestone.milestoneId, {
-      title: editingMilestoneTitle.trim(),
-      dayIndex: editingMilestoneDayIndex,
-    })
-    setEditingMilestone(null)
-    setEditingMilestoneTitle("")
-    setEditingMilestoneDayIndex(0)
-  }
-
-  function cancelMilestoneEdit() {
-    setEditingMilestone(null)
-    setEditingMilestoneTitle("")
-    setEditingMilestoneDayIndex(0)
   }
 
   return (
@@ -510,7 +453,14 @@ export function ProjectsModule() {
 
       {/* Detail sheet (click-to-open from list row) */}
       <Sheet open={!!selectedProject} onOpenChange={(isOpen) => !isOpen && setSelectedProjectId(null)}>
-        <SheetContent className="w-full sm:max-w-md flex flex-col gap-0 p-0 [&>button:last-child]:hidden">
+        <SheetContent
+          className="w-full sm:max-w-xl flex flex-col gap-0 p-0 [&>button:last-child]:hidden"
+          onEscapeKeyDown={(e) => {
+            // Esc inside an inline editor cancels the edit, not the whole sheet.
+            const target = e.target as HTMLElement | null
+            if (target?.closest?.("input, textarea, [data-inline-edit]")) e.preventDefault()
+          }}
+        >
           <SheetTitle className="sr-only">{selectedProject?.title ?? "Project details"}</SheetTitle>
           {selectedProject ? (
             <ProjectDetailPanel
@@ -520,18 +470,6 @@ export function ProjectsModule() {
               onUpdateProject={updateProject}
               onStatusChange={(id, nextStatus) => updateProject(id, { status: nextStatus })}
               onDelete={deleteProject}
-              editingMilestone={editingMilestone}
-              editingMilestoneTitle={editingMilestoneTitle}
-              getMilestoneDraft={getMilestoneDraft}
-              updateMilestoneDraft={updateMilestoneDraft}
-              handleAddMilestone={handleAddMilestone}
-              onToggleTask={toggleTask}
-              toggleMilestone={toggleMilestone}
-              startEditingMilestone={startEditingMilestone}
-              saveMilestoneEdit={saveMilestoneEdit}
-              cancelMilestoneEdit={cancelMilestoneEdit}
-              setEditingMilestoneTitle={setEditingMilestoneTitle}
-              deleteMilestone={deleteMilestone}
             />
           ) : null}
         </SheetContent>
@@ -695,18 +633,6 @@ function ProjectDetailPanel({
   onUpdateProject,
   onStatusChange,
   onDelete,
-  editingMilestone,
-  editingMilestoneTitle,
-  getMilestoneDraft,
-  updateMilestoneDraft,
-  handleAddMilestone,
-  toggleMilestone,
-  startEditingMilestone,
-  saveMilestoneEdit,
-  cancelMilestoneEdit,
-  setEditingMilestoneTitle,
-  deleteMilestone,
-  onToggleTask,
 }: {
   project: Project
   tasks: Task[]
@@ -714,20 +640,7 @@ function ProjectDetailPanel({
   onUpdateProject: (id: string, updates: Partial<Project>) => void
   onStatusChange: (id: string, status: ProjectStatus) => void
   onDelete: (id: string) => void
-  editingMilestone: { projectId: string; milestoneId: string } | null
-  editingMilestoneTitle: string
-  getMilestoneDraft: (projectId: string) => { title: string; dayIndex: number }
-  updateMilestoneDraft: (projectId: string, updates: Partial<{ title: string; dayIndex: number }>) => void
-  handleAddMilestone: (projectId: string) => void
-  toggleMilestone: (projectId: string, milestoneId: string) => void
-  startEditingMilestone: (projectId: string, milestone: ProjectMilestone) => void
-  saveMilestoneEdit: () => void
-  cancelMilestoneEdit: () => void
-  setEditingMilestoneTitle: (value: string) => void
-  deleteMilestone: (projectId: string, milestoneId: string) => void
-  onToggleTask: (taskId: string) => void
 }) {
-  const [showAddMilestone, setShowAddMilestone] = useState(false)
   const [showAddLink, setShowAddLink] = useState(false)
   const [addLinkLabel, setAddLinkLabel] = useState("")
   const [addLinkUrl, setAddLinkUrl] = useState("")
@@ -736,13 +649,6 @@ function ProjectDetailPanel({
   const [editingLinkUrl, setEditingLinkUrl] = useState("")
   const [deleteLinkIdx, setDeleteLinkIdx] = useState<number | null>(null)
 
-  const projectTasks = tasks.filter((t) => t.linkedProjectId === project.id)
-  const completedTasks = projectTasks.filter((t) => t.completed).length
-  const sortedMilestones = sortMilestonesByTitle(project.milestones)
-  const openMilestones = sortedMilestones.filter((m) => !m.completed)
-  const completedMilestones = sortedMilestones.filter((m) => m.completed)
-  const totalMilestones = project.milestones.length
-  const progressPct = totalMilestones > 0 ? (completedMilestones.length / totalMilestones) * 100 : 0
   const dotColor = normalizeProjectColor(project.color)
   const currentStatus = getProjectStatus(project)
   const days = daysLeftInfo(project)
@@ -751,11 +657,6 @@ function ProjectDetailPanel({
   const weeklyLines = project.weeklyOutcome?.trim()
     ? project.weeklyOutcome.trim().split("\n").filter((l) => l.trim())
     : []
-
-  function commitAddMilestone() {
-    handleAddMilestone(project.id)
-    setShowAddMilestone(false)
-  }
 
   const projectLinks = getProjectLinks(project)
 
@@ -831,23 +732,6 @@ function ProjectDetailPanel({
           <p className="text-sm italic text-muted-foreground">{project.objective}</p>
         ) : null}
 
-        {/* Progress */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-medium">Progress</p>
-            <div className="flex items-center gap-2">
-              <Progress value={progressPct} className="h-1.5 w-28 [&>div]:bg-primary" />
-              <span className="w-8 text-right text-xs text-muted-foreground">{Math.round(progressPct)}%</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {completedMilestones.length} of {totalMilestones} milestones
-            {projectTasks.length > 0 ? (
-              <> · {completedTasks}/{projectTasks.length} tasks</>
-            ) : null}
-          </p>
-        </div>
-
         {/* This week — weekly outcome as bullet lines */}
         {weeklyLines.length > 0 ? (
           <div className="flex flex-col gap-1">
@@ -861,225 +745,11 @@ function ProjectDetailPanel({
           </div>
         ) : null}
 
-        {/* Milestones */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium">Milestones</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setShowAddMilestone(true)}
-            >
-              <Plus className="h-3 w-3" /> Add
-            </Button>
-          </div>
+        {/* Roadmap — milestones with their tasks (P12, ADR-025) */}
+        <ProjectRoadmap project={project} />
 
-          {showAddMilestone ? (
-            <div className="flex gap-1.5">
-              <Input
-                value={getMilestoneDraft(project.id).title}
-                onChange={(e) => updateMilestoneDraft(project.id, { title: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitAddMilestone()
-                  if (e.key === "Escape") {
-                    setShowAddMilestone(false)
-                    updateMilestoneDraft(project.id, { title: "" })
-                  }
-                }}
-                placeholder="Milestone name..."
-                className="h-8 text-xs"
-                autoFocus
-              />
-              <Button type="button" size="icon" variant="secondary" className="h-8 w-8" onClick={commitAddMilestone}>
-                <Check className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => {
-                  setShowAddMilestone(false)
-                  updateMilestoneDraft(project.id, { title: "" })
-                }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-1">
-            {openMilestones.map((m) => (
-              <div key={m.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
-                <Checkbox
-                  checked={false}
-                  onCheckedChange={() => toggleMilestone(project.id, m.id)}
-                  aria-label={`Complete milestone: ${m.title}`}
-                  className="shrink-0"
-                />
-                {editingMilestone?.projectId === project.id && editingMilestone.milestoneId === m.id ? (
-                  <>
-                    <Input
-                      value={editingMilestoneTitle}
-                      onChange={(e) => setEditingMilestoneTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveMilestoneEdit()
-                        if (e.key === "Escape") cancelMilestoneEdit()
-                      }}
-                      className="h-7 flex-1 text-xs"
-                      autoFocus
-                    />
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveMilestoneEdit}>
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelMilestoneEdit}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <TruncatedTooltip as="p" content={m.title} className="min-w-0 flex-1 truncate text-sm" />
-                    <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={() => startEditingMilestone(project.id, m)}
-                        aria-label={`Edit milestone: ${m.title}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 text-destructive"
-                        onClick={() => deleteMilestone(project.id, m.id)}
-                        aria-label={`Delete milestone: ${m.title}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-            {openMilestones.length === 0 && !showAddMilestone ? (
-              <p className="text-xs text-muted-foreground">No open milestones.</p>
-            ) : null}
-          </div>
-
-          {completedMilestones.length > 0 ? (
-            <Collapsible>
-              <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                <CollapsibleTrigger asChild>
-                  <button type="button" className="group flex w-full items-center gap-2 text-left">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Completed ({completedMilestones.length})
-                    </p>
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="flex flex-col gap-1">
-                    {completedMilestones.map((m) => (
-                      <div key={m.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
-                        <Checkbox
-                          checked={true}
-                          onCheckedChange={() => toggleMilestone(project.id, m.id)}
-                          aria-label={`Reopen milestone: ${m.title}`}
-                          className="shrink-0"
-                        />
-                        <TruncatedTooltip
-                          as="p"
-                          content={m.title}
-                          className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          ) : null}
-        </div>
-
-        {/* Tasks */}
-        {projectTasks.length > 0 ? (() => {
-          const today = new Date()
-          const openTasks = projectTasks.filter((t) => !t.completed)
-          const doneTasks = projectTasks.filter((t) => t.completed)
-          return (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium">Tasks</p>
-              <div className="flex flex-col gap-1">
-                {openTasks.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No open tasks.</p>
-                ) : (
-                  openTasks.map((t) => {
-                    const overdue = t.dueDate
-                      ? differenceInCalendarDays(parseISO(t.dueDate), today) < 0
-                      : false
-                    return (
-                      <div key={t.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-muted/40">
-                        <Checkbox
-                          checked={false}
-                          onCheckedChange={() => onToggleTask(t.id)}
-                          aria-label={`Complete task: ${t.title}`}
-                          className="shrink-0"
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>
-                        {overdue && t.dueDate ? (
-                          <span className="shrink-0 text-xs text-destructive">
-                            {format(parseISO(t.dueDate), "MMM d")}
-                          </span>
-                        ) : t.dueDate ? (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {format(parseISO(t.dueDate), "MMM d")}
-                          </span>
-                        ) : null}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-              {doneTasks.length > 0 ? (
-                <Collapsible>
-                  <div className="rounded-md border border-border/60 bg-background/40 p-2">
-                    <CollapsibleTrigger asChild>
-                      <button type="button" className="group flex w-full items-center gap-2 text-left">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Done ({doneTasks.length})
-                        </p>
-                      </button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-2">
-                      <div className="flex flex-col gap-1">
-                        {doneTasks.map((t) => (
-                          <div key={t.id} className="flex items-center gap-2 rounded-md px-1 py-0.5">
-                            <Checkbox
-                              checked={true}
-                              onCheckedChange={() => onToggleTask(t.id)}
-                              aria-label={`Reopen task: ${t.title}`}
-                              className="shrink-0"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-sm line-through text-muted-foreground">
-                              {t.title}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              ) : null}
-            </div>
-          )
-        })() : null}
+        {/* Resources — cross-links to the Resources library */}
+        <ProjectResourceLinks project={project} />
 
         {/* Links — inline editable */}
         <div className="flex flex-col gap-2">
@@ -1105,13 +775,19 @@ function ProjectDetailPanel({
                   value={addLinkLabel}
                   onChange={(e) => setAddLinkLabel(e.target.value)}
                   placeholder="Label"
-                  className="h-7 text-xs"
+                  aria-label="Link label"
+                  className="h-7 w-28 shrink-0 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitAddLink()
+                    if (e.key === "Escape") setShowAddLink(false)
+                  }}
                 />
                 <Input
                   value={addLinkUrl}
                   onChange={(e) => setAddLinkUrl(e.target.value)}
                   placeholder="https://..."
-                  className="h-7 flex-1 text-xs"
+                  aria-label="Link URL"
+                  className="h-7 min-w-0 flex-1 text-xs"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") commitAddLink()
                     if (e.key === "Escape") setShowAddLink(false)
@@ -1120,7 +796,7 @@ function ProjectDetailPanel({
                 />
               </div>
               <div className="flex gap-1.5">
-                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink}>
+                <Button type="button" size="sm" variant="secondary" className="h-7 text-xs" onClick={commitAddLink} disabled={!normalizeUrl(addLinkUrl)}>
                   Save
                 </Button>
                 <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddLink(false); setAddLinkLabel(""); setAddLinkUrl("") }}>
@@ -1131,7 +807,7 @@ function ProjectDetailPanel({
           ) : null}
 
           {projectLinks.length === 0 && !showAddLink ? (
-            <p className="text-xs text-muted-foreground">No links yet — add one.</p>
+            <p className="text-xs text-muted-foreground">No links yet. Add the repo, live app or design file.</p>
           ) : null}
 
           <div className="flex flex-col gap-1">

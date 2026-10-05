@@ -666,3 +666,89 @@ rewrite strategy. Keeping the module ceiling and WIP 1 keeps the build focused.
 - **Rollback:** revert the PR that adds this ADR.
 
 **Revisit trigger:** P11 shipped (the write model in use), or an OS decision on the revert date.
+
+---
+
+## ADR-025: Project roadmap inside Projects (P12); amends ADR-016
+
+**Date:** 2026-10-05
+**Status:** Accepted (Roman, 2026-10-05). Merged before P1 was `done`, by Roman's explicit exception to
+WIP = 1 on 2026-10-05; the original condition was to merge only after P1 closed.
+**Amends:** ADR-016 (milestone as a label with no CRUD surface). **Relates to:** ADR-024 (queue, WIP = 1, 9-module ceiling).
+
+### Context
+
+Roman asked for a project roadmap inside the Projects module: create, edit and delete milestones and
+tasks, and link Resources to them. Two things stood in the way.
+
+- **ADR-016 vs the code.** ADR-016 chose Project → Tasks with an optional milestone *label* and no
+  milestone CRUD. The label was never built. The code instead embeds `milestones[]` in the Project
+  document as a checklist (title, done, completion date, a legacy 0–6 weekday index), with add,
+  rename, toggle and delete already in the detail Sheet. Tasks join projects through
+  `Task.linkedProjectId` only.
+- **The queue.** The item is not in `CONTROL_PLANE_UI_SPEC.md`. P1 is `open` until its verdict on
+  2026-10-06; P7 is next but blocked on the OS context feed and the PAT.
+
+### Decision
+
+1. **Data model: extend what exists, no new collection.**
+   - `ProjectMilestone` gains optional `order`, `targetDate` (yyyy-MM-dd), `note` (definition of
+     done) and `resourceIds`. It stays embedded in the Project document.
+   - `Task` gains optional `milestoneId`, which points at a milestone of its `linkedProjectId`.
+     `""` means unassigned. An empty string is used rather than `undefined` because writes go
+     through `set(..., { merge: true })` with `undefined` stripped, so an unset field would never
+     clear on the server.
+   - `Project` gains optional `resourceIds`.
+   - Firestore rules are unchanged; the generic sync rule already accepts these documents.
+2. **Milestones get a CRUD surface** in the project detail Sheet: create and edit through a dialog,
+   reorder (move up / down), complete and reopen, delete with confirmation. Deleting a milestone
+   moves its tasks to "No milestone"; it never deletes tasks.
+3. **Tasks get a CRUD surface inside the roadmap:** add inline under a milestone, rename, move between
+   milestones, complete, delete with confirmation. They are ordinary `Task` documents and appear in
+   ToDo as before.
+4. **Resources are cross-linked by id**, from the project and from each milestone. A resource card
+   shows where it is linked from. Ids of deleted resources are ignored when rendering, so deleting a
+   resource needs no cascade.
+5. **Queue.** The item becomes **P12**, ranked right after P1 because P7 is blocked. It is built on a
+   feature branch now and merged only after P1 is set to `done`, so WIP = 1 holds at merge time.
+
+### Rationale
+
+- The embedded milestones already exist and sync; extending them is additive and reversible.
+  A `milestones` collection would add rules, a registry entry, sync paths and a migration while the
+  sync layer still has open correctness work.
+- `Task.milestoneId` gives a real join (renaming a milestone does not touch its tasks), which
+  ADR-016's free-text label could not.
+- Last-write-wins is per document. Milestone edits rewrite the whole Project document, which is
+  acceptable for a single user. Two devices editing different milestones of the same project
+  offline can lose one edit; that risk exists today for every Project field.
+
+### Consequences
+
+- Persist version 11 → 12. `migrate` gives legacy milestones an `order` (their old weekday order)
+  and keeps all other fields. New milestones are appended after renumbering, so legacy data never
+  jumps above them.
+- The detail Sheet widens from `max-w-md` to `max-w-xl`. The separate Milestones and Tasks sections
+  and the duplicated Progress block are replaced by one Roadmap section.
+- The list row's progress still counts completed milestones, as before.
+- ADR-016's "remove the field after 30 days if unused" applies to `Task.milestoneId`: if no task
+  carries one 30 days after P12 merges, remove the grouping and keep the checklist.
+- **Not in scope:** milestone-level resources on tasks, drag-and-drop ordering, dependencies,
+  a Gantt view, syncing roadmaps to the AI-Business-OS repo (P11 decides what MK writes there).
+- **Rollback:** revert the P12 PR. Caveat: zustand runs `migrate` on any version mismatch, and the
+  v11 `migrate` rebuilds each milestone from known fields, so on a device that ran v12 it drops
+  `order`, `targetDate`, `note` and `resourceIds` from local state. The next edit to that project
+  then writes the stripped milestones to Firestore. Before rolling back, export Firestore (or the
+  `magic-kick-store` localStorage key) if roadmap data matters. Task `milestoneId` and project
+  `resourceIds` survive, because v11 spreads tasks and projects.
+
+### Alternatives rejected
+
+- **Milestone collection (`users/{uid}/milestones`).** Cleaner model, but it adds sync and rules
+  surface and a migration for the same user-visible result at this scale.
+- **Literal ADR-016 label.** Renaming means relabelling every task, and there is nowhere for a
+  target date, a definition of done or Resource links.
+- **A Roadmap tab or module.** Breaks "one canonical active view" and the 9-module ceiling.
+
+**Revisit trigger:** two devices losing milestone edits in practice, or more than ~20 milestones on a
+project (time to move them into their own documents).

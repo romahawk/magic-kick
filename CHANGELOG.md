@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - Project roadmap (P12)
+
+### Added
+- A Roadmap section in the project detail panel. Milestones sit in order on a timeline, each with a target date, a definition of done, its tasks and linked resources. The next open milestone is marked, and overdue or due-soon dates are flagged.
+- Milestones can be created, edited, reordered, completed and deleted. Deleting one keeps its tasks on the project under "No milestone".
+- Tasks can be added, renamed, moved between milestones, completed and deleted from the roadmap. They still show in ToDo.
+- Resources can be linked to a project and to each milestone through a searchable picker. A resource card shows where it is linked from.
+
+### Changed
+- The project detail panel is wider. One Roadmap section replaces the separate Milestones, Tasks and Progress blocks.
+- Pressing Esc inside an input in the project panel cancels the edit instead of closing the panel.
+
+---
+
 ## [Unreleased] - 2026-10-05 - ToDo lanes grouped by time
 
 ### Changed
