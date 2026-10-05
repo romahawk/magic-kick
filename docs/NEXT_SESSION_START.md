@@ -1,164 +1,146 @@
 # Next Session Start
 
-**Last updated:** 2026-10-04 (ADR-024: Magic Kick is the UI of AI-Business-OS; #127, #128 merged)
-**Resume on:** `main` after the `docs/adr-024-os-ui` PR merges (until then, `main` at `d86197a`, PR #128). Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-02 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
-**Typecheck status:** passing as of 2026-10-02 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
-**Lint status:** passing as of 2026-10-02 — `npm run lint` exit 0
+**Last updated:** 2026-10-05 (session 2026-10-02 → 10-05: #126–#131 merged; ADR-023, ADR-024, ADR-025; P12 and ToDo time groups shipped)
+**Resume on:** `main` (`33fc3b7`, #131) after the `docs/session-close-2026-10-05` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-05 — `npm run build` exit 0 on `48a1144`, identical tree to `main` `33fc3b7` (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Typecheck status:** passing as of 2026-10-05 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
+**Lint status:** passing as of 2026-10-05 — `npm run lint` exit 0
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** no dependency changes since 2026-09-24.
+**Note:** code and governance session. No dependency changes since 2026-09-24. P12 bumps the persisted store version from 11 to 12.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Read ADR-024 first.** Magic Kick is now the UI of AI-Business-OS: no sandbox framing, a ranked
-   roadmap (P1 → P7 → P11 → P8 → …), WIP = 1, 9-module ceiling kept, the OS repo stays the source of
-   truth and MK writes to it (tasks and context directly, strategy files through a PR).
-3. **P1 is `open`; its usage gate is measurement only**, window 2026-09-29 → 2026-10-05. Pass = 5 of 7
-   days with a task completed. Count from `completedAt` dates (browser console snippet, session of
-   2026-10-04).
-4. **On 2026-10-06:** record the verdict in `docs/DECISIONS_LOG.md` (a date table plus the result),
-   set P1 to `done`, set P7 to `open`. A fail is recorded and taken to the weekly review; it does not
-   stop the build.
-5. **P7 still needs two things from outside this repo:** the OS context feed script plus its
-   feed-shape document (an OS session), and a GitHub fine-grained PAT with `Contents` + `Pull requests`
-   read/write on AI-Business-OS only (Roman). The route unfreeze is ADR-024 §6.
-6. **OS session pending:** cross-repo decision guard, a generic `repo-sync` skill, the amendment to
-   OS `DEC-2026-10-03-001`, and an OS decision on removing the 2026-10-21 revert (ADR-024 §8). Until
-   that lands, 2026-10-21 stands.
-7. Read ADR-020, ADR-021 and ADR-024 before any control-plane or scope decision.
+2. **Read ADR-024 first.** Magic Kick is the UI of AI-Business-OS: no sandbox framing, a ranked roadmap,
+   WIP = 1, the 9-module ceiling kept, the OS repo stays the source of truth and MK writes to it (tasks
+   and context directly, strategy files through a PR). ADR-025 added P12 (now `done`).
+3. **Working order:** P1 (`open`) → P12 (`done`) → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+4. **2026-10-06: record the P1 usage-gate verdict** in `docs/DECISIONS_LOG.md`: a date table and the
+   result. Window 2026-09-29 → 2026-10-05; pass = 5 of 7 days with a task completed; measurement only
+   (a fail is recorded and taken to the weekly review, it does not stop the build). Count with this in
+   the browser console on the logged-in app:
+   ```js
+   const s = JSON.parse(localStorage.getItem("magic-kick-store")).state
+   const days = new Set()
+   for (const t of s.tasks) {
+     if (t.deleted) continue
+     if (t.completedAt) days.add(t.completedAt.slice(0, 10))
+     for (const d of t.recurrenceCompletedDates ?? []) days.add(d.slice(0, 10))
+   }
+   console.log([...days].filter(d => d >= "2026-09-29" && d <= "2026-10-05").sort())
+   ```
+   Assumed, not checked: `completedAt` may be UTC, lane moves leave no timestamp, un-completing erases
+   the date. Then set P1 to `done` and P7 to `open`.
+5. **P7 still needs two things from outside this repo:** the OS context feed script plus its feed-shape
+   document (an OS session), and a GitHub fine-grained PAT with `Contents` + `Pull requests` read/write
+   on AI-Business-OS only (Roman). The route unfreeze is ADR-024 §6.
+6. **OS session pending** (prompt drafted in this session; see Open items).
+7. Read ADR-020, ADR-021, ADR-024 and ADR-025 before any control-plane or scope decision.
 8. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
+
+---
+
+## Where we left off (2026-10-05) — Magic Kick became the OS UI; P1 fixed; P12 and ToDo shipped
+
+**Merged to `main` (by Roman, on GitHub):**
+- **#126** `d3535fe` — production URL docs: https://magic-kick.vercel.app/ is the single URL.
+- **#127** `0be452d` — ADR-023 accepted: P8 before P7 while P7 is blocked; P8 also checks commit
+  messages. Point 1 later superseded by ADR-024; point 2 stands.
+- **#128** `d86197a` — P1 fix: `lib/execution-os.ts` `selectAttentionItems` returns `{ items, total }`,
+  keeps the load row in the last slot when the list overflows; `attention-block.tsx` shows "6 of N".
+- **#129** `6e528d5` — **ADR-024**: Magic Kick is the UI of AI-Business-OS. Rewrote the Governing Rule
+  in `CLAUDE.md` and `AGENTS.md`; `docs/CLAUDE.md` §1/§3/§4/§5/§6/§7 (session frame is item + goal,
+  branches `feat/`/`fix/`/`docs/`, Tracks 0–7 retired, GitHub API route unfrozen for the OS repo only,
+  WIP section replaced); spec: P1 gate measurement-only, new **P11 "Write back to the OS"**;
+  `docs/SANDBOX_RULES.md` rewritten as Scope Rules; README, checklist, issue template, session-start skill.
+- **#130** `c84408a` — ToDo: with "Date: earliest", lanes are split into Overdue / Today / Tomorrow /
+  Later / No date; same-day tasks are ordered by start time (`components/modules/todo-module.tsx`).
+- **#131** `33fc3b7` — **P12 project roadmap** (built by a separate session in this checkout, rebased
+  here onto `main`): `lib/roadmap.ts`, `components/modules/project-roadmap.tsx`, store v11 → v12,
+  `projects-module.tsx`, `resources-module.tsx` backlinks; **ADR-025** accepted, merged before P1 closed
+  by Roman's explicit exception to WIP = 1.
+
+**Branch map:** every session branch is merged, and the local copies are deleted. Still on origin
+(merged, safe to delete): `docs/adr-p8-before-p7`, `fix/p1-load-row-cutoff`, `docs/adr-024-os-ui`,
+`feat/todo-time-groups`, `feat/p12-project-roadmap`. The worktree `magic-kick-wt-todo` is removed.
+This close is on `docs/session-close-2026-10-05`.
+
+**Verified (confirmed):**
+- Gates: lint, typecheck and build exit 0 on `48a1144` (2026-10-05); `main` `33fc3b7` has an identical tree.
+  CI green on #126–#131.
+- P1 browser check (headless Edge, demo + seeded tasks): desktop 1280×800, the whole block is above the
+  fold. Roman's real data: desktop shows "6 of 7" with the load row last; iPhone 16 Pro Max 440×956 all
+  rows above the fold; Galaxy A55 360×800 focus + about 2½ attention rows (DevTools emulation).
+- #128 in the browser: 7 items → "6 of 7" with the load row last; 2 items → "2".
+- #130 in the browser: section order correct, Today ordered 09:00 → 15:00 → untimed, Manual order flat.
+  Roman confirmed it displays correctly on Vercel.
+- P12 after the rebase: the Projects panel shows the Roadmap, and ToDo shows the sections (demo, 1440×900).
+
+**Not verified:**
+- **The P12 store migration v11 → v12 on real localStorage data.** It runs on the first load after
+  deploy. If Projects or ToDo look wrong, check this first.
+- P12: Firestore sync of the new fields across two devices; light theme.
+- #130: mobile widths; dragging between sections.
+- P1 criterion 1 on small phones: 360×800 shows focus + about 2½ attention rows. **Roman's ruling pending.**
+- The Next.js dev overlay showed "1 Issue" after the P12 rebase; not opened (probably the `/login`
+  hydration warning below).
+
+**Process notes:**
+- **Shared checkout again (2026-10-05):** the P12 session committed in this checkout while this session
+  was running. The ToDo change went through a separate worktree. In a worktree, Turbopack rejects a
+  `node_modules` junction that points outside the root ("Symlink node_modules is invalid"): run `npm ci`
+  in the worktree, or use `next dev --webpack` for a quick look.
+- An OS decision (`DEC-2026-10-03-001`, OS commit `9712e0c`) contradicted ADR-023 one day after it was
+  accepted, because no skill reads this log from an OS session. ADR-024 resolved it here; the OS-side
+  fix is in the OS session prompt.
+- `next dev` on port 3001 was started by Roman; sessions should not stop it. Driving the app headless:
+  `playwright-core` + installed Edge (`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`),
+  **Try Demo**, seed via `localStorage["magic-kick-store"]`. Worth turning into a project skill
+  (`/run-skill-generator`).
 
 ---
 
 ## Where we left off (2026-09-29) — P1 code complete, usage gate running
 
-**Merged to `main` today (by Roman, on GitHub):**
-- **#123** `fix(p1): show load in attention block whenever status is not Stable` (`d910882`) —
-  `lib/execution-os.ts`, `CHANGELOG.md`. Settles P1 criterion 7 by widening the code.
-- **#124** `Docs/queue p8 p9` (`5622c6d`) — `docs/CONTROL_PLANE_UI_SPEC.md`: working order
-  P1 → P7 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5 (OS `DEC-2026-09-27-001`), P1 usage gate
-  (criterion 6), P6 decided, P7 reshaped as the OS context feed reader, P8, P9, P10 added.
+**Merged to `main` (by Roman, on GitHub):** #123 `d910882` (load row whenever status is not Stable;
+settles P1 criterion 7) and #124 `5622c6d` (working order, P1 usage gate, P6 decided, P7 reshaped as
+the OS feed reader, P8–P10 added). Branch `docs/p1-usage-gate` became #125.
 
-**This branch (`docs/p1-usage-gate`):** P1 note "code complete; usage gate running
-2026-09-29 → 2026-10-06"; criterion 7 recorded as settled; the Proposed decision entry; this note.
+**Verified:** lint, typecheck and build exit 0 on the tree that became #123.
 
-**Verified (confirmed):**
-- lint, typecheck and build exit 0 on the tree that became #123 (run 2026-09-29).
-- The load change cannot produce an empty detail line: `calculateCognitiveLoad` has three pressure
-  sources, so any non-`Stable` status without over-capacity has a named cause.
+**Not verified then, since checked:** P1 in a browser and the load row with real pressure (both
+checked 2026-10-02 → 10-03, see above).
 
-**Not verified:**
-- P1 in a browser by this session. Roman reported it working on 2026-09-29; devices and viewport
-  were not stated, so criterion 1 (desktop + mobile above the fold) rests on that report.
-- The load row with real pressure (tasks due today over the focus limit, or a missed outcome).
-
-**Process notes:**
-- A Cowork session and this Claude Code session shared one checkout on 2026-09-29, and the Cowork
-  session committed on a branch under the other's feet. Roman confirmed it has stopped. One session
-  per checkout; use a worktree if two must run.
-- #123 and #124 merged with squash messages that lack `Verified:` / `Not verified:` and with PR
-  bodies not filled in. The PR bodies were filled in after the merge; commit messages on `main`
-  are not rewritten (that needs a force-push to `main`).
-- Local branches `docs/queue-p8-p9` and `fix/p1-load-status` hold reworded copies of the same
-  content as #123/#124 and can be deleted; the remote `fix/p1-load-status` and `docs/queue-p8-p9`
-  branches are merged and can be deleted too.
-
----
-
-## Where we left off (2026-09-24) — P1 and session skills on `main`, P1 not yet seen in a browser
-
-**Session summary:** four PRs merged. #119 (control-plane docs) went to `main`. #118 (P1) and #120
-(skills) merged into their already-merged base branch by mistake. #121 brought both onto `main`.
-All session branches are deleted.
-
-On `main` now:
-- **P1 attention block** (#118, via #121):
-  - `lib/execution-os.ts`: `selectAttentionItems()`, `selectOverdueTasks()`, `AttentionItem`,
-    `AttentionKind`, `ATTENTION_LIMIT = 6`.
-  - `components/modules/attention-block.tsx`: new, render only.
-  - `components/modules/command-center.tsx`: mounts the block above the tabs.
-  - `CHANGELOG.md`: entry.
-- **Session tooling** (#120, via #121):
-  - `.claude/skills/session-start` and `.claude/skills/session-close`.
-  - `CLAUDE.md` → "Commit, Push and PR Descriptions", including the stacked-PR rule.
-  - New `.github/PULL_REQUEST_TEMPLATE.md`.
-  - Pointers in `AI_OS_BRIDGE.md`, `docs/CLAUDE.md`, `CONTRIBUTING.md` and `docs/DAILY_CHECKLIST.md`.
-- **Control-plane docs** (#119): ADR-020/021, `docs/CONTROL_PLANE_UI_SPEC.md`, `AI_OS_BRIDGE.md`,
-  `AGENTS.md` and the other governance files.
-- **This close:** `session-close` step 4 now says that when "Resume on" is `main`, the handoff goes
-  through a `docs/session-close-<date>` branch and PR, because `main` is never committed to directly.
-
-**Branch map:** only `main` (`3a4e3c0`) remains from this session. `docs/control-plane-boundary`,
-`feat/attention-block`, `exp/session-handoff-skills` and `fix/land-p1-and-skills-on-main` are
-deleted locally and on origin. Their content was checked against `main` first. This close is on
-`docs/session-close-2026-09-24`.
-
-**Verified (confirmed):**
-- typecheck, lint and build exit 0 on `62c964d`. `main` (`3a4e3c0`) has identical content.
-- CI on #119 was green (lint/type-check/build, policy check, Vercel).
-- P1 criteria 2–5 are met by the code. The component only renders; derivation is in
-  `lib/execution-os.ts`. The empty state is one line. No new modules or collections.
-
-**Not verified:**
-- **P1 criterion 1:** nobody has opened it in a browser, so "above the fold on desktop and mobile"
-  is still unchecked. No login is needed: `npm run dev`, then **Try Demo** on `/login`. With demo
-  data the attention list is empty. Add an overdue task or a 4th active project to see rows.
-- **The session skills have only been run once.** `/session-close` ran for this close;
-  `/session-start` has never run.
-
-**Spec gap:** the P1 spec shows load status "when not `Stable`", but `selectAttentionItems` only adds
-a load item when active projects exceed `maxActiveProjects`. `Busy`, `Strained` and `Overloaded`
-never appear on their own. Fix the code or narrow the spec before marking P1 `done`.
-
-**Environment note:** `next build` failed once on 2026-09-24 with "JavaScript heap out of memory"
-at a ~26 MB heap. The cause was system commit memory, not the code. Close heavy apps and idle WSL
-(`wsl --shutdown`) if it recurs.
-
-## Where we left off (2026-09-23)
-
-**Session summary:** control-plane boundary documented. No code changed.
-
-- `docs/ARCHITECTURE.md` — new **System Role** section: Magic Kick is the execution control plane;
-  no vendor in the core; agents arrive through the generic `AgentJob` / `AgentResult` contract.
-- `docs/DECISIONS_LOG.md` — **ADR-020** (control-plane role + agent boundary) and **ADR-021**
-  (ADR-019 expiry recorded; Track 4 gate recorded as *not assessed*; scoped active build).
-- `docs/CONTROL_PLANE_UI_SPEC.md` — audit of the current UI against the control-plane workflow plus a
-  ranked work queue (P1–P7) with acceptance criteria.
-- `AI_OS_BRIDGE.md` — write-back rule narrowed: build state stays in this repo; only strategic
-  changes go to the OS.
-- Previously untracked governance files committed: `AGENTS.md`, `AI_OS_BRIDGE.md`,
-  `docs/OPERATING_CADENCE.md`, `docs/MAGIC_KICK_PERSONAL_OS_HANDOFF.md`, `docs/SESSION_0_PROMPT.md`,
-  `.claude/settings.json`.
-
-**OS side (AI-Business-OS repo, branch `docs/ai-operating-architecture`):**
-`DEC-2026-09-22-001` (operating architecture), `DEC-2026-09-22-002` (Grok validated outside MK),
-`DEC-2026-09-23-001` (this repo raised to a scoped active build).
+**Process notes:** a Cowork session and a Claude Code session shared one checkout; #123 and #124
+merged with squash messages lacking `Verified:` / `Not verified:` (not rewritten on `main`).
 
 ---
 
 ## Open items
 
-- **P1 usage gate** runs 2026-09-29 → 2026-10-06 (see Start here). The load-status gap is settled
-  (#123). P1's Status stays `open` until the gate resolves; marking it `done` is Roman's call.
-- **P7 has three outside dependencies:** the OS context feed, a GitHub fine-grained PAT, and an ADR
-  unfreezing a GitHub API server route (`docs/CLAUDE.md` §6). MK-DEC-006, cited by P7, is not in
-  this repo's `docs/DECISIONS_LOG.md`; assumed to live in the OS repo.
-- **`docs/CLAUDE.md` §7** still describes the WIP suspension "until 2026-09-20". It expired and
-  ADR-021 records that, but the section was never updated.
-- **OS `current-focus.md`** lists no open magic-kick branches and does not mention the P1 usage gate.
-  Write-back is Roman's call (AI_OS_BRIDGE: only strategic changes go to the OS).
-- **Production login works** (Roman, 2026-09-29) on the single production URL
-  https://magic-kick.vercel.app/. The old `magic-kick-kfb8.vercel.app` domain was removed and now
-  returns 404. Production and `.env.local` both use Firebase project `magickick-78983` (confirmed
-  from the deployed bundle). Dev and preview logins (reported failing 2026-09-24) are still not
-  investigated; they do not block the usage gate.
-- **Branch naming:** `docs/CLAUDE.md` §4 requires `exp/…` or `fix/<issue>-…`, but most branches use
-  `feat/` or `docs/`. Either the rule or the practice should change. This is Roman's call.
-- **ADR-016…ADR-019 are dated 2026-08-09** but sit after ADR-015 (2026-08-10); the log is not in
-  strict date order. Cosmetic; leave unless the log gets an index.
+- **2026-10-06: P1 verdict** (Start here, step 4). Then P1 `done`, P7 `open`.
+- **OS session** (prompt drafted 2026-10-04 in this session; Roman holds it). Deliverables:
+  decision-template field "Repo decisions affected"; one generic `repo-sync` skill (magic-kick,
+  alpharhythm, deutschon-ai) with the old sync skills as aliases; an amendment line on
+  `DEC-2026-10-03-001` (MK ADR-023 superseded); an OS decision removing the 2026-10-21 revert (ADR-024 §8);
+  `source-of-truth-map.md` and `02_PROJECTS/magic-kick/context.md` recording that MK writes to the OS repo
+  (ADR-024 §5). The OS checkout had ~10 untracked daily-plan files and one deleted plan on `main` (2026-10-03).
+- **Allocation reverts to `limited` on 2026-10-21** until that OS decision lands.
+- **GitHub fine-grained PAT** for P7/P11: Roman.
+- **P1 small-phone ruling** (360×800), Roman.
+- **UI findings from the P1 check, not fixed:** overdue tasks appear in both Daily Focus and Needs
+  attention; Daily Focus says "3 of 3 today" when none is due today; the "Friday with zero done" banner
+  shows on Saturday; `/login` logs a React hydration mismatch on the `disabled` attribute.
+- **Dev and preview logins** (reported failing 2026-09-24) still not investigated. Production login works.
+- **Positioning docs** `docs/PUBLIC_PRESENTATION.md` and `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` still use
+  the sandbox wording (left on purpose by ADR-024).
+- **The `roadmap` label** in `.github/ISSUE_TEMPLATE/feature.md` may not exist on GitHub.
+- **Merged remote branches** to delete (Branch map above), plus older local ones: `ai-control-tower`
+  (upstream gone), `dev`, `feat/projects-tab-density-redesign`, `feat/schedule-block-editor-improvements`,
+  `feature/resource-reorder-and-milestone-schedule`, `fix/close-phase-1-adrs`,
+  `fix/sync-existing-profile-on-new-domain`. Check each before deleting.
+- **MK-DEC-006**, cited by P7, is not in this repo's log; assumed to live in the OS repo.
+- **ADR-016…ADR-019 are dated 2026-08-09** but sit after ADR-015 (2026-08-10). Cosmetic.
 - **Track 2 (from ADR-017):** validate state server-side in the existing AI routes.
-- **Allocation reverts to `limited` on 2026-10-21** unless the control-plane scope is delivered
-  first or a new ADR lands (ADR-021).
