@@ -39,9 +39,10 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, OS `DEC-2026-10-03-001`):** P1 → P12 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
+P13 was added on 2026-10-05 by Roman, ranked straight after P1.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -219,6 +220,48 @@ embedded in the Project; `Task.milestoneId`; `resourceIds` on Project and milest
 5. Esc inside an inline editor cancels the edit and does not close the Sheet.
 6. Legacy milestones keep their order after the v12 migration; a new milestone is added last.
 7. No new collection, no Firestore rules change, no new module.
+
+---
+
+### P13 — ToDo toolbar and Done view · S
+
+**Status:** queued
+
+**Why:** the ToDo toolbar has a control that barely does anything, and finished tasks pile up in one
+long list. Verified in `components/modules/todo-module.tsx` on 2026-10-05:
+
+- The status Select ("Open + Archive" / "Open" / "Completed") only shows or hides the Archive card,
+  and "Completed" hides the board. Its trigger is too narrow, so the label shows as "Open + Arc".
+- The Archive is one flat list of every completed task (190 on 2026-10-05). It is sorted by the
+  board's sort setting (due date), not by when a task was finished, and has no grouping or limit.
+- `Task.completedAt` (`yyyy-MM-dd`) already exists, so the list can be grouped by completion date
+  without changing the data.
+
+**Shape.** The toolbar keeps search, category and sort, and a **Done (n)** toggle replaces the status
+Select. The board shows open tasks only. When Done is on, the Done view takes the board's place, so
+only one view is on screen at a time (design principle 1). Completed tasks stay in the data: they
+feed `lib/retrospective.ts` and coaching.
+
+**Acceptance criteria**
+
+1. The status Select is removed. The toolbar has search, category, sort and a Done toggle showing the
+   number of completed tasks that match the current search and category.
+2. No toolbar label is cut off at desktop or mobile widths. When a category is chosen, its trigger
+   shows the category and a control that clears it.
+3. Turning Done on replaces the board with the Done view, and turning it off brings the board back.
+   The Archive card at the bottom of the page is removed.
+4. The Done view groups tasks by `completedAt`, newest first: Today, Yesterday, This week, Earlier
+   this month, then one group per month. Tasks with no `completedAt` go in a last "Undated" group.
+5. Groups up to and including "This week" open expanded. Older groups load only when asked
+   ("Show earlier"), so the view never lists every completed task by default.
+6. Search and the category filter apply to the Done view the same way they apply to the board.
+7. Each row can be reopened (untick, so it goes back to its lane) and opens the same detail Sheet.
+8. Empty states: no completed tasks at all, and none matching the filters, each show a single line.
+9. No data model change, no new store collection, no Firestore rules change, no new module.
+
+**Out of scope:** deleting or purging completed tasks; bulk actions; any count or streak above the
+board (P6, P10); the three lane summary cards (whether to remove them is a separate decision for
+Roman).
 
 ---
 
