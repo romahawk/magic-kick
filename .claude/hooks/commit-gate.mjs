@@ -1,9 +1,9 @@
 // P8 commit gate (CONTROL_PLANE_UI_SPEC P8, ADR-023).
 //
 // PreToolUse hook for Bash / PowerShell calls that run `git commit`. Two checks, in this order:
-//   1. The commit message has a "Verified:" and a "Not verified:" line (root CLAUDE.md,
+//   1. The commit message has a "Verified:" and a "Not verified:" line (AGENTS.md,
 //      "Commit, Push and PR Descriptions"). It checks that the lines exist, not that they are true.
-//   2. npm run typecheck, lint and build all exit 0 (root CLAUDE.md, "Pre-Commit Gates").
+//   2. npm run typecheck, lint and build all exit 0 (AGENTS.md, "Pre-Commit Gates").
 // Exit 2 blocks the commit and sends stderr back to Claude; exit 0 lets it through.
 
 import { spawnSync } from "node:child_process"
@@ -48,7 +48,7 @@ if (!/--no-edit\b/.test(command)) {
   if (missing.length > 0) {
     block(
       `The commit message is missing: ${missing.map((line) => `"${line}"`).join(" and ")}.\n` +
-        "Add both lines (root CLAUDE.md, \"Commit, Push and PR Descriptions\"), then commit again."
+        "Add both lines (AGENTS.md, \"Commit, Push and PR Descriptions\"), then commit again."
     )
   }
 }
