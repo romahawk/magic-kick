@@ -2,29 +2,8 @@
 
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
-import type { ModuleId } from "@/lib/types"
-import {
-  LayoutDashboard,
-  Target,
-  CheckSquare,
-  FolderKanban,
-  Trophy,
-  CalendarDays,
-  BookOpen,
-  BookHeart,
-  Zap,
-} from "lucide-react"
-
-const NAV_ITEMS: { id: ModuleId; label: string; icon: React.ElementType }[] = [
-  { id: "command-center", label: "Command Center", icon: LayoutDashboard },
-  { id: "goals", label: "Goals", icon: Target },
-  { id: "todo", label: "ToDo", icon: CheckSquare },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "achievements", label: "Achievements", icon: Trophy },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "resources", label: "Resources", icon: BookOpen },
-  { id: "journal", label: "Journal", icon: BookHeart },
-]
+import { Zap } from "lucide-react"
+import { NAV_GROUPS } from "./sidebar"
 
 export function MobileNav({ onClose }: { onClose: () => void }) {
   const activeModule = useAppStore((s) => s.activeModule)
@@ -38,28 +17,42 @@ export function MobileNav({ onClose }: { onClose: () => void }) {
         </div>
         <span className="font-serif text-lg font-bold tracking-tight">Magic Kick</span>
       </div>
-      <nav className="flex-1 p-3" role="navigation" aria-label="Mobile navigation">
-        <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.id}>
-              <button
-                onClick={() => {
-                  setActiveModule(item.id)
-                  onClose()
-                }}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  activeModule === item.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            </li>
-          ))}
-        </ul>
+      <nav className="flex flex-1 flex-col gap-4 p-3" role="navigation" aria-label="Mobile navigation">
+        {NAV_GROUPS.map((group) => {
+          const secondary = group.id === "reference"
+          return (
+            <div key={group.id}>
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50" aria-hidden>
+                {group.label}
+              </p>
+              <ul className="flex flex-col gap-1" aria-label={group.label}>
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => {
+                        setActiveModule(item.id)
+                        onClose()
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg px-3 transition-colors",
+                        secondary ? "py-2 text-[13px] font-normal" : "py-2.5 text-sm font-medium",
+                        activeModule === item.id
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : secondary
+                            ? "text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                      aria-current={activeModule === item.id ? "page" : undefined}
+                    >
+                      <item.icon className={secondary ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </nav>
     </div>
   )

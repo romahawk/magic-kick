@@ -200,7 +200,7 @@ writes a non-manual item yet.
 
 ### P5 — Navigation weight · S
 
-**Status:** queued
+**Status:** open
 
 **Why:** F6. Reference surfaces should not compete with execution surfaces.
 
@@ -213,6 +213,14 @@ no new modules, no routing change. Mobile bottom nav keeps its five, ordered by 
 1. Same eight destinations, same `ModuleId` values, same deep links.
 2. Group headings are visible when the sidebar is expanded, and collapse cleanly at `w-20`.
 3. Keyboard navigation and `aria-label`s unchanged or improved.
+
+**As built (2026-10-05):** `NAV_GROUPS` in `components/sidebar.tsx` holds both groups and is shared with
+the mobile menu (`mobile-nav.tsx`, which had its own differently ordered copy of the list). Reference
+items use a smaller, dimmer style; collapsed, a divider replaces the headings. Each group is a list with
+an `aria-label`, and the active item has `aria-current="page"`; buttons and their `aria-label`s are
+unchanged. The bottom bar keeps its five, reordered: Home, Schedule, ToDo, Projects, Journal.
+Checked in headless Edge against the dev server in demo mode: expanded and collapsed sidebar at
+1280×800, mobile menu and bottom bar at 375×812.
 
 ---
 
