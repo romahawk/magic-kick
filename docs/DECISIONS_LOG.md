@@ -784,3 +784,39 @@ start P13 now.
 
 **Revisit trigger:** a third exception to WIP = 1. At that point the rule, not the exceptions, needs
 a decision.
+
+---
+
+## ADR-027: Close P1 without the usage count; move P2 up
+
+**Date:** 2026-10-05
+**Status:** Accepted (Roman, 2026-10-05).
+**Relates to:** ADR-024 §7 (P1 usage gate is measurement only), ADR-026 (P13 merge condition).
+
+### Context
+
+P1's code was merged and checked in a browser (2026-10-02 → 10-03). Its last open criterion was the
+usage-gate verdict for 2026-09-29 → 2026-10-05, due on 2026-10-06 and counted from task completion
+dates in the browser's store. On 2026-10-05 Roman asked to mark P1 complete and start P2.
+
+### Decision
+
+1. **P1 is `done`.** The usage count was not taken, so criterion 6 is recorded as **not measured**,
+   not as pass or fail. Under ADR-024 §7 the gate never stopped the build.
+2. **P13 is `done`.** #134 merged on 2026-10-05, the day P1 closed, which meets ADR-026's condition.
+3. **P2 is `open`** and moves ahead of P7, P11, P8, P6 and P10. New working order:
+   P1 → P12 → P13 → P2 → P7 → P11 → P8 → P6 → P10 → P3 → P9 → P4 → P5.
+
+### Rationale
+
+- P7 and P11 are blocked on the OS context feed and the PAT, so they could not start anyway.
+- P2 is small (S) and settles which planning selectors stay, before later items build on them.
+
+### Consequences
+
+- There is no usage evidence for P1. The weekly review gets "not measured" instead of a verdict.
+  The count can still be taken later from task `completedAt` dates if needed
+  (snippet in `docs/NEXT_SESSION_START.md`).
+- The small-phone question on P1 criterion 1 (360×800) stays open as a follow-up, not a P1 blocker.
+- The UI findings from the P1 check (overdue tasks in two places, "3 of 3 today" with none due,
+  the Friday banner on Saturday) are not fixed by closing P1.

@@ -39,10 +39,11 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P7 → P11 → P8 → P6 → P10 → P2 → P3 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P7 → P11 → P8 → P6 → P10 → P3 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
-P13 was added on 2026-10-05 by Roman, ranked straight after P1.
+P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
+P7, P11, P8, P6 and P10 (ADR-027).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -60,9 +61,11 @@ view is wrong the moment one is stale.
 
 ### P1 — Attention block at the top of Command Center · M
 
-**Status:** open
+**Status:** done
 
-**Note:** code complete; usage gate running 2026-09-29 → 2026-10-06.
+**Note:** closed by Roman on 2026-10-05, the last day of the usage window, without the usage count
+being taken (ADR-027). Criterion 6 is recorded as not measured. The small-phone question on
+criterion 1 (360×800 shows focus and about 2½ attention rows) is still open.
 
 **Why:** F1, F3. The control plane's first answer must be on screen without a click.
 
@@ -100,7 +103,7 @@ acceptance criteria above disagree, the criteria win.
 
 ### P2 — Resolve the duplicate planning layer · S
 
-**Status:** queued
+**Status:** open
 
 **Why:** F2. Two sources of the same derivation is the "no duplicate state" anti-goal inside one repo.
 
@@ -225,10 +228,10 @@ embedded in the Project; `Task.milestoneId`; `resourceIds` on Project and milest
 
 ### P13 — ToDo toolbar and Done view · S
 
-**Status:** queued
+**Status:** done
 
 **Note:** built on 2026-10-05 while P1 was open, by Roman's explicit exception to WIP = 1 (ADR-026).
-It merges only after P1 is `done`.
+Merged on 2026-10-05 (#134), the day P1 was closed (ADR-027).
 
 **Why:** the ToDo toolbar has a control that barely does anything, and finished tasks pile up in one
 long list. Verified in `components/modules/todo-module.tsx` on 2026-10-05:
