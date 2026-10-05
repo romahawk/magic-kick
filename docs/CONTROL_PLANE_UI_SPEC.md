@@ -170,7 +170,7 @@ P3 instead turns attention rows into decisions, in the attention block.
 
 ### P4 — Provenance fields on Task and Project · S
 
-**Status:** open
+**Status:** done
 
 **Why:** F5. Prerequisite for any agent result ever landing in Magic Kick, and cheap now.
 
@@ -449,7 +449,7 @@ lines required by root `CLAUDE.md` → "Commit, Push and PR Descriptions". One h
 
 ### P9 — One governance file, not two · S
 
-**Status:** open
+**Status:** done
 
 **Why:** `CLAUDE.md` (102 lines) and `AGENTS.md` (57) carry the same governing rule, working
 agreement and anti-pattern table with the agent's name swapped. Two copies of one rule set means the
