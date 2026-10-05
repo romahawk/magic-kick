@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - ToDo lanes grouped by time
+
+### Changed
+- With "Date: earliest" (the default sort), each ToDo lane is split into Overdue, Today, Tomorrow, Later and No date, earliest first, with a count on each section.
+- Tasks due on the same day are ordered by start time (from their schedule or time block); tasks without a time follow. Before, same-day tasks were alphabetical.
+- "Date: latest" and "Manual order" still show one flat list.
+
+---
+
 ## [Unreleased] - 2026-10-03 - Load row survives a full attention list (P1)
 
 ### Fixed

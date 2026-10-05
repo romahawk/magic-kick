@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import type { ElementType } from "react"
+import { isTomorrow, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS } from "@/lib/execution-os"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
@@ -24,6 +25,24 @@ const TASK_LANES: Array<{ id: TaskLane; title: string; description: string; icon
   { id: "daily-focus", title: "Daily Focus", description: "Only the few tasks that deserve today.", icon: Focus },
   { id: "parking-lot", title: "Parking Lot", description: "Ideas and tasks not needed this month.", icon: Archive },
 ]
+
+// Time sections for the "Date: earliest" sort, in display order.
+type DueGroup = "overdue" | "today" | "tomorrow" | "later" | "no-date"
+const DUE_GROUPS: Array<{ id: DueGroup; title: string }> = [
+  { id: "overdue", title: "Overdue" },
+  { id: "today", title: "Today" },
+  { id: "tomorrow", title: "Tomorrow" },
+  { id: "later", title: "Later" },
+  { id: "no-date", title: "No date" },
+]
+
+function dueGroupOf(task: Task): DueGroup {
+  if (!task.dueDate) return "no-date"
+  if (isOverdue(task.dueDate)) return "overdue"
+  if (isDueToday(task.dueDate)) return "today"
+  if (isTomorrow(parseISO(task.dueDate))) return "tomorrow"
+  return "later"
+}
 
 export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
@@ -94,6 +113,12 @@ export function TodoModule() {
       if (sortBy === "date-asc") {
         const diff = dueToTs(a) - dueToTs(b)
         if (diff !== 0) return diff
+        // Same day: tasks with a start time first, earliest start first.
+        const aStart = taskTimeSlots[a.id]?.startTime
+        const bStart = taskTimeSlots[b.id]?.startTime
+        if (aStart && bStart && aStart !== bStart) return aStart.localeCompare(bStart)
+        if (aStart && !bStart) return -1
+        if (!aStart && bStart) return 1
       } else if (sortBy === "date-desc") {
         const aTs = a.dueDate ? new Date(`${a.dueDate}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY
         const bTs = b.dueDate ? new Date(`${b.dueDate}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY
@@ -106,7 +131,7 @@ export function TodoModule() {
       return a.title.localeCompare(b.title)
     })
     return items
-  }, [filteredTasks, sortBy])
+  }, [filteredTasks, sortBy, taskTimeSlots])
 
   const openTasks = useMemo(() => sortedTasks.filter((task) => !task.completed), [sortedTasks])
   const archivedTasks = useMemo(() => sortedTasks.filter((task) => task.completed), [sortedTasks])
@@ -253,6 +278,7 @@ export function TodoModule() {
                 lane={laneConfig.id}
                 tasks={laneTasks[laneConfig.id]}
                 limit={laneConfig.id === "daily-focus" ? dailyFocusLimit : undefined}
+                grouped={sortBy === "date-asc"}
                 categoryColors={categoryColors}
                 taskTimeSlots={taskTimeSlots}
                 onToggle={toggleTask}
@@ -398,8 +424,8 @@ function LaneSummaryCard({ title, count, badge, description, icon: Icon, tone }:
 
 // ── Kanban column (row 2) ────────────────────────────────────────────────────
 
-function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
-  lane: TaskLane; tasks: Task[]; limit?: number; categoryColors: Record<string, string>
+function KanbanColumn({ lane, tasks, limit, grouped = false, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
+  lane: TaskLane; tasks: Task[]; limit?: number; grouped?: boolean; categoryColors: Record<string, string>
   taskTimeSlots: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }>
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
@@ -408,6 +434,24 @@ function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onTog
 }) {
   const config = TASK_LANES.find((l) => l.id === lane)
   const atLimit = typeof limit === "number" && tasks.length >= limit
+
+  function renderCard(task: Task) {
+    return (
+      <TaskCard
+        key={task.id}
+        task={task}
+        categoryColor={categoryColors[task.category]}
+        timeSlot={taskTimeSlots[task.id]}
+        onToggle={onToggle}
+        onSelect={onSelect}
+        onDragStart={onDragStart}
+        onDropOnTask={onDropOnTask}
+        onDragEnd={onDragEnd}
+        draggable={!task.completed}
+        onQuickEdit={onQuickEdit}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -434,21 +478,20 @@ function KanbanColumn({ lane, tasks, limit, categoryColors, taskTimeSlots, onTog
             Drop tasks here
           </div>
         ) : null}
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            categoryColor={categoryColors[task.category]}
-            timeSlot={taskTimeSlots[task.id]}
-            onToggle={onToggle}
-            onSelect={onSelect}
-            onDragStart={onDragStart}
-            onDropOnTask={onDropOnTask}
-            onDragEnd={onDragEnd}
-            draggable={!task.completed}
-            onQuickEdit={onQuickEdit}
-          />
-        ))}
+        {grouped
+          ? DUE_GROUPS.map((group) => {
+              const groupTasks = tasks.filter((task) => dueGroupOf(task) === group.id)
+              if (groupTasks.length === 0) return null
+              return (
+                <div key={group.id} className="flex flex-col gap-2">
+                  <p className={cn("px-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground", group.id === "overdue" && "text-destructive")}>
+                    {group.title} · {groupTasks.length}
+                  </p>
+                  {groupTasks.map(renderCard)}
+                </div>
+              )
+            })
+          : tasks.map(renderCard)}
       </div>
     </div>
   )
