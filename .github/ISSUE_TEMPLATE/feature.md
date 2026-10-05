@@ -1,18 +1,13 @@
 ---
-name: Itch or Experiment
-about: A personal-use fix (itch) or a named AI-workflow experiment
-labels: itch
+name: Roadmap item or bug
+about: Work on a roadmap item from docs/CONTROL_PLANE_UI_SPEC.md, or a fix to shipped behaviour
+labels: roadmap
 ---
 
-## Itch or experiment?
+## Roadmap item or bug?
 
-<!-- Select one: itch / experiment -->
-
-## If experiment: name, learning question, time box
-
-<!-- Name: e.g. "inline-date-edit-experiment"
-     Learning question: e.g. "Can I replace the date picker with inline editing without adding new state?"
-     Time box: e.g. "1 session (~2h)" -->
+<!-- Roadmap item: name it, e.g. "P7 — Read the OS context feed"
+     Bug: what is broken, where, and how to reproduce it -->
 
 ## Summary
 
@@ -20,7 +15,7 @@ labels: itch
 
 ## Acceptance Criteria
 
-<!-- Checkboxes — be specific and testable -->
+<!-- Checkboxes — be specific and testable. For a roadmap item, copy them from the spec. -->
 - [ ]
 - [ ]
 
@@ -35,7 +30,7 @@ labels: itch
 ## Definition of Done
 
 - [ ] Stays inside the 9 existing modules (no new top-level modules)
-- [ ] No TypeScript errors (`npm run build` clean)
+- [ ] `npm run typecheck`, `npm run lint`, `npm run build` pass
 - [ ] Tested manually on mobile (375px) and desktop (1280px) if UI change
 - [ ] PR linked to this issue
-- [ ] If experiment: outcome logged in `docs/DECISIONS_LOG.md`
+- [ ] For a roadmap item: its `**Status:**` line in the spec is updated

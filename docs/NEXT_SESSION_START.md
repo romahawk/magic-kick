@@ -1,7 +1,7 @@
 # Next Session Start
 
-**Last updated:** 2026-10-02 (#126 merged; ADR-023 accepted: P8 before P7 while P7 is blocked)
-**Resume on:** `main` after the `docs/adr-p8-before-p7` PR merges (until then, `main` at `d3535fe`, PR #126). Start a new branch from `main` for any work.
+**Last updated:** 2026-10-04 (ADR-024: Magic Kick is the UI of AI-Business-OS; #127, #128 merged)
+**Resume on:** `main` after the `docs/adr-024-os-ui` PR merges (until then, `main` at `d86197a`, PR #128). Start a new branch from `main` for any work.
 **Build status:** passing as of 2026-10-02 — `npm run build` exit 0 (Next.js 16.1.6, Turbopack, Node 22.19.0)
 **Typecheck status:** passing as of 2026-10-02 — `npm run typecheck` exit 0 (the build ignores type errors, so this gate is the one that catches them)
 **Lint status:** passing as of 2026-10-02 — `npm run lint` exit 0
@@ -12,19 +12,24 @@
 
 ## Start here
 
-1. Run `/session-start`. It checks this note against git, runs the gates and asks for the experiment name.
-2. **P1 is `open` and in its usage gate, 2026-09-29 → 2026-10-06.** Use Magic Kick on real projects,
-   tasks and weekly outcomes. Pass = opened on 5 of 7 days AND a task changed state on each of those
-   days. Nothing else in the queue opens until the gate resolves (WIP = 1). The day count is kept by
-   Roman; the repo does not record it.
-3. On 2026-10-06: record the verdict in `docs/DECISIONS_LOG.md`. Pass → P1 `done`, then check P7's
-   three dependencies (OS context feed, GitHub PAT, ADR unfreezing its GitHub API route): all present →
-   P7 opens; any missing → P8 opens (ADR-023). Record which, and why. Fail → stop building Magic Kick
-   (P1 criterion 6).
-4. ADR-023 (accepted 2026-10-02) also widens P8: the hook checks gates **and** the `Verified:` /
-   `Not verified:` commit-message lines. See P8 in `docs/CONTROL_PLANE_UI_SPEC.md`.
-5. Read ADR-020 and ADR-021 before any control-plane or scope decision.
-6. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
+1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
+2. **Read ADR-024 first.** Magic Kick is now the UI of AI-Business-OS: no sandbox framing, a ranked
+   roadmap (P1 → P7 → P11 → P8 → …), WIP = 1, 9-module ceiling kept, the OS repo stays the source of
+   truth and MK writes to it (tasks and context directly, strategy files through a PR).
+3. **P1 is `open`; its usage gate is measurement only**, window 2026-09-29 → 2026-10-05. Pass = 5 of 7
+   days with a task completed. Count from `completedAt` dates (browser console snippet, session of
+   2026-10-04).
+4. **On 2026-10-06:** record the verdict in `docs/DECISIONS_LOG.md` (a date table plus the result),
+   set P1 to `done`, set P7 to `open`. A fail is recorded and taken to the weekly review; it does not
+   stop the build.
+5. **P7 still needs two things from outside this repo:** the OS context feed script plus its
+   feed-shape document (an OS session), and a GitHub fine-grained PAT with `Contents` + `Pull requests`
+   read/write on AI-Business-OS only (Roman). The route unfreeze is ADR-024 §6.
+6. **OS session pending:** cross-repo decision guard, a generic `repo-sync` skill, the amendment to
+   OS `DEC-2026-10-03-001`, and an OS decision on removing the 2026-10-21 revert (ADR-024 §8). Until
+   that lands, 2026-10-21 stands.
+7. Read ADR-020, ADR-021 and ADR-024 before any control-plane or scope decision.
+8. `npm run build`, `npm run lint`, `npm run typecheck` must exit 0 before any commit.
 
 ---
 

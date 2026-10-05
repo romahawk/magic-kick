@@ -2,19 +2,20 @@
 
 ## Governing Rule
 
-> Magic Kick is a personal planner and an AI-SDLC sandbox. It has no users, no
-> roadmap, and no backlog. Changes are either (a) self-scratching an itch, or
-> (b) a named, time-boxed AI-workflow experiment with a stated learning goal.
-> Anything else is scope drift. The 9 existing modules are the ceiling; new
-> work happens inside them, not alongside them.
+> Magic Kick is the UI of AI-Business-OS and Roman's daily planner: the screen where
+> the OS's tasks and context are reached, updated and used (ADR-024). Work follows the
+> ranked roadmap in `docs/CONTROL_PLANE_UI_SPEC.md`, one item at a time. The
+> AI-Business-OS repo stays the source of truth; Magic Kick reads and writes it through
+> server-side routes only. The 9 existing modules are the ceiling; OS content goes
+> inside them, not alongside them.
 
 ## Working Agreement
 
-- One experiment at a time, named and time-boxed.
+- One roadmap item open at a time (WIP = 1).
 - No new top-level modules; the 9 existing modules are the ceiling.
-- Net new files per experiment: keep small; prefer refactors over additions.
-- Every session must start by naming the experiment or the itch.
-  If neither can be named, stop and work on a different repo.
+- Keep net new files small; prefer refactors over additions.
+- Every session must start by naming the roadmap item or the bug it works on.
+  If neither can be named, stop.
 
 ---
 
@@ -23,7 +24,7 @@
 Codex assists with implementation, debugging, documentation, and review work inside this repository.
 
 Codex must not make unilateral decisions about:
-- experiment scope or direction
+- roadmap scope, order or direction
 - governance or policy exceptions
 - deleting major features or changing product direction
 

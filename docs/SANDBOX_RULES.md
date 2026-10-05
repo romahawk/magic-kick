@@ -1,12 +1,16 @@
-# Sandbox Rules
+# Scope Rules
+
+> Formerly "Sandbox Rules". The sandbox framing was retired by ADR-024 (2026-10-04); the file
+> keeps its path so existing links still work.
 
 ## Governing Rule
 
-> Magic Kick is a personal planner and an AI-SDLC sandbox. It has no users, no
-> roadmap, and no backlog. Changes are either (a) self-scratching an itch, or
-> (b) a named, time-boxed AI-workflow experiment with a stated learning goal.
-> Anything else is scope drift. The 9 existing modules are the ceiling; new
-> work happens inside them, not alongside them.
+> Magic Kick is the UI of AI-Business-OS and Roman's daily planner: the screen where
+> the OS's tasks and context are reached, updated and used (ADR-024). Work follows the
+> ranked roadmap in `docs/CONTROL_PLANE_UI_SPEC.md`, one item at a time. The
+> AI-Business-OS repo stays the source of truth; Magic Kick reads and writes it through
+> server-side routes only. The 9 existing modules are the ceiling; OS content goes
+> inside them, not alongside them.
 
 ## Module Ceiling
 
@@ -22,10 +26,14 @@ The 9 existing modules are fixed. No new top-level modules may be added:
 8. Journal
 9. XP / Levels
 
-## Experiment Protocol
+OS content lives inside these: Command Center (today's plan, focus, allocation), Projects (OS
+project context), Resources (knowledge).
+
+## What a change can be
 
 Every change is one of:
-- **Itch** — a personal-use fix or improvement, named in the PR description.
-- **Experiment** — a named, time-boxed AI-workflow exercise with a stated learning goal, logged in `docs/DECISIONS_LOG.md`.
+- **Roadmap item** — an item from the working order in `docs/CONTROL_PLANE_UI_SPEC.md`, the one
+  that is `open`.
+- **Bug** — a fix to shipped behaviour, named in the PR description.
 
-Any change that cannot be classified as one of the above is scope drift and should not be merged.
+Anything else needs a ruling from Roman, and an ADR if it changes scope, before it is merged.

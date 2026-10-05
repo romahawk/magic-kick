@@ -3,13 +3,13 @@
 Governing rules for all Claude Code sessions in this repository.
 Read this file at the start of every session. If a request conflicts with this file, stop and say so before writing code.
 
-Last updated: 2026-08-09
+Last updated: 2026-10-04 (ADR-024: Magic Kick is the UI of AI-Business-OS)
 
 ---
 
 ## 1. Project framing
 
-Magic Kick is a **personal execution OS** and an **AI-SDLC learning environment**. It has no commercial path and is not being built as a business. Every session is an experiment with a stated learning question, not a feature factory.
+Magic Kick is the **UI of AI-Business-OS** and Roman's daily planner (ADR-024): the screen where the OS's tasks and context are reached, updated and used. It has no commercial path and is not being built as a business. Work follows the ranked roadmap in `docs/CONTROL_PLANE_UI_SPEC.md`, one item at a time. The AI-Business-OS repo stays the source of truth; Magic Kick reads and writes it only through server-side routes (ADR-024 §5).
 
 Operating loop the product exists to serve:
 
@@ -40,10 +40,10 @@ Magic Kick is the control plane for priorities, active projects, tasks, approval
 
 ## 3. Session rules
 
-Every Claude Code session must be framed as an experiment:
+Every Claude Code session must be framed before work starts:
 
-1. **Experiment name** — short identifier, becomes the branch name.
-2. **Learning question** — what this session is meant to teach or prove.
+1. **Item** — the roadmap item (e.g. P7) or the bug it works on; its slug becomes the branch name.
+2. **Goal** — what the session must make true.
 3. **Time box** — hard stop. Default 90 minutes. If the box expires, commit work-in-progress and report status; do not extend silently.
 4. **Deliverables** — explicit list.
 5. **Out of scope** — explicit list. Anything not listed as a deliverable is out of scope by default.
@@ -56,7 +56,7 @@ Every Claude Code session must be framed as an experiment:
 - **No broad rewrites.** Refactors need an issue and an ADR.
 - **No new dependencies** without stating the reason and the alternative considered.
 - **No new Firestore collection** without updating `firestore.rules` and the shared collection definitions in the same commit.
-- **No new AI route** until the Track 5 gate is passed (see §5).
+- **No new AI route** without its own ADR (still frozen under ADR-024, see §6).
 - **Distinguish confirmed facts from assumptions** in every report. Label them.
 - If the repository state contradicts the plan, **report the contradiction and stop.** Do not adapt the plan unilaterally.
 
@@ -64,7 +64,7 @@ Every Claude Code session must be framed as an experiment:
 
 ## 4. Branch, commit and PR discipline
 
-- Branch: `exp/<experiment-name>` or `fix/<issue-number>-<slug>`.
+- Branch: `feat/<slug>`, `fix/<slug>` or `docs/<slug>`; put the roadmap item or issue number in the slug when there is one (e.g. `feat/p7-os-feed`, `fix/131-load-row`).
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
 - One PR per issue. PR description states: issue link, what changed, what was verified, what was **not** verified.
 - Commit bodies, push reports and PR bodies follow root `CLAUDE.md` → "Commit, Push and PR Descriptions".
@@ -75,17 +75,11 @@ Every Claude Code session must be framed as an experiment:
 
 ## 5. Current roadmap position
 
-Active track order. Do not start a track before the previous one is closed.
+The roadmap is the working order in `docs/CONTROL_PLANE_UI_SPEC.md`, and each item's `**Status:**`
+line is its state. One item is `open` at a time. Do not reorder without an ADR or a note in the spec.
 
-- **Track 0** — Governance reset (ADRs, this file). *In progress.*
-- **Track 1** — Session 0: repo truth. Read-only verification. No code changes.
-- **Track 2** — Stabilisation. Fixes sized from the Track 1 report.
-- **Track 3** — Finish in-flight redesign (Projects list, project detail Sheet, Edit Project modal).
-- **Track 4** — Dumb Inbox. `InboxItem`, capture, list, convert-to-task. **No AI, no triage, no connectors, no approval state machine.** 14 days of real use follows.
-- **Gate** — under ~10 captured items/week without prompting → stop, reinstate WIP limit, reassess.
-- **Track 5** — AI triage + approval queue. Blocked by gate.
-- **Track 6** — Today Command Brief. Blocked by Track 5.
-- **Track 7** — n8n, Gmail label ingestion, read-only Calendar. Blocked by daily use of the brief.
+The Track 0–7 plan from 2026-08-09 is retired (ADR-024). Its Inbox gate still governs triage, brief
+and non-OS connector work (ADR-018).
 
 ---
 
@@ -116,18 +110,20 @@ Exception: ADR-014 permits using Firebase's existing Google provider as the prim
 
 Exception: ADR-015 permits browser-only Calendar auto-sync while a user-triggered short-lived access token remains cached in memory. It does not permit persisted tokens, refresh tokens, server-side OAuth, webhooks, workers, or calendar writes.
 
+Exception: ADR-024 permits **server-side routes that read and write the AI-Business-OS repo through the GitHub API**, with a fine-grained PAT held in a Vercel env var and never sent to the browser. Tasks and day-to-day context are committed directly; strategy files change only through a pull request Roman merges; writes against a file changed since it was read are refused. The writable paths are listed in P11. It does not permit any other connector, other repositories, webhooks, n8n or other runtimes, or new AI routes.
+
 Existing AI routes (`weekly-summary`, `schedule-suggest`, `coaching`, `retro-summary`) are **parked behind their feature flag, default off** — see ADR on drifted AI routes. They may be read and maintained, not extended.
 
 ---
 
-## 7. WIP limit — temporarily suspended
+## 7. WIP limit
 
-The three-active-project limit is **suspended until 2026-09-20** to concentrate effort on Magic Kick workflow optimisation.
+One roadmap item is `open` at a time (OS `DEC-2026-09-24-001`). Project-level WIP is set by the OS
+lanes in `AI-Business-OS/01_CONTEXT/decision-rules.md`, not here.
 
-- This is a calendar deadline, not a conditional one. It does not extend because work is unfinished.
-- Dormant during suspension: AlphaRhythm, FlowLogix.
-- **Not dormant:** LiveSurgery POC — it has external dependencies and continues regardless.
-- On 2026-09-20 the limit is reinstated automatically and Magic Kick returns to sandbox status unless a new ADR says otherwise.
+The ADR-019 suspension ended on 2026-09-20 (ADR-021). Magic Kick's allocation is set by OS
+`DEC-2026-09-23-001`, which reverts it to `limited` on 2026-10-21. Roman asked to remove that revert
+(ADR-024 §8); until an OS decision does, the date stands.
 
 ---
 
