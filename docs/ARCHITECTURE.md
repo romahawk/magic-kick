@@ -71,10 +71,10 @@ Browser
 
 Execution OS selector layer
   -> normalizeSystemConfig()
-  -> selectActiveProjects()
-  -> selectWeeklyOutcomes()
+  -> selectThisWeekOutcomes()   weekly outcomes, from this week's WeeklyPlan only (ADR-022)
   -> selectDailyFocus()
   -> calculateCognitiveLoad()
+  -> selectAttentionItems()     the Command Center attention block (P1)
 
 Persistence
   -> localStorage via zustand/persist
@@ -86,7 +86,7 @@ Persistence
 | Existing Module | Execution OS Role | Notes |
 |---|---|---|
 | Goals | Strategic direction | Remains the highest planning layer |
-| Projects | Active work areas | Now supports `status` and `weeklyOutcome` |
+| Projects | Active work areas | Supports `status`; shows this week's outcome from the weekly plan (ADR-022) |
 | ToDo | Backlog | Supplies Daily Focus instead of being the primary decision layer |
 | Command Center | Daily execution surface | Shows Daily Focus, Weekly Outcomes, Focus Health, XP |
 | Achievements | Motivation layer | Rewards completed execution |
@@ -125,7 +125,7 @@ Default values:
 Signals:
 - active projects above `maxActiveProjects`
 - tasks due today above `dailyFocusLimit`
-- missed weekly outcomes
+- active projects past their end date (`weekEndISO`)
 
 Formula:
 
@@ -138,7 +138,7 @@ if activeProjects > maxActiveProjects:
 if tasksDueToday > dailyFocusLimit:
   pressure += 1 + (tasksDueToday - dailyFocusLimit)
 
-pressure += missedWeeklyOutcomes * 2
+pressure += projectsPastEnd * 2
 ```
 
 Status mapping:
@@ -155,7 +155,7 @@ Focus score:
 ```text
 focusScore = 100
   - 15 * max(0, activeProjects - maxActiveProjects)
-  - 10 * missedWeeklyOutcomes
+  - 10 * projectsPastEnd
 ```
 
 ## Dashboard Layout Proposal
@@ -182,9 +182,11 @@ Behavior rules:
 
 1. Add `profile.systemConfig` with safe defaults in store migration.
 2. Add `project.status`, defaulting to `active`.
-3. Add `project.weeklyOutcome`, defaulting to the existing project objective.
+3. Add `project.weeklyOutcome`, defaulting to the existing project objective. *Superseded by ADR-022:
+   the field is still stored but no longer read; weekly outcomes come from the weekly plan.*
 4. Keep module navigation unchanged to avoid feature regressions.
-5. Move Command Center and Projects onto the selector layer first.
+5. Move Command Center and Projects onto the selector layer first. *Done: P1 (attention block) and
+   P2 (weekly outcomes, ADR-022).*
 6. Add `Settings -> System Rules` later as a thin editor for `profile.systemConfig`.
 
 ## AI Layer

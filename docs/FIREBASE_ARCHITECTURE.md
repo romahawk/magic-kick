@@ -517,12 +517,12 @@ if activeProjectCount > maxActiveProjects:
 if todayScheduledTaskCount > dailyFocusLimit:
   pressure += 1 + (todayScheduledTaskCount - dailyFocusLimit)
 
-pressure += missedWeeklyOutcomes * 2
+pressure += projectsPastEnd * 2   # active projects past weekEndISO (ADR-022)
 
 focusHealthScore =
   100
   - 15 * max(0, activeProjectCount - maxActiveProjects)
-  - 10 * missedWeeklyOutcomes
+  - 10 * projectsPastEnd
 ```
 
 Load status mapping:

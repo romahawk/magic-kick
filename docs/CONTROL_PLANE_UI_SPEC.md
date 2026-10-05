@@ -101,20 +101,37 @@ acceptance criteria above disagree, the criteria win.
 
 ---
 
-### P2 — Resolve the duplicate planning layer · S
+### P2 — Resolve the duplicate planning layer · M
 
 **Status:** open
 
 **Why:** F2. Two sources of the same derivation is the "no duplicate state" anti-goal inside one repo.
 
-Decide per selector: wire it into P1, or delete it. `calculateCognitiveLoad` stays (used by insights).
-Record the outcome as a one-paragraph ADR (ADR-022) — including anything deleted.
+**Rescoped 2026-10-05 (Roman, ADR-022).** P1 already wired the selectors into the attention block;
+what is left of F2 is that the weekly outcome itself is stored twice and never synced:
+
+- `WeeklyPlan.allocations[].weeklyOutcome` is written by the Command Center Plan tab.
+- `Project.weeklyOutcome` has no editor. A store migration copies `objective` into it. It feeds the
+  attention block, the load status and the Projects panel's "This week" lines.
+
+So "No weekly outcome" can never be cleared for a new project, never fires for an old one, and
+"Weekly outcome overdue" really checks the project's end date (`weekEndISO`).
+
+**Decision:** this week's `WeeklyPlan` is the only source of a weekly outcome.
 
 **Acceptance criteria**
 
-1. No exported selector in `lib/execution-os.ts` is unreferenced by app code after this item.
-2. `docs/ARCHITECTURE.md` migration list reflects reality (step 5 marked done or dropped).
-3. ADR-022 records what was wired, what was deleted, and why.
+1. Attention, load, Daily Focus scoring and the Projects panel read weekly outcomes only from the
+   current week's plan. No app code reads `Project.weeklyOutcome` (the stored data is left alone).
+2. The attention row that checked `weekEndISO` is named for what it checks: an active project past its
+   end date. The load status and the parked AI insight count the same thing under the same name.
+3. With no plan for the current week, attention shows one "No plan for this week" row. With a plan,
+   each active project without an outcome in it shows "No weekly outcome". Both open the Command
+   Center Plan tab.
+4. No exported selector in `lib/execution-os.ts` is unreferenced by app code.
+5. `docs/ARCHITECTURE.md` migration list reflects reality (step 5 marked done or dropped).
+6. ADR-022 records the source decision, what was wired, what was deleted, and why.
+7. No data model change, no store migration, no Firestore rules change.
 
 ---
 

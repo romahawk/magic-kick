@@ -21,10 +21,11 @@ import { cn } from "@/lib/utils"
  * what should I do next (Focus), and what is wrong right now (Attention).
  * All derivation lives in lib/execution-os.ts; this file only renders.
  */
-export function AttentionBlock() {
+export function AttentionBlock({ onOpenPlan }: { onOpenPlan: () => void }) {
   const profile = useAppStore((s) => s.profile)
   const tasks = useAppStore((s) => s.tasks)
   const projects = useAppStore((s) => s.projects)
+  const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const toggleTask = useAppStore((s) => s.toggleTask)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
@@ -32,8 +33,14 @@ export function AttentionBlock() {
   const liveTasks = tasks.filter((task) => !task.deleted)
   const liveProjects = projects.filter((project) => !project.deleted)
 
-  const focus = selectDailyFocus(liveTasks, liveProjects, config)
-  const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, config })
+  const focus = selectDailyFocus(liveTasks, liveProjects, config, { weeklyPlans })
+  const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, weeklyPlans, config })
+
+  // The block lives on the Command Center, so a "command-center" item opens the Plan tab there.
+  function openItem(item: AttentionItem) {
+    if (item.module === "command-center") onOpenPlan()
+    else setActiveModule(item.module)
+  }
 
   return (
     <section aria-label="Now" className="flex flex-col gap-3">
@@ -123,7 +130,7 @@ export function AttentionBlock() {
           ) : (
             <ul className="flex flex-col divide-y divide-border">
               {attention.items.map((item) => (
-                <AttentionRow key={item.id} item={item} onOpen={() => setActiveModule(item.module)} />
+                <AttentionRow key={item.id} item={item} onOpen={() => openItem(item)} />
               ))}
             </ul>
           )}

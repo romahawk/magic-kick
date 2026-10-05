@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-05 - One source for weekly outcomes (P2)
+
+### Changed
+- Weekly outcomes come only from this week's plan in Command Center. The attention block, Daily Focus and the Projects panel's "This week" lines all read it. A project's objective no longer stands in for its weekly outcome.
+- With no plan for the current week, the attention block shows one "No plan for this week" row. With a plan, an active project without an outcome in it shows "No weekly outcome". Both open the Plan tab.
+- "Weekly outcome overdue" is now "Past end date", which is what it always checked: an active project whose end date has passed. The load status and its cause text use the same name.
+
+---
+
 ## [Unreleased] - 2026-10-05 - ToDo toolbar and Done view (P13)
 
 ### Added

@@ -84,6 +84,7 @@ export function CommandCenter() {
     ? validateWeeklyPlan(activePlan, activeProjects)
     : { isValid: false, errors: [], allocatedHours: 0, remainingHours: 0, isOverCapacity: false }
 
+  const [tab, setTab] = useState("week")
   const [nextWeekCapacity, setNextWeekCapacity] = useState(
     String(existingReview?.nextWeekCapacityHours ?? "")
   )
@@ -220,9 +221,9 @@ export function CommandCenter() {
         </p>
       </div>
 
-      <AttentionBlock />
+      <AttentionBlock onOpenPlan={() => setTab("plan")} />
 
-      <Tabs defaultValue="week" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="grid w-full max-w-sm grid-cols-3">
           <TabsTrigger value="week">Week</TabsTrigger>
           <TabsTrigger value="plan">Plan</TabsTrigger>
