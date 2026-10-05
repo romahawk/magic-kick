@@ -24,6 +24,8 @@ export interface Task extends SyncFields {
   completed: boolean
   completedAt?: string
   linkedProjectId?: string
+  /** Roadmap grouping (ADR-025): id of a milestone embedded in the linked project. "" = unassigned. */
+  milestoneId?: string
   xpValue: number
   notes?: string
 }
@@ -45,9 +47,17 @@ export interface Goal extends SyncFields {
 export interface ProjectMilestone {
   id: string
   title: string
+  /** Legacy weekday index (0–6) from the weekly checklist model. Kept for old data; the roadmap orders by `order`. */
   dayIndex: number
   completed: boolean
   completedAt?: string
+  /** Roadmap position, ascending (ADR-025). Missing on legacy data and on milestones from older clients. */
+  order?: number
+  /** Target date, yyyy-MM-dd. Empty or missing = no target. */
+  targetDate?: string
+  note?: string
+  /** Cross-links to Resources by id. Ids of deleted resources are ignored when rendering. */
+  resourceIds?: string[]
 }
 
 export type ProjectStatus = "active" | "paused" | "parked" | "completed"
@@ -88,6 +98,8 @@ export interface Project extends SyncFields {
     label: string
     url: string
   }>
+  /** Cross-links to Resources by id (ADR-025). */
+  resourceIds?: string[]
 }
 
 export interface WeeklyAllocation {

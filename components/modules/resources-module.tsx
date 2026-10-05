@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { selectResourceBacklinks } from "@/lib/roadmap"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -63,6 +64,8 @@ export function ResourcesModule() {
   const reorderResources = useAppStore((s) => s.reorderResources)
   const updateResource = useAppStore((s) => s.updateResource)
   const deleteResource = useAppStore((s) => s.deleteResource)
+  const projects = useAppStore((s) => s.projects)
+  const setActiveModule = useAppStore((s) => s.setActiveModule)
   const resources = useMemo(
     () => allResources.filter((r) => !r.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allResources]
@@ -529,6 +532,34 @@ export function ResourcesModule() {
                               ))}
                             </div>
                           )}
+                          {(() => {
+                            const backlinks = selectResourceBacklinks(resource.id, projects)
+                            if (backlinks.length === 0) return null
+                            return (
+                              <div className="mt-3 border-t border-border/60 pt-2">
+                                <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Linked from</p>
+                                <div className="flex flex-col gap-0.5">
+                                  {backlinks.map((link) => (
+                                    <button
+                                      key={`${link.projectId}-${link.milestoneId ?? "project"}`}
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setActiveModule("projects") }}
+                                      className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                                    >
+                                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: link.projectColor }} />
+                                      <span className="truncate">{link.projectTitle}</span>
+                                      {link.milestoneTitle ? (
+                                        <>
+                                          <ChevronRight className="h-3 w-3 shrink-0 opacity-60" />
+                                          <span className="truncate">{link.milestoneTitle}</span>
+                                        </>
+                                      ) : null}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
                       )}
                     </CardContent>

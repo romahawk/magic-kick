@@ -34,6 +34,7 @@ import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollb
 import { levelFromXP } from "@/lib/game-utils"
 import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achievement-engine"
 import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence"
+import { moveMilestoneInList, nextMilestoneOrder, renumberMilestones, sortMilestones } from "./roadmap"
 import {
   seedAchievements,
   seedGoals,
@@ -193,11 +194,17 @@ function touchEntity<T extends LocalEntity>(entity: T): T {
   }
 }
 
-function sortProjectMilestones<T extends Pick<ProjectMilestone, "dayIndex" | "title">>(milestones: T[]): T[] {
-  return [...milestones].sort((a, b) => {
-    if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex
-    return a.title.localeCompare(b.title)
-  })
+function sortProjectMilestones<T extends Pick<ProjectMilestone, "order" | "dayIndex" | "title">>(milestones: T[]): T[] {
+  return sortMilestones(milestones)
+}
+
+function cleanMilestoneText(value: string | undefined, max: number) {
+  const trimmed = value?.trim() ?? ""
+  return trimmed ? trimmed.slice(0, max) : undefined
+}
+
+function cleanDateISO(value: string | undefined) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined
 }
 
 function inferLegacyMilestoneCompletionDate(weekStartISO: string | undefined, dayIndex: number) {
@@ -383,12 +390,18 @@ export interface AppState {
   addProject: (project: Omit<Project, "id" | "milestones"> & { milestones?: Array<{ title: string; dayIndex: number }> }) => void
   updateProject: (projectId: string, updates: Partial<Omit<Project, "id" | "milestones">>) => void
   deleteProject: (projectId: string) => void
-  addMilestone: (projectId: string, milestone: Pick<ProjectMilestone, "title" | "dayIndex">) => void
+  addMilestone: (
+    projectId: string,
+    milestone: Pick<ProjectMilestone, "title"> & Partial<Pick<ProjectMilestone, "dayIndex" | "targetDate" | "note" | "resourceIds">>
+  ) => string
+  /** `targetDate: ""` and `note: ""` clear the field. */
   updateMilestone: (
     projectId: string,
     milestoneId: string,
-    updates: Partial<Pick<ProjectMilestone, "title" | "dayIndex" | "completed">>
+    updates: Partial<Pick<ProjectMilestone, "title" | "dayIndex" | "completed" | "targetDate" | "note" | "resourceIds">>
   ) => void
+  moveMilestone: (projectId: string, milestoneId: string, direction: -1 | 1) => void
+  /** Deletes the milestone and unassigns its tasks (they stay on the project). */
   deleteMilestone: (projectId: string, milestoneId: string) => void
   addAchievement: (a: Omit<Achievement, "id">) => void
   addResource: (r: Omit<Resource, "id">) => void
@@ -1575,15 +1588,14 @@ export const useAppStore = create<AppState>()(
       addProject: (project) => {
         const id = generateId()
         const ts = now()
-        const milestones = sortProjectMilestones(
-          (project.milestones ?? []).map((milestone) => ({
-            id: generateId(),
-            title: milestone.title,
-            dayIndex: milestone.dayIndex,
-            completed: false,
-            completedAt: undefined,
-          }))
-        )
+        const milestones = (project.milestones ?? []).map((milestone, index) => ({
+          id: generateId(),
+          title: milestone.title,
+          dayIndex: milestone.dayIndex,
+          completed: false,
+          completedAt: undefined,
+          order: index + 1,
+        }))
         const item = touchEntity({
           id,
           title: project.title,
@@ -1675,24 +1687,30 @@ export const useAppStore = create<AppState>()(
 
       addMilestone: (projectId, milestone) => {
         const ts = now()
-        const nextMilestone: ProjectMilestone = {
-          id: generateId(),
-          title: milestone.title.trim() || "Milestone",
-          dayIndex: Math.max(0, Math.min(6, milestone.dayIndex)),
-          completed: false,
-          completedAt: undefined,
-        }
+        const id = generateId()
         set((s) => ({
-          projects: s.projects.map((project) =>
-            project.id === projectId
-              ? {
-                  ...project,
-                  clientUpdatedAt: ts,
-                  deleted: false,
-                  milestones: sortProjectMilestones([...project.milestones, nextMilestone]),
-                }
-              : project
-          ),
+          projects: s.projects.map((project) => {
+            if (project.id !== projectId) return project
+            // Renumber first so legacy milestones without `order` keep their place above the new one.
+            const existing = renumberMilestones(project.milestones ?? [])
+            const nextMilestone: ProjectMilestone = {
+              id,
+              title: cleanMilestoneText(milestone.title, 200) ?? "Milestone",
+              dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
+              completed: false,
+              completedAt: undefined,
+              order: nextMilestoneOrder(existing),
+              targetDate: cleanDateISO(milestone.targetDate),
+              note: cleanMilestoneText(milestone.note, 2000),
+              resourceIds: milestone.resourceIds && milestone.resourceIds.length > 0 ? [...new Set(milestone.resourceIds)] : undefined,
+            }
+            return {
+              ...project,
+              clientUpdatedAt: ts,
+              deleted: false,
+              milestones: [...existing, nextMilestone],
+            }
+          }),
           sync: {
             ...s.sync,
             pending: {
@@ -1701,6 +1719,7 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+        return id
       },
 
       updateMilestone: (projectId, milestoneId, updates) => {
@@ -1718,10 +1737,19 @@ export const useAppStore = create<AppState>()(
                         ? {
                             ...milestone,
                             ...(typeof updates.title === "string"
-                              ? { title: updates.title.trim() || milestone.title }
+                              ? { title: cleanMilestoneText(updates.title, 200) ?? milestone.title }
                               : {}),
                             ...(typeof updates.dayIndex === "number"
                               ? { dayIndex: Math.max(0, Math.min(6, updates.dayIndex)) }
+                              : {}),
+                            ...(typeof updates.targetDate === "string"
+                              ? { targetDate: cleanDateISO(updates.targetDate) }
+                              : {}),
+                            ...(typeof updates.note === "string"
+                              ? { note: cleanMilestoneText(updates.note, 2000) }
+                              : {}),
+                            ...(Array.isArray(updates.resourceIds)
+                              ? { resourceIds: [...new Set(updates.resourceIds)] }
                               : {}),
                             ...(typeof updates.completed === "boolean"
                               ? {
@@ -1748,7 +1776,7 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
-      deleteMilestone: (projectId, milestoneId) => {
+      moveMilestone: (projectId, milestoneId, direction) => {
         const ts = now()
         set((s) => ({
           projects: s.projects.map((project) =>
@@ -1757,7 +1785,7 @@ export const useAppStore = create<AppState>()(
                   ...project,
                   clientUpdatedAt: ts,
                   deleted: false,
-                  milestones: project.milestones.filter((milestone) => milestone.id !== milestoneId),
+                  milestones: moveMilestoneInList(project.milestones ?? [], milestoneId, direction),
                 }
               : project
           ),
@@ -1769,6 +1797,46 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+      },
+
+      deleteMilestone: (projectId, milestoneId) => {
+        const ts = now()
+        set((s) => {
+          // "" (not undefined) so the cleared value survives Firestore's merge write.
+          const affectedTaskIds = s.tasks
+            .filter((task) => task.linkedProjectId === projectId && task.milestoneId === milestoneId)
+            .map((task) => task.id)
+          const affected = new Set(affectedTaskIds)
+          return {
+            projects: s.projects.map((project) =>
+              project.id === projectId
+                ? {
+                    ...project,
+                    clientUpdatedAt: ts,
+                    deleted: false,
+                    milestones: renumberMilestones(project.milestones.filter((milestone) => milestone.id !== milestoneId)),
+                  }
+                : project
+            ),
+            tasks: affected.size
+              ? s.tasks.map((task) => (affected.has(task.id) ? { ...task, milestoneId: "", clientUpdatedAt: ts } : task))
+              : s.tasks,
+            sync: {
+              ...s.sync,
+              pending: {
+                ...s.sync.pending,
+                projects: { ...s.sync.pending.projects, [projectId]: ts },
+                tasks: affectedTaskIds.reduce<Record<string, number>>(
+                  (acc, id) => {
+                    acc[id] = ts
+                    return acc
+                  },
+                  { ...s.sync.pending.tasks }
+                ),
+              },
+            },
+          }
+        })
       },
 
       addAchievement: (a) => {
@@ -2348,7 +2416,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: STORE_KEY,
-      version: 11,
+      version: 12,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AppState> | undefined
         const base = createInitialData()
@@ -2439,8 +2507,9 @@ export const useAppStore = create<AppState>()(
           ...project,
           status: project.status ?? "active",
           weeklyOutcome: project.weeklyOutcome?.trim() || project.objective,
-          milestones: sortProjectMilestones(
+          milestones: renumberMilestones(
             (project.milestones ?? []).map((milestone) => ({
+              ...milestone,
               id: milestone.id ?? generateId(),
               title: milestone.title ?? "Milestone",
               dayIndex: Math.max(0, Math.min(6, milestone.dayIndex ?? 0)),
