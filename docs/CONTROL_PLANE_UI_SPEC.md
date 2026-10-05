@@ -449,7 +449,7 @@ lines required by root `CLAUDE.md` → "Commit, Push and PR Descriptions". One h
 
 ### P9 — One governance file, not two · S
 
-**Status:** open
+**Status:** done
 
 **Why:** `CLAUDE.md` (102 lines) and `AGENTS.md` (57) carry the same governing rule, working
 agreement and anti-pattern table with the agent's name swapped. Two copies of one rule set means the

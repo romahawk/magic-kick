@@ -1,8 +1,8 @@
 # Next Session Start
 
-**Last updated:** 2026-10-05 (second session of the day: #133–#139 merged, #140 open; P13, P1, P2, P3, P8, P6 closed; P9 built; P10 gated)
-**Resume on:** `main` after #140 (`docs/p9-one-governance-file`, which carries this handoff) merges. `main` is `a332d76` (#139) until then. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-05 — `npm run build` exit 0, run by the P8 commit-gate hook on `8b16115` (#140 head) (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Last updated:** 2026-10-05 (second session of the day: #133–#140 merged; P13, P1, P2, P3, P8, P6, P9 closed; P10 gated)
+**Resume on:** `main` (`c5cb0a7`, #140) after the `docs/session-close-2026-10-05b` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-05 — `npm run build` exit 0, run by the P8 commit-gate hook on `8b16115` (#140 head, same tree as `main` `c5cb0a7`) (Next.js 16.1.6, Turbopack, Node 22.19.0)
 **Typecheck status:** passing as of 2026-10-05 — `npm run typecheck` exit 0 (same run)
 **Lint status:** passing as of 2026-10-05 — `npm run lint` exit 0 (same run)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
@@ -14,12 +14,13 @@
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
 2. **Rules now live in `AGENTS.md`** (P9, #140). `CLAUDE.md` keeps the governing rule, imports
-   `AGENTS.md` with `@AGENTS.md` and adds Claude Code specifics. Check at session start that the
-   imported rules are in context (first session after the change; not verified yet).
+   `AGENTS.md` with `@AGENTS.md` and adds Claude Code specifics. First session after the change:
+   run `/memory` (or `/context`) and check that `AGENTS.md` is listed as an imported file, and that
+   the "Commit, Push and PR Descriptions" rules are known without opening the file. Not verified yet.
 3. **Working order:** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P8, P6. **P9:** set `done` once #140 merges. **P7, P11:** blocked
-   (step 4). **P10:** `gated` on P7. **Next unblocked item: P4** (provenance fields on Task and
-   Project, S), then P5 (navigation weight, S).
+   Done: P1, P12, P13, P2, P3, P8, P6, P9. **P7, P11:** blocked (step 4). **P10:** `gated` on P7.
+   **Next unblocked item: P4** (provenance fields on Task and Project, S), then P5 (navigation
+   weight, S).
 4. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
    - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
      document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
@@ -34,7 +35,7 @@
 
 ---
 
-## Where we left off (2026-10-05, session 2) — seven roadmap items closed, rules in one file
+## Where we left off (2026-10-05, session 2) — eight roadmap items closed, rules in one file
 
 **Merged to `main` (by Roman, on GitHub):**
 - **#133** `17bc2e6` — spec: new **P13** "ToDo toolbar and Done view".
@@ -57,15 +58,17 @@
 - **#139** `a332d76` — **P6**: sidebar profile card shows name only; avatar menu adds level;
   Achievements header adds streak.
 
-**Open:** **#140** `8b16115` + this close — **P9**: `AGENTS.md` is the single rule set; `CLAUDE.md`
-imports it; references in `CONTRIBUTING.md`, PR template, `docs/CLAUDE.md`, session-close skill and the
-hook point at `AGENTS.md`; spec: P6 done, P9 open, P10 gated.
+- **#140** `c5cb0a7` — **P9**: `AGENTS.md` is the single rule set; `CLAUDE.md` imports it; references
+  in `CONTRIBUTING.md`, PR template, `docs/CLAUDE.md`, session-close skill and the hook point at
+  `AGENTS.md`; spec: P6 done, P9 open, P10 gated. P9 is set `done` by this close.
 
 **Branch map:** all branches are off `main`, none stacked except #136 on #135 (both merged in order).
 Merged and still on origin, safe to delete: `docs/p13-todo-done-view`, `feat/p13-todo-done-view`,
 `docs/p1-done-p2-open`, `feat/p2-weekly-outcome-source`, `feat/p3-attention-decisions`,
-`feat/p8-commit-gate-hook`, `feat/p6-gamification-placement`, `docs/session-close-2026-10-05`.
-Open: `docs/p9-one-governance-file` (#140). Local copies of the merged branches also remain.
+`feat/p8-commit-gate-hook`, `feat/p6-gamification-placement`, `docs/p9-one-governance-file`,
+`docs/session-close-2026-10-05`. Local copies also remain; the local `docs/p9-one-governance-file`
+holds an unpushed first copy of this handoff (`89b3480`), superseded by this branch. This close is on
+`docs/session-close-2026-10-05b`.
 
 **Verified (confirmed):**
 - Gates exit 0 on every PR's head: run by hand for #133–#137, by the P8 hook for #138–#140.
@@ -113,7 +116,6 @@ roadmap, ADR-025, store v11 → v12).
 
 ## Open items
 
-- **Merge #140**, then set P9 `done` in the spec.
 - **P7 / P11 blockers:** the OS context feed (OS session) and the GitHub PAT in Vercel (Roman).
   See Start here, step 4.
 - **OS session** (prompt drafted 2026-10-04; Roman holds it). Deliverables: decision-template field
@@ -121,6 +123,8 @@ roadmap, ADR-025, store v11 → v12).
   amendment line on `DEC-2026-10-03-001` (MK ADR-023 superseded); an OS decision removing the
   2026-10-21 revert (ADR-024 §8); `source-of-truth-map.md` and `02_PROJECTS/magic-kick/context.md`
   recording that MK writes to the OS repo (ADR-024 §5); now also the context feed (P7 path step 2).
+  The OS `current-focus.md` still says "P7 next, then P8" (stale since 2026-10-05; MK sessions do
+  not edit it).
 - **Allocation reverts to `limited` on 2026-10-21** until that OS decision lands.
 - **P1 small-phone ruling** (360×800 shows focus + about 2½ attention rows), Roman. Carried by ADR-027.
 - **UI findings from the P1 check, not fixed:** overdue tasks appear in both Daily Focus and Needs
