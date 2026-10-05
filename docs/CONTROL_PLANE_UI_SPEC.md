@@ -137,7 +137,7 @@ So "No weekly outcome" can never be cleared for a new project, never fires for a
 
 ### P3 — "Waiting on you" queue · M
 
-**Status:** open
+**Status:** done
 
 **Why:** F4. The approval loop is the control plane's core, and it can be proven with today's data —
 before any agent exists.
@@ -387,7 +387,14 @@ opportunities qualified, betas released. No activity counters, no day streaks.
 
 ### P8 — Enforce the commit gates with a hook · S
 
-**Status:** queued
+**Status:** open
+
+**As built (2026-10-05):** `.claude/hooks/commit-gate.mjs`, registered in `.claude/settings.json` for
+the Bash and PowerShell tools with `if: "<Tool>(git commit*)"`, which per the official hooks docs
+checks each part of a compound command. Measured gate time on 2026-10-05: typecheck 4 s, lint 14 s,
+build 14 s (about 31 s together), so the hook runs all three, not only typecheck and lint.
+`--no-edit` commits skip the message check (the message already exists). It covers commits made from
+Claude Code only; a commit typed in a terminal is not checked.
 
 **Why:** `CLAUDE.md` line 52 says no commit may be created if `npm run build` or `npm run lint` fails.
 That rule is prose: an agent that skips it commits anyway, and this repo's own history (AI routes

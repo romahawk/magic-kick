@@ -3,5 +3,33 @@
     "allow": [
       "Bash(git commit -m ' *)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/commit-gate.mjs\"",
+            "timeout": 300,
+            "statusMessage": "Commit gate: message lines, typecheck, lint, build"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "PowerShell(git commit*)",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/commit-gate.mjs\"",
+            "timeout": 300,
+            "statusMessage": "Commit gate: message lines, typecheck, lint, build"
+          }
+        ]
+      }
+    ]
   }
 }
