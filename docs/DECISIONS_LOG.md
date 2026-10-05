@@ -880,3 +880,54 @@ Results: "No weekly outcome" could not be cleared for a project created after th
 - **Rollback:** revert the P2 PR. No data was written or migrated.
 
 **Revisit trigger:** a need to set outcomes without a weekly plan (for example from the OS feed, P7).
+
+---
+
+## ADR-028: P3 decisions live in the attention block; P3 moves up
+
+**Date:** 2026-10-05
+**Status:** Accepted (Roman, 2026-10-05).
+**Relates to:** P1 (attention block), ADR-022 (P2), ADR-018 ("AI proposes, never silently commits").
+
+### Context
+
+P3 was specified on 2026-09-23 as a separate "Waiting on you" section with three row types: an
+unreviewed finished week, an overdue outcome needing continue / adjust / remove, and a project over
+`maxActiveProjects`. Since then P1 and P2 made the second and third attention rows ("Past end date",
+"Over capacity"). A second list would show the same project twice on one screen. Separately, the
+Review tab only reviewed the current week, so a finished week could never be reviewed once it ended.
+
+### Decision
+
+1. **Queue.** P2 is `done`. P3 is `open` and moves ahead of P7, P11, P8, P6 and P10.
+2. **No second list.** Attention rows become decisions where a decision exists:
+   - "Past end date — X": **Complete**, **Park** or **Extend** (end date set to 7 days from today).
+   - "Last week not reviewed" (new): last week's plan has allocations and is not `reviewed`.
+     **Review** opens the Review tab on that week.
+   - Other rows keep one action that opens the owning module or tab.
+3. **Item shape:** `{ id, kind, severity, subject, detail, since?, actions[] }`. Each action carries its
+   effect as data (`open-module`, `open-tab`, `update-project`), and the block runs effects without
+   knowing the kind. An agent proposal can be added as a new kind that reuses these effects; a
+   genuinely new effect (for example "apply proposal") is one more branch in `runEffect`.
+4. **"Since"** is shown when known: the project's end date, the task's due date, or the start of the
+   current week for plan and review rows. The load row has none.
+5. **Review tab:** it reviews last week's plan while that plan is unreviewed, then this week's. The
+   review form moved into `WeeklyReviewCard`, keyed by the plan id so its draft resets when the target
+   week changes. Saving a review already sets the plan to `reviewed`, which clears the row.
+
+### Rationale
+
+- One list answers "what needs me now"; decisions in place remove the round trip to another module.
+- Effects as data keep the block generic, which is what P3's criterion 3 asked of the component.
+- Only last week is offered for review. Older unreviewed weeks are stale, and an endless backlog of
+  reviews would be guilt mechanics (`lifeos-architecture.md` §0 rule 5).
+
+### Consequences
+
+- Complete, Park and Extend write immediately with no confirmation, the same as the status menu in
+  Projects. Undo is the reverse action in Projects.
+- Overdue tasks and the over-capacity row are unchanged ("Open", "Review"). Per-project parking from
+  the over-capacity row is out of scope.
+- **Rollback:** revert the P3 PR. No data model change, migration or rules change.
+
+**Revisit trigger:** the first agent proposal kind, or a need to review weeks older than last week.

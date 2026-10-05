@@ -1,7 +1,7 @@
-import { parseISO } from "date-fns"
+import { addDays, format, parseISO } from "date-fns"
 import type { ExecutionBlockTemplate, ModuleId, Project, ProjectStatus, SystemConfig, Task, TaskLane, WeeklyPlan } from "@/lib/types"
 import { isDueToday, isDueThisWeek, isOverdue } from "@/lib/game-utils"
-import { findWeeklyPlanForWeek } from "@/lib/weekly-plan"
+import { findWeeklyPlanForWeek, getCurrentWeekStartISO, selectWeekAwaitingReview } from "@/lib/weekly-plan"
 
 const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
   {
@@ -191,22 +191,33 @@ export function calculateCognitiveLoad(input: {
  * Attention — "what requires attention now?"
  *
  * One derivation, used by the Command Center's attention block. Every
- * item is a thing that is wrong or missing right now, never an FYI, and
- * every item names the module that can resolve it. Agent proposals will
- * arrive later as one more `kind` (see CONTROL_PLANE_UI_SPEC P3) — the
- * shape is deliberately provider-neutral.
+ * item is a thing that is wrong or missing right now, never an FYI.
+ * Each action carries its effect as data, so the block can run it
+ * without knowing the item's kind (P3, ADR-028). Agent proposals will
+ * arrive later as one more `kind` — the shape is provider-neutral.
  * ------------------------------------------------------------------ */
 
-type AttentionKind = "project-past-end" | "task-overdue" | "plan-missing" | "outcome-missing" | "load"
+type AttentionKind = "project-past-end" | "week-unreviewed" | "task-overdue" | "plan-missing" | "outcome-missing" | "load"
+
+export type AttentionEffect =
+  | { type: "open-module"; module: ModuleId }
+  | { type: "open-tab"; tab: "plan" | "review" }
+  | { type: "update-project"; projectId: string; patch: Partial<Pick<Project, "status" | "weekEndISO">> }
+
+export interface AttentionAction {
+  label: string
+  effect: AttentionEffect
+}
 
 export interface AttentionItem {
   id: string
   kind: AttentionKind
   severity: "high" | "medium"
-  title: string
+  subject: string
   detail: string
-  module: ModuleId
-  actionLabel: string
+  /** yyyy-MM-dd the item has been waiting since, when that is known. */
+  since?: string
+  actions: AttentionAction[]
 }
 
 const ATTENTION_LIMIT = 6
@@ -217,12 +228,6 @@ function selectOverdueTasks(tasks: Task[]) {
     .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
 }
 
-function daysSince(dateISO?: string) {
-  if (!dateISO) return 0
-  const diff = Date.now() - parseISO(dateISO).getTime()
-  return Math.max(0, Math.floor(diff / 86_400_000))
-}
-
 export function selectAttentionItems(input: {
   projects: Project[]
   tasks: Task[]
@@ -231,30 +236,48 @@ export function selectAttentionItems(input: {
 }): { items: AttentionItem[]; total: number } {
   const rules = normalizeSystemConfig(input.config)
   const items: AttentionItem[] = []
+  const now = new Date()
+  const weekStartISO = getCurrentWeekStartISO(now)
 
   for (const project of selectProjectsPastEnd(input.projects)) {
-    const days = daysSince(project.weekEndISO)
     items.push({
       id: "project-past-end:" + project.id,
       kind: "project-past-end",
       severity: "high",
-      title: "Past end date — " + project.title,
-      detail: days === 1 ? "Ended 1 day ago, still active" : "Ended " + days + " days ago, still active",
-      module: "projects",
-      actionLabel: "Decide",
+      subject: "Past end date — " + project.title,
+      detail: "Still active",
+      since: project.weekEndISO,
+      actions: [
+        { label: "Complete", effect: { type: "update-project", projectId: project.id, patch: { status: "completed" } } },
+        { label: "Park", effect: { type: "update-project", projectId: project.id, patch: { status: "parked" } } },
+        { label: "Extend", effect: { type: "update-project", projectId: project.id, patch: { weekEndISO: format(addDays(now, 7), "yyyy-MM-dd") } } },
+      ],
+    })
+  }
+
+  const unreviewed = selectWeekAwaitingReview(input.weeklyPlans, now)
+  if (unreviewed) {
+    const count = unreviewed.allocations.length
+    items.push({
+      id: "week-unreviewed:" + unreviewed.id,
+      kind: "week-unreviewed",
+      severity: "medium",
+      subject: "Last week not reviewed",
+      detail: "Week of " + format(parseISO(unreviewed.weekStartISO), "d MMM") + " · " + count + (count === 1 ? " project" : " projects"),
+      since: weekStartISO,
+      actions: [{ label: "Review", effect: { type: "open-tab", tab: "review" } }],
     })
   }
 
   for (const task of selectOverdueTasks(input.tasks)) {
-    const days = daysSince(task.dueDate)
     items.push({
       id: "task-overdue:" + task.id,
       kind: "task-overdue",
       severity: "high",
-      title: "Task overdue — " + task.title,
-      detail: days === 1 ? "1 day past due" : days + " days past due",
-      module: "todo",
-      actionLabel: "Open",
+      subject: "Task overdue — " + task.title,
+      detail: "Past due",
+      since: task.dueDate,
+      actions: [{ label: "Open", effect: { type: "open-module", module: "todo" } }],
     })
   }
 
@@ -265,10 +288,10 @@ export function selectAttentionItems(input: {
       id: "plan-missing",
       kind: "plan-missing",
       severity: "medium",
-      title: "No plan for this week",
+      subject: "No plan for this week",
       detail: activeProjects.length === 1 ? "1 active project with no weekly outcome" : activeProjects.length + " active projects with no weekly outcome",
-      module: "command-center",
-      actionLabel: "Plan",
+      since: weekStartISO,
+      actions: [{ label: "Plan", effect: { type: "open-tab", tab: "plan" } }],
     })
   } else {
     const weekOutcomes = selectThisWeekOutcomes(input.weeklyPlans)
@@ -277,10 +300,10 @@ export function selectAttentionItems(input: {
         id: "outcome-missing:" + project.id,
         kind: "outcome-missing",
         severity: "medium",
-        title: "No weekly outcome — " + project.title,
+        subject: "No weekly outcome — " + project.title,
         detail: "Active project with no outcome in this week's plan",
-        module: "command-center",
-        actionLabel: "Set",
+        since: weekStartISO,
+        actions: [{ label: "Set", effect: { type: "open-tab", tab: "plan" } }],
       })
     }
   }
@@ -300,12 +323,11 @@ export function selectAttentionItems(input: {
       id: "load:" + (load.overCapacity ? "over-capacity" : "pressure"),
       kind: "load",
       severity: load.status === "Busy" ? "medium" : "high",
-      title: load.overCapacity
+      subject: load.overCapacity
         ? "Over capacity — " + load.activeProjects + " active projects, limit " + rules.maxActiveProjects
         : "Load: " + load.status,
       detail: load.overCapacity ? "Load: " + load.status : causes.join(" · "),
-      module: load.overCapacity || load.projectsPastEnd > 0 ? "projects" : "todo",
-      actionLabel: "Review",
+      actions: [{ label: "Review", effect: { type: "open-module", module: load.overCapacity || load.projectsPastEnd > 0 ? "projects" : "todo" } }],
     })
   }
 

@@ -39,11 +39,11 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P7 → P11 → P8 → P6 → P10 → P3 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
-P7, P11, P8, P6 and P10 (ADR-027).
+P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -103,7 +103,7 @@ acceptance criteria above disagree, the criteria win.
 
 ### P2 — Resolve the duplicate planning layer · M
 
-**Status:** open
+**Status:** done
 
 **Why:** F2. Two sources of the same derivation is the "no duplicate state" anti-goal inside one repo.
 
@@ -137,24 +137,34 @@ So "No weekly outcome" can never be cleared for a new project, never fires for a
 
 ### P3 — "Waiting on you" queue · M
 
-**Status:** queued
+**Status:** open
 
 **Why:** F4. The approval loop is the control plane's core, and it can be proven with today's data —
 before any agent exists.
 
-A named section (inside Command Center, not a new module) listing items that need a human decision:
-unreviewed finished week, overdue outcome needing continue/adjust/remove, project over
-`maxActiveProjects`. Each row: what is waiting, since when, and the decision control.
+**Rescoped 2026-10-05 (Roman, ADR-028).** The original shape was a separate "Waiting on you" section.
+After P1 and P2, two of its three row types (a project past its end date, a project over
+`maxActiveProjects`) are already attention rows, so a second list would show the same project twice.
+P3 instead turns attention rows into decisions, in the attention block.
+
+- **Project past its end date:** Complete, Park, or Extend (end date moves to 7 days from today).
+- **Last week not reviewed** (new row): last week's plan has allocations and is not `reviewed`.
+  "Review" opens the Review tab on that week, which can now review it after the week has ended.
+- **Other rows** keep their single action (open the owning module or tab).
 
 **Acceptance criteria**
 
-1. Every row is an actual decision, not an FYI; resolving it removes the row.
-2. "Since when" is shown for each row.
-3. The component takes a list of `{id, kind, subject, since, actions}` — so an agent proposal can be
-   added later as one more `kind` without touching the component.
-4. No new modules; no schema change beyond what already exists.
+1. The three decisions above act in place; resolving a row removes it.
+2. Each row that is waiting on something shows since when: the end date, the due date, or the start of
+   the week.
+3. The block renders items of shape `{id, kind, subject, detail, since, actions}`, and each action
+   carries its effect as data (open a module or tab, update a project). An agent proposal can then be
+   added as one more `kind` without changing the component.
+4. The Review tab reviews last week's plan while it is unreviewed, then the current week's.
+5. No new modules, no schema change, no store migration, no Firestore rules change.
 
-**Out of scope:** agent jobs, notifications, anything requiring a server.
+**Out of scope:** agent jobs, notifications, anything requiring a server; decisions on overdue tasks
+(they stay "Open"); per-project parking from the over-capacity row.
 
 ---
 

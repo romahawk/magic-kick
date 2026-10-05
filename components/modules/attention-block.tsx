@@ -1,6 +1,6 @@
 "use client"
 
-import { format } from "date-fns"
+import { format, isToday, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
   TASK_LANE_LABELS,
@@ -8,7 +8,7 @@ import {
   selectDailyFocus,
   normalizeSystemConfig,
 } from "@/lib/execution-os"
-import type { AttentionItem } from "@/lib/execution-os"
+import type { AttentionEffect, AttentionItem } from "@/lib/execution-os"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -21,12 +21,13 @@ import { cn } from "@/lib/utils"
  * what should I do next (Focus), and what is wrong right now (Attention).
  * All derivation lives in lib/execution-os.ts; this file only renders.
  */
-export function AttentionBlock({ onOpenPlan }: { onOpenPlan: () => void }) {
+export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "review") => void }) {
   const profile = useAppStore((s) => s.profile)
   const tasks = useAppStore((s) => s.tasks)
   const projects = useAppStore((s) => s.projects)
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const toggleTask = useAppStore((s) => s.toggleTask)
+  const updateProject = useAppStore((s) => s.updateProject)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
   const config = normalizeSystemConfig(profile.systemConfig)
@@ -36,10 +37,12 @@ export function AttentionBlock({ onOpenPlan }: { onOpenPlan: () => void }) {
   const focus = selectDailyFocus(liveTasks, liveProjects, config, { weeklyPlans })
   const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, weeklyPlans, config })
 
-  // The block lives on the Command Center, so a "command-center" item opens the Plan tab there.
-  function openItem(item: AttentionItem) {
-    if (item.module === "command-center") onOpenPlan()
-    else setActiveModule(item.module)
+  // Actions carry their effect as data (P3), so this runs any item without knowing its kind.
+  // The block lives on the Command Center, so "open-tab" switches a tab there.
+  function runEffect(effect: AttentionEffect) {
+    if (effect.type === "open-module") setActiveModule(effect.module)
+    else if (effect.type === "open-tab") onOpenTab(effect.tab)
+    else updateProject(effect.projectId, effect.patch)
   }
 
   return (
@@ -130,7 +133,7 @@ export function AttentionBlock({ onOpenPlan }: { onOpenPlan: () => void }) {
           ) : (
             <ul className="flex flex-col divide-y divide-border">
               {attention.items.map((item) => (
-                <AttentionRow key={item.id} item={item} onOpen={() => openItem(item)} />
+                <AttentionRow key={item.id} item={item} onAction={runEffect} />
               ))}
             </ul>
           )}
@@ -140,7 +143,12 @@ export function AttentionBlock({ onOpenPlan }: { onOpenPlan: () => void }) {
   )
 }
 
-function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: () => void }) {
+function formatSince(dateISO: string) {
+  const date = parseISO(dateISO)
+  return isToday(date) ? "since today" : "since " + format(date, "d MMM")
+}
+
+function AttentionRow({ item, onAction }: { item: AttentionItem; onAction: (effect: AttentionEffect) => void }) {
   return (
     <li className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
       <span
@@ -150,13 +158,22 @@ function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen: () => voi
           item.severity === "high" ? "bg-destructive" : "bg-muted-foreground",
         )}
       />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium leading-snug">{item.title}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{item.detail}</p>
+      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 basis-48 flex-1">
+          <p className="text-sm font-medium leading-snug">{item.subject}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {item.detail}
+            {item.since ? " · " + formatSince(item.since) : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          {item.actions.map((action) => (
+            <Button key={action.label} variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => onAction(action.effect)}>
+              {action.label}
+            </Button>
+          ))}
+        </div>
       </div>
-      <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={onOpen}>
-        {item.actionLabel}
-      </Button>
     </li>
   )
 }

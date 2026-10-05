@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import {
   DEFAULT_WEEKLY_CAPACITY_HOURS,
@@ -14,6 +14,7 @@ import {
   getWeeklyReviewForPlan,
   selectProjectHours,
   selectTimeBlocksForDay,
+  selectWeekAwaitingReview,
   validateWeeklyPlan,
 } from "@/lib/weekly-plan"
 import type { Project, ProjectPriority, WeeklyAllocation } from "@/lib/types"
@@ -84,20 +85,12 @@ export function CommandCenter() {
     ? validateWeeklyPlan(activePlan, activeProjects)
     : { isValid: false, errors: [], allocatedHours: 0, remainingHours: 0, isOverCapacity: false }
 
+  // The Review tab reviews last week while it is unreviewed, then this week (P3, ADR-028).
+  const reviewPlan = selectWeekAwaitingReview(weeklyPlans) ?? activePlan
+  const reviewPlanReview = getWeeklyReviewForPlan(weeklyReviews, reviewPlan?.id)
+  const reviewPlanHours = selectProjectHours(reviewPlan, timeBlocks, executionLogs)
+
   const [tab, setTab] = useState("week")
-  const [nextWeekCapacity, setNextWeekCapacity] = useState(
-    String(existingReview?.nextWeekCapacityHours ?? "")
-  )
-  const [reviewState, setReviewState] = useState<
-    Record<string, { achieved: boolean; decision: "continue" | "adjust" | "remove"; notes: string }>
-  >(() =>
-    Object.fromEntries(
-      (existingReview?.summary ?? []).map((item) => [
-        item.projectId,
-        { achieved: item.outcomeAchieved, decision: item.decision, notes: item.notes ?? "" },
-      ])
-    )
-  )
   const [planSaveModal, setPlanSaveModal] = useState<{
     open: boolean
     status: "success" | "error"
@@ -170,46 +163,6 @@ export function CommandCenter() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function updateReview(
-    projectId: string,
-    updates: Partial<{ achieved: boolean; decision: "continue" | "adjust" | "remove"; notes: string }>
-  ) {
-    setReviewState((cur) => ({
-      ...cur,
-      [projectId]: {
-        achieved: cur[projectId]?.achieved ?? false,
-        decision: cur[projectId]?.decision ?? "continue",
-        notes: cur[projectId]?.notes ?? "",
-        ...updates,
-      },
-    }))
-  }
-
-  function handleSaveReview() {
-    if (!activePlan) return
-    saveWeeklyReview({
-      id: weekStartISO,
-      weekPlanId: activePlan.id,
-      weekStartISO,
-      summary: activePlan.allocations.map((allocation) => {
-        const metric = projectHours.find((item) => item.projectId === allocation.projectId)
-        const entry = reviewState[allocation.projectId]
-        return {
-          projectId: allocation.projectId,
-          outcomePlanned: allocation.weeklyOutcome,
-          outcomeAchieved: entry?.achieved ?? false,
-          plannedHours: metric?.plannedHours ?? 0,
-          actualHours: metric?.actualHours ?? 0,
-          decision: entry?.decision ?? "continue",
-          notes: entry?.notes?.trim() || undefined,
-        }
-      }),
-      nextWeekCapacityHours: nextWeekCapacity ? Number(nextWeekCapacity) : undefined,
-      completed: true,
-      deleted: false,
-    })
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -221,7 +174,7 @@ export function CommandCenter() {
         </p>
       </div>
 
-      <AttentionBlock onOpenPlan={() => setTab("plan")} />
+      <AttentionBlock onOpenTab={setTab} />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="grid w-full max-w-sm grid-cols-3">
@@ -335,76 +288,15 @@ export function CommandCenter() {
         </TabsContent>
 
         <TabsContent value="review" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle2 className="h-4 w-4" />Weekly Review
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!activePlan || activePlan.allocations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Save a weekly plan first, then close the week here.</p>
-              ) : (
-                <>
-                  {activePlan.allocations.map((allocation) => {
-                    const project = projects.find((p) => p.id === allocation.projectId)
-                    const metric = projectHours.find((item) => item.projectId === allocation.projectId)
-                    const entry = reviewState[allocation.projectId]
-                    return (
-                      <div key={allocation.projectId} className="space-y-2 rounded-lg border border-border/70 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <PriorityDot priority={allocation.priority} />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{project?.title ?? "Unknown"}</p>
-                              <p className="truncate text-xs text-muted-foreground">{allocation.weeklyOutcome}</p>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                            <span>{allocation.hoursAllocated}h alloc</span>
-                            <span>{metric?.plannedHours ?? 0}h planned</span>
-                            <span className="font-medium text-foreground">{metric?.actualHours ?? 0}h done</span>
-                          </div>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-[auto_1fr_2fr]">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Achieved?</Label>
-                            <Select value={String(entry?.achieved ?? false)} onValueChange={(value) => updateReview(allocation.projectId, { achieved: value === "true" })}>
-                              <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="true">Yes</SelectItem>
-                                <SelectItem value="false">No</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Decision</Label>
-                            <Select value={entry?.decision ?? "continue"} onValueChange={(value) => updateReview(allocation.projectId, { decision: value as "continue" | "adjust" | "remove" })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="continue">Continue</SelectItem>
-                                <SelectItem value="adjust">Adjust</SelectItem>
-                                <SelectItem value="remove">Remove</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Notes</Label>
-                            <Textarea value={entry?.notes ?? ""} onChange={(e) => updateReview(allocation.projectId, { notes: e.target.value })} placeholder="What should change next week?" className="min-h-9 resize-none" rows={1} />
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <div className="flex items-center gap-3">
-                    <Label htmlFor="next-week-capacity" className="shrink-0 text-sm">Next week hours</Label>
-                    <Input id="next-week-capacity" type="number" value={nextWeekCapacity} onChange={(e) => setNextWeekCapacity(e.target.value)} placeholder="Optional" className="w-24" />
-                  </div>
-                  <Button type="button" onClick={handleSaveReview}>Save review</Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <WeeklyReviewCard
+            key={reviewPlan?.id ?? "none"}
+            plan={reviewPlan}
+            isLastWeek={Boolean(reviewPlan && reviewPlan.id !== activePlan?.id)}
+            existingReview={reviewPlanReview}
+            projects={projects}
+            projectHours={reviewPlanHours}
+            onSave={saveWeeklyReview}
+          />
         </TabsContent>
       </Tabs>
 
@@ -632,5 +524,146 @@ function StatusPill({ label, value, highlight }: { label: string; value: string;
         {value}
       </span>
     </span>
+  )
+}
+
+// ── Weekly review (P3: reviews last week while it is unreviewed) ────────────
+
+type ReviewEntry = { achieved: boolean; decision: "continue" | "adjust" | "remove"; notes: string }
+
+function WeeklyReviewCard({
+  plan,
+  isLastWeek,
+  existingReview,
+  projects,
+  projectHours,
+  onSave,
+}: {
+  plan: ReturnType<typeof getActiveWeeklyPlan>
+  isLastWeek: boolean
+  existingReview: ReturnType<typeof getWeeklyReviewForPlan>
+  projects: Project[]
+  projectHours: ReturnType<typeof selectProjectHours>
+  onSave: ReturnType<typeof useAppStore.getState>["saveWeeklyReview"]
+}) {
+  const [nextWeekCapacity, setNextWeekCapacity] = useState(String(existingReview?.nextWeekCapacityHours ?? ""))
+  const [reviewState, setReviewState] = useState<Record<string, ReviewEntry>>(() =>
+    Object.fromEntries(
+      (existingReview?.summary ?? []).map((item) => [
+        item.projectId,
+        { achieved: item.outcomeAchieved, decision: item.decision, notes: item.notes ?? "" },
+      ])
+    )
+  )
+
+  function updateReview(projectId: string, updates: Partial<ReviewEntry>) {
+    setReviewState((cur) => ({
+      ...cur,
+      [projectId]: {
+        achieved: cur[projectId]?.achieved ?? false,
+        decision: cur[projectId]?.decision ?? "continue",
+        notes: cur[projectId]?.notes ?? "",
+        ...updates,
+      },
+    }))
+  }
+
+  function handleSave() {
+    if (!plan) return
+    onSave({
+      id: plan.weekStartISO,
+      weekPlanId: plan.id,
+      weekStartISO: plan.weekStartISO,
+      summary: plan.allocations.map((allocation) => {
+        const metric = projectHours.find((item) => item.projectId === allocation.projectId)
+        const entry = reviewState[allocation.projectId]
+        return {
+          projectId: allocation.projectId,
+          outcomePlanned: allocation.weeklyOutcome,
+          outcomeAchieved: entry?.achieved ?? false,
+          plannedHours: metric?.plannedHours ?? 0,
+          actualHours: metric?.actualHours ?? 0,
+          decision: entry?.decision ?? "continue",
+          notes: entry?.notes?.trim() || undefined,
+        }
+      }),
+      nextWeekCapacityHours: nextWeekCapacity ? Number(nextWeekCapacity) : undefined,
+      completed: true,
+      deleted: false,
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CheckCircle2 className="h-4 w-4" />Weekly Review{isLastWeek && plan ? " — week of " + format(parseISO(plan.weekStartISO), "d MMM") : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLastWeek ? <p className="text-sm text-muted-foreground">Last week is not reviewed yet. Close it before reviewing this week.</p> : null}
+        {!plan || plan.allocations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Save a weekly plan first, then close the week here.</p>
+        ) : (
+          <>
+            {plan.allocations.map((allocation) => {
+              const project = projects.find((p) => p.id === allocation.projectId)
+              const metric = projectHours.find((item) => item.projectId === allocation.projectId)
+              const entry = reviewState[allocation.projectId]
+              return (
+                <div key={allocation.projectId} className="space-y-2 rounded-lg border border-border/70 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <PriorityDot priority={allocation.priority} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{project?.title ?? "Unknown"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{allocation.weeklyOutcome}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+                      <span>{allocation.hoursAllocated}h alloc</span>
+                      <span>{metric?.plannedHours ?? 0}h planned</span>
+                      <span className="font-medium text-foreground">{metric?.actualHours ?? 0}h done</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[auto_1fr_2fr]">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Achieved?</Label>
+                      <Select value={String(entry?.achieved ?? false)} onValueChange={(value) => updateReview(allocation.projectId, { achieved: value === "true" })}>
+                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="false">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Decision</Label>
+                      <Select value={entry?.decision ?? "continue"} onValueChange={(value) => updateReview(allocation.projectId, { decision: value as "continue" | "adjust" | "remove" })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="continue">Continue</SelectItem>
+                          <SelectItem value="adjust">Adjust</SelectItem>
+                          <SelectItem value="remove">Remove</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Notes</Label>
+                      <Textarea value={entry?.notes ?? ""} onChange={(e) => updateReview(allocation.projectId, { notes: e.target.value })} placeholder="What should change next week?" className="min-h-9 resize-none" rows={1} />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex items-center gap-3">
+              <Label htmlFor="next-week-capacity" className="shrink-0 text-sm">Next week hours</Label>
+              <Input id="next-week-capacity" type="number" value={nextWeekCapacity} onChange={(e) => setNextWeekCapacity(e.target.value)} placeholder="Optional" className="w-24" />
+            </div>
+            <Button type="button" onClick={handleSave}>Save review</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
