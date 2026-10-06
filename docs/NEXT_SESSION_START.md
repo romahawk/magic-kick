@@ -1,8 +1,8 @@
 # Next Session Start
 
-**Last updated:** 2026-10-05 (second session of the day: #133–#141 merged; P13, P1, P2, P3, P8, P6, P9, P4 closed; P10 gated)
-**Resume on:** `main` (`5c5ac71`, #141) after the `docs/session-close-2026-10-05b` PR merges. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-05 — `npm run build` exit 0, run by the P8 commit-gate hook on `93a593f` (#141 head; merged to `main` as `5c5ac71`) (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Last updated:** 2026-10-06 (closes the session of 2026-10-05: #133–#143 merged; P13, P1, P2, P3, P8, P6, P9, P4, P5 closed; P10 gated; no item open)
+**Resume on:** `main` (`7e6a3ad`, #143) after the `docs/session-close-2026-10-06` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-05 — `npm run build` exit 0, run by the P8 commit-gate hook on `85cf648` (#143 head; merged to `main` as `7e6a3ad`) (Next.js 16.1.6, Turbopack, Node 22.19.0)
 **Typecheck status:** passing as of 2026-10-05 — `npm run typecheck` exit 0 (same run)
 **Lint status:** passing as of 2026-10-05 — `npm run lint` exit 0 (same run)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
@@ -18,9 +18,9 @@
    run `/memory` (or `/context`) and check that `AGENTS.md` is listed as an imported file, and that
    the "Commit, Push and PR Descriptions" rules are known without opening the file. Not verified yet.
 3. **Working order:** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P8, P6, P9, P4. **P7, P11:** blocked (step 4). **P10:** `gated` on P7.
-   **Next unblocked item: P5** (navigation weight, S), the last one; after it, only blocked or
-   gated items remain.
+   Done: P1, P12, P13, P2, P3, P8, P6, P9, P4, P5. **P7, P11:** blocked (step 4). **P10:** `gated`
+   on P7. **No roadmap item is open and none is unblocked.** A session must name a bug from Open items
+   (for example the P1 UI findings) or a new item Roman adds to the spec; otherwise it stops.
 4. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
    - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
      document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
@@ -35,7 +35,7 @@
 
 ---
 
-## Where we left off (2026-10-05, session 2) — nine roadmap items closed, rules in one file
+## Where we left off (2026-10-05, session 2) — ten roadmap items closed, rules in one file
 
 **Merged to `main` (by Roman, on GitHub):**
 - **#133** `17bc2e6` — spec: new **P13** "ToDo toolbar and Done view".
@@ -64,21 +64,29 @@
 - **#141** `5c5ac71` — **P4**: optional `source` (`manual` | `agent` | `import`) and `sourceId` on Task
   and Project; `lib/provenance.ts` (`sourceOf`, `sourceLabel`, `findBySource`); `addTask` /
   `addProject` skip a duplicate `source + sourceId` (deleted items included); "Agent" / "Import" label
-  on non-manual items in ToDo and Projects. No store migration: untagged reads as `manual`. P4 is set
-  `done` by this close.
+  on non-manual items in ToDo and Projects. No store migration: untagged reads as `manual`.
+- **#142** `db72ad5` — session-close handoff; P9 and P4 set `done`.
+- **#143** `7e6a3ad` — **P5**: `NAV_GROUPS` in `sidebar.tsx` (Execution: Command Center, Schedule,
+  ToDo, Projects; Reference: Goals, Resources, Journal, Achievements, visually secondary; divider when
+  collapsed; list `aria-label`s, `aria-current`); `mobile-nav.tsx` uses it; bottom bar reordered Home,
+  Schedule, ToDo, Projects, Journal. P5 is set `done` by this close.
 
 **Branch map:** all branches are off `main`, none stacked except #136 on #135 (both merged in order).
 Merged and still on origin, safe to delete: `docs/p13-todo-done-view`, `feat/p13-todo-done-view`,
 `docs/p1-done-p2-open`, `feat/p2-weekly-outcome-source`, `feat/p3-attention-decisions`,
 `feat/p8-commit-gate-hook`, `feat/p6-gamification-placement`, `docs/p9-one-governance-file`,
-`feat/p4-provenance-fields`,
+`feat/p4-provenance-fields`, `docs/session-close-2026-10-05b`, `feat/p5-navigation-weight`,
 `docs/session-close-2026-10-05`. Local copies also remain; the local `docs/p9-one-governance-file`
-holds an unpushed first copy of this handoff (`89b3480`), superseded by this branch. This close is on
-`docs/session-close-2026-10-05b`.
+holds an unpushed first copy of this handoff (`89b3480`), superseded; delete it. This close is on
+`docs/session-close-2026-10-06`.
 
 **Verified (confirmed):**
-- Gates exit 0 on every PR's head: run by hand for #133–#137, by the P8 hook for #138–#141.
+- Gates exit 0 on every PR's head: run by hand for #133–#137, by the P8 hook for #138–#143.
 - P4: the real `lib/provenance.ts` on 9 sample cases, all passing.
+- P5 in a browser: headless Edge (playwright-core in the session scratchpad) on the dev server in demo
+  mode; sidebar expanded and collapsed at 1280×800, mobile menu and bottom bar at 375×812; group
+  lists read from the accessibility tree. Same eight `ModuleId`s before and after. The same
+  screenshots show P6's name-only profile card, expanded and collapsed.
 - P13 Done grouping, P2 selectors and P3 attention items: the real `lib/*.ts` code run under
   `node --experimental-strip-types` with sample data (cases listed in each PR).
 - P8: pipe tests of the hook script; live probes via the Bash and PowerShell tools were blocked; the
@@ -87,10 +95,10 @@ holds an unpushed first copy of this handoff (`89b3480`), superseded by this bra
 - `@AGENTS.md` import and hook format checked against the official Claude Code docs.
 
 **Not verified:**
-- **No UI change from this session was opened in a browser** (no screenshots): the ToDo Done view
-  and toolbar (incl. 375 px), the P2/P3 attention rows and actions, the Plan/Review tab switch,
-  reviewing last week end to end, three action buttons wrapping at 360 px, the name-only sidebar
-  (expanded and collapsed), avatar menu and Achievements.
+- **Only P5 (and P6's profile card) was opened in a browser.** Not seen: the ToDo Done view and
+  toolbar (incl. 375 px), the P2/P3 attention rows and actions, the Plan/Review tab switch, reviewing
+  last week end to end, three action buttons wrapping at 360 px, the avatar menu and Achievements.
+- P5: a keyboard-only walk through the nav; light theme; a real (non-demo) account.
 - After P2, projects that were covered by their objective now show "No plan for this week" or "No
   weekly outcome" until this week's plan exists. The attention list may be longer at first.
 - Unticking a task in the Done view clears its `completedAt`; ticking it again stamps today.
@@ -109,6 +117,11 @@ holds an unpushed first copy of this handoff (`89b3480`), superseded by this bra
   not committed). Worth keeping if checks like this recur.
 - On 2026-10-05 a `next build` crashed once with "JavaScript heap out of memory" while the machine had
   about 1.8 GB of commit memory free; it passed after memory was freed.
+- Browser checks without a repo dependency: `npm i playwright-core` in a scratch folder, launch the
+  installed Edge (`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`), open
+  `http://localhost:3001`, click **Try Demo**, and use one browser context for every page so the demo
+  session carries over. Used for P5 on 2026-10-05.
+- The session ran past midnight; this close is dated 2026-10-06.
 
 ---
 
@@ -126,6 +139,9 @@ roadmap, ADR-025, store v11 → v12).
 
 ## Open items
 
+- **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked. Candidates from
+  this list: the P1 UI findings (bugs, below), the `/login` hydration mismatch, the dev/preview
+  login failure, or a new spec item.
 - **P7 / P11 blockers:** the OS context feed (OS session) and the GitHub PAT in Vercel (Roman).
   See Start here, step 4.
 - **OS session** (prompt drafted 2026-10-04; Roman holds it). Deliverables: decision-template field
