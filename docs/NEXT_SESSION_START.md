@@ -1,7 +1,7 @@
 # Next Session Start
 
 **Last updated:** 2026-10-06 (session of 2026-10-06: #145 merged, two P1 UI bugs fixed; no roadmap item open)
-**Resume on:** `main` (`4b2d4ef`, #145) after the `docs/session-close-2026-10-06b` PR merges. Start a new branch from `main` for any work.
+**Resume on:** `main` (`bb41dcb`, #146) after the `docs/session-close-2026-10-06c` PR merges. Start a new branch from `main` for any work.
 **Build status:** passing as of 2026-10-06 — `npm run build` exit 0 on `a990cee` (#145 head; tree identical to `main` at `4b2d4ef`), run by the P8 commit-gate hook and again by hand (Next.js 16.1.6, Turbopack, Node 22.19.0)
 **Typecheck status:** passing as of 2026-10-06 — `npm run typecheck` exit 0 (same runs)
 **Lint status:** passing as of 2026-10-06 — `npm run lint` exit 0 (same runs)
@@ -47,10 +47,17 @@
 dealt with, so Needs attention does not repeat it. The alternative was to keep the attention row and
 stop the derived fill from picking overdue tasks.
 
-**Branch map:** `fix/daily-focus-overdue` off `main` `7d15add`, not stacked, merged as #145. This close
-is on `docs/session-close-2026-10-06b` off `main` `4b2d4ef`. Merged and still on origin, safe to
-delete: `fix/daily-focus-overdue`, `docs/session-close-2026-10-06`, plus the previous session's list
-below. Local `main` is behind `origin/main`; pull before branching.
+**Branch map:** `fix/daily-focus-overdue` off `main` `7d15add`, not stacked, merged as #145. The first
+close was `docs/session-close-2026-10-06b` (#146, merged as `bb41dcb`). This update is on
+`docs/session-close-2026-10-06c` off `main` `bb41dcb`; it only records the branch cleanup.
+
+**Branch cleanup (2026-10-06, confirmed):** 15 merged branches deleted on origin and locally, each
+checked first (PR `MERGED`, remote head = PR head): the #132–#146 branches, i.e. `fix/daily-focus-overdue`,
+`docs/session-close-2026-10-05`, `-05b`, `-06`, `-06b`, `docs/p13-todo-done-view`,
+`feat/p13-todo-done-view`, `docs/p1-done-p2-open`, `feat/p2-weekly-outcome-source`,
+`feat/p3-attention-decisions`, `feat/p8-commit-gate-hook`, `feat/p6-gamification-placement`,
+`docs/p9-one-governance-file` (its local unpushed `89b3480` copy was superseded),
+`feat/p4-provenance-fields`, `feat/p5-navigation-weight`.
 
 **Verified (confirmed):**
 - Session start: `origin/main` `7d15add` passed lint, typecheck, build (exit 0).
@@ -119,14 +126,9 @@ below. Local `main` is behind `origin/main`; pull before branching.
   collapsed; list `aria-label`s, `aria-current`); `mobile-nav.tsx` uses it; bottom bar reordered Home,
   Schedule, ToDo, Projects, Journal. P5 is set `done` by this close.
 
-**Branch map:** all branches are off `main`, none stacked except #136 on #135 (both merged in order).
-Merged and still on origin, safe to delete: `docs/p13-todo-done-view`, `feat/p13-todo-done-view`,
-`docs/p1-done-p2-open`, `feat/p2-weekly-outcome-source`, `feat/p3-attention-decisions`,
-`feat/p8-commit-gate-hook`, `feat/p6-gamification-placement`, `docs/p9-one-governance-file`,
-`feat/p4-provenance-fields`, `docs/session-close-2026-10-05b`, `feat/p5-navigation-weight`,
-`docs/session-close-2026-10-05`. Local copies also remain; the local `docs/p9-one-governance-file`
-holds an unpushed first copy of this handoff (`89b3480`), superseded; delete it. This close is on
-`docs/session-close-2026-10-06`.
+**Branch map:** all branches were off `main`, none stacked except #136 on #135 (both merged in order).
+All of them were deleted on 2026-10-06 (see the cleanup note above). That close was on
+`docs/session-close-2026-10-06` (#144).
 
 **Verified (confirmed):**
 - Gates exit 0 on every PR's head: run by hand for #133–#137, by the P8 hook for #138–#143.
@@ -202,11 +204,12 @@ holds an unpushed first copy of this handoff (`89b3480`), superseded; delete it.
 - **Positioning docs** `docs/PUBLIC_PRESENTATION.md` and `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` still use
   the sandbox wording (left on purpose by ADR-024).
 - **The `roadmap` label** in `.github/ISSUE_TEMPLATE/feature.md` may not exist on GitHub.
-- **Merged remote branches** to delete (Branch map above; session 1's are already gone from origin),
-  plus older local ones (`ai-control-tower`, `dev`,
-  `feat/projects-tab-density-redesign`, `feat/schedule-block-editor-improvements`,
-  `feature/resource-reorder-and-milestone-schedule`, `fix/close-phase-1-adrs`,
-  `fix/sync-existing-profile-on-new-domain`). Check each before deleting.
+- **Older branches, not confirmed merged** (the #132–#146 branches were deleted 2026-10-06). Local:
+  `ai-control-tower` (origin gone), `dev`, `feat/projects-tab-density-redesign`,
+  `feat/schedule-block-editor-improvements`, `feature/resource-reorder-and-milestone-schedule`,
+  `fix/close-phase-1-adrs`, `fix/sync-existing-profile-on-new-domain`. On origin, 16 besides `main`,
+  e.g. `chore/reframe-as-sandbox`, `feature/todo-schedule-sync`, `claude/audit-ai-production-os-hHzSN`
+  (`git branch -r`). Check each one's work reached `main` before deleting.
 - **MK-DEC-006**, cited by P7, is not in this repo's log; assumed to live in the OS repo.
 - **ADR numbering:** ADR-022 (2026-10-05) sits after ADR-027 because the number was reserved for P2 in
   2026-09; ADR-016…019 are dated 2026-08-09 but follow ADR-015. Cosmetic.
