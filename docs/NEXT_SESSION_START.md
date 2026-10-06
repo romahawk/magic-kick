@@ -1,37 +1,85 @@
 # Next Session Start
 
-**Last updated:** 2026-10-06 (closes the session of 2026-10-05: #133–#143 merged; P13, P1, P2, P3, P8, P6, P9, P4, P5 closed; P10 gated; no item open)
-**Resume on:** `main` (`7e6a3ad`, #143) after the `docs/session-close-2026-10-06` PR merges. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-05 — `npm run build` exit 0, run by the P8 commit-gate hook on `85cf648` (#143 head; merged to `main` as `7e6a3ad`) (Next.js 16.1.6, Turbopack, Node 22.19.0)
-**Typecheck status:** passing as of 2026-10-05 — `npm run typecheck` exit 0 (same run)
-**Lint status:** passing as of 2026-10-05 — `npm run lint` exit 0 (same run)
+**Last updated:** 2026-10-06 (session of 2026-10-06: #145 merged, two P1 UI bugs fixed; no roadmap item open)
+**Resume on:** `main` (`4b2d4ef`, #145) after the `docs/session-close-2026-10-06b` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-06 — `npm run build` exit 0 on `a990cee` (#145 head; tree identical to `main` at `4b2d4ef`), run by the P8 commit-gate hook and again by hand (Next.js 16.1.6, Turbopack, Node 22.19.0)
+**Typecheck status:** passing as of 2026-10-06 — `npm run typecheck` exit 0 (same runs)
+**Lint status:** passing as of 2026-10-06 — `npm run lint` exit 0 (same runs)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** code, governance and tooling session. No dependency, store-version or Firestore-rules changes (P4 adds optional fields only). A commit-gate hook now runs on every `git commit` from Claude Code.
+**Note:** one bug-fix session on the Command Center "Now" block. No dependency, store, data-model or Firestore-rules change.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Rules now live in `AGENTS.md`** (P9, #140). `CLAUDE.md` keeps the governing rule, imports
-   `AGENTS.md` with `@AGENTS.md` and adds Claude Code specifics. First session after the change:
-   run `/memory` (or `/context`) and check that `AGENTS.md` is listed as an imported file, and that
-   the "Commit, Push and PR Descriptions" rules are known without opening the file. Not verified yet.
-3. **Working order:** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P8, P6, P9, P4, P5. **P7, P11:** blocked (step 4). **P10:** `gated`
-   on P7. **No roadmap item is open and none is unblocked.** A session must name a bug from Open items
-   (for example the P1 UI findings) or a new item Roman adds to the spec; otherwise it stops.
-4. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
+2. **Working order:** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P8, P6, P9, P4, P5. **P7, P11:** `queued` but blocked (step 3).
+   **P10:** `gated` on P7. **No roadmap item is open and none is unblocked.** A session must name a
+   bug from Open items or a new item Roman adds to the spec; otherwise it stops.
+3. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
    - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
      document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
-5. Read ADR-024, ADR-027 and ADR-028 before any control-plane or scope decision.
-6. **Commit gate (P8):** every `git commit` from Claude Code goes through
+4. Read ADR-024, ADR-027 and ADR-028 before any control-plane or scope decision.
+5. **Commit gate (P8):** every `git commit` from Claude Code goes through
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
    lines and typecheck, lint and build pass (about 31 s: typecheck 4 s, lint 14 s, build 14 s,
    measured 2026-10-05). Commits typed in a terminal are not checked.
+
+---
+
+## Where we left off (2026-10-06) — Daily Focus count and duplicate overdue rows fixed
+
+**Merged to `main` (by Roman, on GitHub):**
+- **#144** `7d15add` — the previous session-close handoff.
+- **#145** `4b2d4ef` — bug fix from the P1 UI findings (branch `fix/daily-focus-overdue`, `a990cee`):
+  - `lib/execution-os.ts`: `selectDailyFocus` marks each entry `chosen` (Daily Focus lane) or not
+    (derived fill); `selectAttentionItems` skips overdue tasks already in today's focus.
+  - `components/modules/attention-block.tsx`: header "n of limit chosen" (was "n of limit today",
+    counting derived fill); derived rows say "suggested"; an overdue focus row says
+    "overdue, due d MMM" in red; due date parsed with `parseISO` (was `new Date`, read as UTC).
+  - `CHANGELOG.md`: Fixed entry dated 2026-10-06.
+
+**Rule chosen in #145 (Roman to confirm; no ADR):** an overdue task in Daily Focus counts as being
+dealt with, so Needs attention does not repeat it. The alternative was to keep the attention row and
+stop the derived fill from picking overdue tasks.
+
+**Branch map:** `fix/daily-focus-overdue` off `main` `7d15add`, not stacked, merged as #145. This close
+is on `docs/session-close-2026-10-06b` off `main` `4b2d4ef`. Merged and still on origin, safe to
+delete: `fix/daily-focus-overdue`, `docs/session-close-2026-10-06`, plus the previous session's list
+below. Local `main` is behind `origin/main`; pull before branching.
+
+**Verified (confirmed):**
+- Session start: `origin/main` `7d15add` passed lint, typecheck, build (exit 0).
+- #145: lint, typecheck, build exit 0 on `a990cee`, by the P8 hook and again by hand (output in the PR).
+  `main` at `4b2d4ef` has the same tree (`git diff a990cee origin/main` empty).
+- Selectors: the real `lib/execution-os.ts` under `node --experimental-strip-types` on 10 sample cases,
+  all passing (none chosen → 3 suggested; derived overdue not duplicated; chosen overdue not
+  duplicated; overdue outside focus and in the parking lot keep their row; 1 chosen + 2 suggested).
+- Browser: headless Edge on the dev server in demo mode, 1280×800 and 375×812: "0 of 3 chosen" with
+  suggested rows. With the demo store edited (one task overdue and in the Daily Focus lane, another
+  overdue in the backlog): the first shows once, in focus, in red; the second keeps its attention row.
+- The `@AGENTS.md` import works in a fresh Claude Code session: the AGENTS.md rules, including
+  "Commit, Push and PR Descriptions", were in context at session start without opening the file.
+
+**Not verified:**
+- #145 on a real (non-demo) account; light theme; keyboard walk.
+- Derived fill picking an overdue task, seen in a browser (selector cases only: in the demo data,
+  tasks due today outrank overdue ones, because overdue tasks get no due-date score).
+- No before screenshots in #145.
+- Everything under the previous session's "Not verified" below, unchanged.
+
+**Process notes:**
+- The Node selector harness and playwright-core scripts were rebuilt in the session scratchpad. In the
+  harness, absolute imports need `file:///D:/…` URLs and `date-fns` resolved from the repo's
+  `node_modules`.
+- The demo store is `localStorage["magic-kick-store"]` (`{ state, version }`); editing `state.tasks`
+  and reloading sets up browser cases the demo data does not have.
+- The Gmail and Google Calendar claude.ai connectors need authorizing in claude.ai settings. Advice
+  given: connect Calendar; hold Gmail until a concrete job needs it. No repo change.
 
 ---
 
@@ -125,25 +173,17 @@ holds an unpushed first copy of this handoff (`89b3480`), superseded; delete it.
 
 ---
 
-## Where we left off (2026-10-05, session 1) — Magic Kick became the OS UI; P1 fixed; P12 and ToDo shipped
-
-**Merged to `main`:** #126 (production URL docs), #127 (ADR-023), #128 (P1 load row), #129 (ADR-024,
-Magic Kick is the UI of AI-Business-OS; P11 added), #130 (ToDo time groups), #131 (P12 project
-roadmap, ADR-025, store v11 → v12).
-
-**Verified then:** gates on `48a1144`; P1, #128, #130 and P12 checked in a browser (headless Edge).
-
-**Not verified then:** the P12 migration on real data; P12 sync across devices; #130 at mobile widths.
-
----
-
 ## Open items
 
 - **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked. Candidates from
-  this list: the P1 UI findings (bugs, below), the `/login` hydration mismatch, the dev/preview
-  login failure, or a new spec item.
+  this list: the `/login` hydration mismatch, the dev/preview login failure, the overdue ranking in
+  derived focus, or a new spec item.
+- **Confirm the #145 rule** (an overdue task in Daily Focus is not repeated in Needs attention), Roman.
+- **Derived Daily Focus ranks overdue tasks below anything due this week:** once past due a task gets
+  no due-date score (`selectDailyFocus`). Found 2026-10-06; Roman to decide whether overdue tasks
+  should be suggested first.
 - **P7 / P11 blockers:** the OS context feed (OS session) and the GitHub PAT in Vercel (Roman).
-  See Start here, step 4.
+  See Start here, step 3.
 - **OS session** (prompt drafted 2026-10-04; Roman holds it). Deliverables: decision-template field
   "Repo decisions affected"; one generic `repo-sync` skill with the old sync skills as aliases; an
   amendment line on `DEC-2026-10-03-001` (MK ADR-023 superseded); an OS decision removing the
@@ -153,10 +193,9 @@ roadmap, ADR-025, store v11 → v12).
   not edit it).
 - **Allocation reverts to `limited` on 2026-10-21** until that OS decision lands.
 - **P1 small-phone ruling** (360×800 shows focus + about 2½ attention rows), Roman. Carried by ADR-027.
-- **UI findings from the P1 check, not fixed:** overdue tasks appear in both Daily Focus and Needs
-  attention; Daily Focus says "3 of 3 today" when none is due today; the "Friday with zero done" text
-  (not in any component; most likely the parked AI coaching route); `/login` logs a React hydration
-  mismatch on the `disabled` attribute.
+- **UI findings from the P1 check, still open:** the "Friday with zero done" text (not in any
+  component; most likely the parked AI coaching route); `/login` logs a React hydration mismatch on
+  the `disabled` attribute. (Overdue tasks in two places and "3 of 3 today" fixed in #145.)
 - **Journal header still shows a streak** (left by P6; Journal is a reference module). Roman to decide.
 - **`SystemConfig.weeklyOutcomeLimit`** is no longer read after P2 (ADR-022); left in the config.
 - **Dev and preview logins** (reported failing 2026-09-24) still not investigated. Production login works.
