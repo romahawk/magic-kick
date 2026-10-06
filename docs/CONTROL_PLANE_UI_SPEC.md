@@ -200,7 +200,7 @@ writes a non-manual item yet.
 
 ### P5 — Navigation weight · S
 
-**Status:** open
+**Status:** done
 
 **Why:** F6. Reference surfaces should not compete with execution surfaces.
 
