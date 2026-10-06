@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth"
 import { auth, firebaseInitError } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
@@ -12,7 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+const subscribeNoop = () => () => {}
+
 export default function LoginPage() {
+  // `auth` is only created in the browser, so read it after hydration to keep the server and
+  // first client render identical.
+  const authReady = useSyncExternalStore(subscribeNoop, () => auth !== null, () => false)
   const router = useRouter()
   const { user, loading } = useAuth()
   const activateDemoMode = useAppStore((s) => s.activateDemoMode)
@@ -82,10 +87,10 @@ export default function LoginPage() {
             </div>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             {!auth && firebaseInitError ? <p className="text-sm text-destructive">{firebaseInitError}</p> : null}
-            <Button type="submit" className="w-full" disabled={submitting || !auth}>
+            <Button type="submit" className="w-full" disabled={submitting || !authReady}>
               {submitting ? "Signing in..." : "Sign in"}
             </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={onGoogleLogin} disabled={submitting || !auth}>
+            <Button type="button" variant="outline" className="w-full" onClick={onGoogleLogin} disabled={submitting || !authReady}>
               Continue with Google
             </Button>
           </form>
