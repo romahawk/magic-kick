@@ -2,6 +2,7 @@
 
 import { format, isToday, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
+import { isOverdue } from "@/lib/game-utils"
 import {
   TASK_LANE_LABELS,
   selectAttentionItems,
@@ -35,6 +36,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   const liveProjects = projects.filter((project) => !project.deleted)
 
   const focus = selectDailyFocus(liveTasks, liveProjects, config, { weeklyPlans })
+  const chosenCount = focus.filter((entry) => entry.chosen).length
   const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, weeklyPlans, config })
 
   // Actions carry their effect as data (P3), so this runs any item without knowing its kind.
@@ -60,7 +62,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
               {TASK_LANE_LABELS["daily-focus"]}
             </h3>
             <span className="text-xs text-muted-foreground">
-              {focus.length} of {config.dailyFocusLimit} today
+              {chosenCount} of {config.dailyFocusLimit} chosen
             </span>
           </div>
 
@@ -78,7 +80,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
             </p>
           ) : (
             <ul className="flex flex-col gap-2.5">
-              {focus.map(({ task, linkedProject }) => (
+              {focus.map(({ task, linkedProject, chosen }) => (
                 <li key={task.id} className="flex items-start gap-3">
                   <Checkbox
                     id={`focus-${task.id}`}
@@ -101,10 +103,11 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
                         </Badge>
                       ) : null}
                       {task.dueDate ? (
-                        <span className="text-xs text-muted-foreground">
-                          due {format(new Date(task.dueDate), "d MMM")}
+                        <span className={cn("text-xs", isOverdue(task.dueDate) ? "font-medium text-destructive" : "text-muted-foreground")}>
+                          {isOverdue(task.dueDate) ? "overdue, " : ""}due {format(parseISO(task.dueDate), "d MMM")}
                         </span>
                       ) : null}
+                      {chosen ? null : <span className="text-xs text-muted-foreground">suggested</span>}
                     </div>
                   </div>
                 </li>

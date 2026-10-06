@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-06 - Daily Focus counts and overdue rows
+
+### Fixed
+- The Daily Focus header counts only the tasks you chose ("1 of 3 chosen"), not the ones filled in for you. Filled-in tasks are marked "suggested". It used to say "3 of 3 today" even when nothing was due today.
+- An overdue task that is already in Daily Focus no longer gets a second row under Needs attention. Its focus row says "overdue" in red instead.
+
+---
+
 ## [Unreleased] - 2026-10-05 - Navigation grouped by weight (P5)
 
 ### Changed

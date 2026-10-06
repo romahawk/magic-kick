@@ -116,13 +116,16 @@ export function selectDailyFocus(
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .slice(0, rules.dailyFocusLimit)
 
-  if (explicitFocus.length >= rules.dailyFocusLimit) {
-    return explicitFocus.map((task) => ({
-      task,
-      linkedProject: task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined,
-      score: Number.MAX_SAFE_INTEGER,
-    }))
-  }
+  // `chosen`: the task is in the Daily Focus lane. Derived tasks only fill empty slots; they are
+  // suggestions, not choices, and the block must not count them as "today".
+  const chosen = explicitFocus.map((task) => ({
+    task,
+    linkedProject: task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined,
+    score: Number.MAX_SAFE_INTEGER,
+    chosen: true,
+  }))
+
+  if (explicitFocus.length >= rules.dailyFocusLimit) return chosen
 
   const derived = tasks
     .filter((task) => !task.deleted && !task.completed && task.lane !== "parking-lot" && task.lane !== "daily-focus")
@@ -141,19 +144,13 @@ export function selectDailyFocus(
         task,
         linkedProject,
         score,
+        chosen: false,
       }
     })
     .sort((a, b) => b.score - a.score || a.task.title.localeCompare(b.task.title))
     .slice(0, Math.max(0, rules.dailyFocusLimit - explicitFocus.length))
 
-  return [
-    ...explicitFocus.map((task) => ({
-      task,
-      linkedProject: task.linkedProjectId ? projectById.get(task.linkedProjectId) : undefined,
-      score: Number.MAX_SAFE_INTEGER,
-    })),
-    ...derived,
-  ]
+  return [...chosen, ...derived]
 }
 
 export function calculateCognitiveLoad(input: {
@@ -269,7 +266,12 @@ export function selectAttentionItems(input: {
     })
   }
 
-  for (const task of selectOverdueTasks(input.tasks)) {
+  // An overdue task already in today's Daily Focus is being dealt with; the focus row marks it
+  // overdue, so it does not get a second row here.
+  const focusTaskIds = new Set(
+    selectDailyFocus(input.tasks, input.projects, rules, { weeklyPlans: input.weeklyPlans }).map((entry) => entry.task.id),
+  )
+  for (const task of selectOverdueTasks(input.tasks).filter((t) => !focusTaskIds.has(t.id))) {
     items.push({
       id: "task-overdue:" + task.id,
       kind: "task-overdue",
