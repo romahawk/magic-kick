@@ -5,10 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
-## [Unreleased] - 2026-10-06 - Login buttons after page load
+## [Unreleased] - 2026-10-06 - Login and signup buttons after page load
 
 ### Fixed
 - On the login page, "Sign in" and "Continue with Google" no longer stay greyed out after the page loads. The server and browser disagreed on whether sign-in was available, which also logged a hydration error in the console.
+- The same fix on the signup page: "Create account" is no longer greyed out after the page loads.
 
 ---
 
