@@ -60,8 +60,14 @@ an optional OS domain (ADR-029) over adopting the four OS domains only.
 
 **Branch map:**
 - `feat/categories-single-source` off `main` `45f25c9`, head `3bd2f34` (7 commits) → **#152 merged**
-  (squash `66c3bf6`). Remote and local branch still exist; safe to delete.
-- `docs/session-close-2026-10-09` off `main` `66c3bf6`: this handoff. Not stacked.
+  (squash `66c3bf6`). Branch deleted on origin and locally on 2026-10-09.
+- `docs/session-close-2026-10-09` off `main` `66c3bf6`: this handoff, PR #153. Not stacked.
+
+**Branch cleanup (2026-10-09, confirmed):** deleted on origin and locally after checking each PR is
+MERGED with the branch at the PR head: `feat/categories-single-source` (#152),
+`fix/signup-hydration-to-main` (#150), `docs/session-close-2026-10-06d` (#151),
+`fix/signup-hydration-mismatch` (#149, local only). `fix/login-hydration-mismatch` was at `3148374`
+(#148 head plus the stray #149 merge); its tree equals `4a387e1` (#150), so nothing was lost.
 
 **Verified (confirmed):**
 - Gates exit 0 by hand on `3bd2f34` (typecheck, lint, build) and by the P8 hook on every commit;
@@ -137,10 +143,6 @@ Continue with Google) and `/signup` (Create account).
 
 - **Real-data check of P14** (Start here, step 2): orphaned categories listed, merged or mapped;
   then confirm the new fields round-trip through Firestore on a second device.
-- **Delete merged branches** (signup fix merged as #150 on 2026-10-06; P14 as #152 on 2026-10-09):
-  on origin `fix/login-hydration-mismatch` (holds only the stray #149 merge),
-  `fix/signup-hydration-to-main`, `docs/session-close-2026-10-06d`, `feat/categories-single-source`;
-  locally the same plus `fix/signup-hydration-mismatch`.
 - **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked. Candidates:
   the dev/preview login failure (worth re-testing after the auth-button fix), the overdue ranking in
   derived focus, or a new spec item.
