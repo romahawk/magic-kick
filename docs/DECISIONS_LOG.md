@@ -931,3 +931,43 @@ Review tab only reviewed the current week, so a finished week could never be rev
 - **Rollback:** revert the P3 PR. No data model change, migration or rules change.
 
 **Revisit trigger:** the first agent proposal kind, or a need to review weeks older than last week.
+
+---
+
+## ADR-029: Categories stay in Magic Kick, with an optional OS domain (P14, P15)
+
+**Date:** 2026-10-09
+**Status:** Accepted (Roman, 2026-10-09).
+**Relates to:** ADR-024 (the OS is the source of truth), ADR-004 (category base XP), OS
+`DEC-2026-08-21-001` (four life domains).
+
+### Context
+
+Task labels are free-text categories kept on the profile. They are assigned differently by each
+module, so the same work shows different labels and colors in ToDo, Schedule and Projects, and
+custom categories earn less XP. The OS defines four life domains (Work, Learning, Admin, Life;
+`10_AUTOMATION/lifeos-architecture.md` §3), but Roman needs categories the OS does not have yet.
+
+### Decision
+
+1. **Categories stay flexible and are defined in Magic Kick.** Each may map to one OS domain or stay
+   unmapped. Unmapped means "Magic Kick only for now".
+2. **Projects carry an optional category;** tasks made from a project inherit it.
+3. **One module owns category rules** (`lib/categories.ts`) and one component renders them.
+4. **Base XP is the same for every category** (supersedes ADR-004's per-name values).
+5. **The OS link is read-only and one-way.** P15 reads the domain list from the OS once P7 exists.
+   Magic Kick never adds an OS domain; new domains are an OS decision (OS `AGENTS.md` rule 9).
+
+### Rationale
+
+- Forcing the four OS domains would lose distinctions Roman uses today; a mapping keeps both.
+- Inheriting from the project removes the main source of wrong labels without asking for input.
+- Name-keyed XP penalises every custom category, which contradicts flexible categories.
+
+### Consequences
+
+- New optional fields: `Project.category`, `Profile.taskCategoryDomains`. No migration, no rules
+  change.
+- **Rollback:** revert the P14 PR. The optional fields are ignored by older code.
+
+**Revisit trigger:** the OS adds a domain, or more than a few categories stay unmapped for a month.

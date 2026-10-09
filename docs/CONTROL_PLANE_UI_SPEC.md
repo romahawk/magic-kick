@@ -39,11 +39,12 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
-P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028).
+P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028). P14 and P15 were added on
+2026-10-09 by Roman (ADR-029): P14 straight after P3, P15 after P11 because it reads through P7.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -322,6 +323,69 @@ feed `lib/retrospective.ts` and coaching.
 **Out of scope:** deleting or purging completed tasks; bulk actions; any count or streak above the
 board (P6, P10); the three lane summary cards (whether to remove them is a separate decision for
 Roman).
+
+---
+
+### P14 — One category model across modules · M
+
+**Status:** open
+
+**Why:** the same task shows different labels, colors and XP depending on where it was made and
+which module shows it. Verified in the code on 2026-10-09:
+
+- The default category list is copied in five files (`lib/store.ts`, `todo-module.tsx`,
+  `schedule-module.tsx`, `goals-module.tsx`, `quick-add-dialog.tsx`).
+- Tasks made from a project roadmap (`project-roadmap.tsx`) or a new Schedule block (`lib/store.ts`
+  `upsertTimeBlock`) silently get the first category in the list; onboarding hard-codes "Learning".
+  That is why project work shows as "Learning".
+- Schedule shows category badges in grey; ToDo and Goals use the category color.
+- `lib/xp-engine.ts` keys base XP on five category names, so every custom category is worth less.
+- Names are only compared case-insensitively, so "Job / Career" and "Career-&-Business" coexist.
+
+**Shape (ADR-029).** Categories stay defined in Magic Kick. Each one may map to an OS domain (Work,
+Learning, Admin, Life) or stay unmapped; unmapped is a normal state, not an error. A project may
+carry a category, and tasks made from that project inherit it.
+
+**Acceptance criteria**
+
+1. `lib/categories.ts` is the only place that holds the default categories, their colors, the
+   color lookup and name normalization. No module declares its own default list.
+2. One `CategoryBadge` component renders a category everywhere a task or goal category is shown
+   (ToDo, Schedule, Goals, Journal, Command Center), in the category's color.
+3. `Project` has an optional `category`, editable in the project form. A task made from a project
+   roadmap or from a Schedule block linked to a project takes the project's category; otherwise it
+   takes the first category, as today. Onboarding uses the first category, not a literal.
+4. The profile has `taskCategoryDomains: Record<string, OsDomain>`. The category manager lets each
+   category be mapped to Work, Learning, Admin or Life, or left unmapped. Rename carries the mapping;
+   delete removes it. A missing entry means unmapped, so existing data needs no migration.
+5. A new or renamed category is refused if it equals an existing one after normalization (case,
+   spaces, `&`, `/`, `-` and `_` ignored).
+6. Base XP no longer depends on the category name: every category gets the same base. XP already
+   stored on tasks is not recalculated.
+7. No new module, no new store collection, no Firestore rules change. Old clients keep working:
+   the new fields are optional.
+
+**Out of scope:** reading the domain list from the OS (P15); bulk re-categorising existing tasks;
+labels with more than one category per task.
+
+---
+
+### P15 — Read OS domains for category mapping · S
+
+**Status:** gated
+
+**Gate:** P7 (the server-side OS read path exists).
+
+**Why:** P14 hard-codes the four OS domains. When the OS adds a domain, Magic Kick should offer it
+without a code change, and show which Magic Kick categories have no domain yet so they can be
+raised at the next OS review.
+
+**Acceptance criteria**
+
+1. The domain list is read from the OS through the P7 server route; the hard-coded list from P14 is
+   the fallback when the OS cannot be reached.
+2. Settings lists unmapped categories with their open-task count.
+3. Magic Kick never creates or proposes an OS domain by itself (OS `AGENTS.md` rule 9).
 
 ---
 
