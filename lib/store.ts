@@ -46,40 +46,22 @@ import {
   seedSchedule,
   seedTasks,
 } from "@/lib/seed-data"
+import {
+  DEFAULT_TASK_CATEGORIES,
+  DEFAULT_TASK_CATEGORY_COLORS,
+  FALLBACK_CATEGORY,
+  buildCategoryColors,
+  colorFromCategoryName,
+  firstCategory,
+} from "@/lib/categories"
 
 export const STORE_KEY = "magic-kick-store"
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
-const DEFAULT_TASK_CATEGORY_COLORS: Record<string, string> = {
-  Learning: "#22c55e",
-  Sport: "#f97316",
-  "Family/Home": "#06b6d4",
-  Hobby: "#a855f7",
-  Travel: "#f59e0b",
-}
 const DEFAULT_GOOGLE_CALENDAR_METADATA: GoogleCalendarMetadata = {
   enabled: false,
   selectedCalendarIds: [],
   syncTokenByCalendarId: {},
   status: "disconnected",
   displayExternalBlocks: true,
-}
-
-function colorFromCategoryName(name: string) {
-  const source = name.trim().toLowerCase()
-  let hash = 0
-  for (let i = 0; i < source.length; i++) {
-    hash = source.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue}, 70%, 50%)`
-}
-
-function buildCategoryColors(categories: string[], existing?: Record<string, string>) {
-  const result: Record<string, string> = {}
-  for (const category of categories) {
-    result[category] = existing?.[category] ?? DEFAULT_TASK_CATEGORY_COLORS[category] ?? colorFromCategoryName(category)
-  }
-  return result
 }
 
 function normalizeGoogleCalendarMetadata(input?: Partial<GoogleCalendarMetadata>): GoogleCalendarMetadata {
@@ -654,7 +636,7 @@ export const useAppStore = create<AppState>()(
           const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
           if (!categories.includes(name)) return {}
           const remaining = categories.filter((item) => item !== name)
-          const fallback = remaining[0] ?? "General"
+          const fallback = remaining[0] ?? FALLBACK_CATEGORY
           const nextCategories = remaining.length > 0 ? remaining : [fallback]
           const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS
           const nextColors = { ...colors }
@@ -2110,7 +2092,7 @@ export const useAppStore = create<AppState>()(
           let tasksPending = s.sync.pending.tasks
 
           if (isNew) {
-            const category = s.profile.taskCategories?.[0] ?? "General"
+            const category = firstCategory(s.profile.taskCategories)
             const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
             const newTask = touchEntity({
               id: `block-${id}`,

@@ -9,6 +9,8 @@ import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 import { cn } from "@/lib/utils"
+import { firstCategory, resolveCategories } from "@/lib/categories"
+import { CategoryBadge } from "@/components/category-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,7 +22,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Archive, CheckCheck, ChevronDown, Clock, Focus, LayoutList, Pencil, Save, Search, Trash2, X, Zap } from "lucide-react"
 import type { Task, TaskCategory, TaskLane, TaskRepeat } from "@/lib/types"
 
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 const TASK_LANES: Array<{ id: TaskLane; title: string; description: string; icon: ElementType }> = [
   { id: "backlog", title: "Backlog", description: "Important work waiting for a focus slot.", icon: LayoutList },
   { id: "daily-focus", title: "Daily Focus", description: "Only the few tasks that deserve today.", icon: Focus },
@@ -78,15 +79,13 @@ export function TodoModule() {
   const allTimeBlocks = useAppStore((s) => s.timeBlocks)
   const allScheduleItems = useAppStore((s) => s.schedule)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
-  const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
   const toggleTask = useAppStore((s) => s.toggleTask)
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
   const updateTask = useAppStore((s) => s.updateTask)
   const deleteTask = useAppStore((s) => s.deleteTask)
-  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
-  const categoryColors = taskCategoryColors ?? {}
+  const categories = resolveCategories(taskCategories)
   const tasks = useMemo(() => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [allTasks])
 
   const taskTimeSlots = useMemo(() => {
@@ -302,7 +301,6 @@ export function TodoModule() {
           olderGroupsShown={olderGroupsShown}
           onShowEarlier={() => setOlderGroupsShown((n) => n + 1)}
           emptyMessage={hasAnyDone ? "No completed tasks match your filters." : "No completed tasks yet."}
-          categoryColors={categoryColors}
           onToggle={toggleTask}
           onSelect={openTask}
         />
@@ -326,7 +324,6 @@ export function TodoModule() {
                   tasks={laneTasks[laneConfig.id]}
                   limit={laneConfig.id === "daily-focus" ? dailyFocusLimit : undefined}
                   grouped={sortBy === "date-asc"}
-                  categoryColors={categoryColors}
                   taskTimeSlots={taskTimeSlots}
                   onToggle={toggleTask}
                   onSelect={openTask}
@@ -350,7 +347,7 @@ export function TodoModule() {
                   <div><Label htmlFor="edit-task-title">Title</Label><Input id="edit-task-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></div>
                   <div>
                     <Label>Category</Label>
-                    <Select value={categories.includes(editCategory) ? editCategory : categories[0] ?? "General"} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
+                    <Select value={categories.includes(editCategory) ? editCategory : firstCategory(categories)} onValueChange={(v) => setEditCategory(v as TaskCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
@@ -383,7 +380,7 @@ export function TodoModule() {
                 </div>
               ) : null}
               <div className="flex flex-wrap items-center gap-2">
-                <Badge style={{ backgroundColor: categoryColors[selectedTask.category] ?? "#334155", color: "#ffffff" }}>{selectedTask.category}</Badge>
+                <CategoryBadge category={selectedTask.category} />
                 <Badge variant="outline">{TASK_LANE_LABELS[selectedTask.lane ?? "backlog"]}</Badge>
                 {(selectedTask.repeat ?? "none") !== "none" ? <Badge variant="outline">Repeats {selectedTask.repeat}</Badge> : null}
                 <Badge variant="outline" className="gap-1"><Zap className="h-3 w-3" /> {selectedTask.xpValue} XP</Badge>
@@ -426,9 +423,9 @@ export function TodoModule() {
 
 // ── Done view (replaces the board while Done is on) ──────────────────────────
 
-function DoneView({ groups, olderGroupsShown, onShowEarlier, emptyMessage, categoryColors, onToggle, onSelect }: {
+function DoneView({ groups, olderGroupsShown, onShowEarlier, emptyMessage, onToggle, onSelect }: {
   groups: DoneGroup[]; olderGroupsShown: number; onShowEarlier: () => void; emptyMessage: string
-  categoryColors: Record<string, string>; onToggle: (id: string) => void; onSelect: (task: Task) => void
+  onToggle: (id: string) => void; onSelect: (task: Task) => void
 }) {
   if (groups.length === 0) {
     return <p className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</p>
@@ -448,7 +445,7 @@ function DoneView({ groups, olderGroupsShown, onShowEarlier, emptyMessage, categ
             {group.title} · {group.tasks.length}
           </p>
           {group.tasks.map((task) => (
-            <TaskCard key={task.id} task={task} categoryColor={categoryColors[task.category]} onToggle={onToggle} onSelect={onSelect} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} showLane />
+            <TaskCard key={task.id} task={task} onToggle={onToggle} onSelect={onSelect} onDragStart={() => {}} onDropOnTask={() => {}} onDragEnd={() => {}} draggable={false} showLane />
           ))}
         </section>
       ))}
@@ -488,8 +485,8 @@ function LaneSummaryCard({ title, count, badge, description, icon: Icon, tone }:
 
 // ── Kanban column (row 2) ────────────────────────────────────────────────────
 
-function KanbanColumn({ lane, tasks, limit, grouped = false, categoryColors, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
-  lane: TaskLane; tasks: Task[]; limit?: number; grouped?: boolean; categoryColors: Record<string, string>
+function KanbanColumn({ lane, tasks, limit, grouped = false, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
+  lane: TaskLane; tasks: Task[]; limit?: number; grouped?: boolean
   taskTimeSlots: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }>
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
@@ -504,7 +501,6 @@ function KanbanColumn({ lane, tasks, limit, grouped = false, categoryColors, tas
       <TaskCard
         key={task.id}
         task={task}
-        categoryColor={categoryColors[task.category]}
         timeSlot={taskTimeSlots[task.id]}
         onToggle={onToggle}
         onSelect={onSelect}
@@ -576,8 +572,8 @@ function fmtOverrun(diffHours: number) {
   return m > 0 ? `+${h}h ${m}m` : `+${h}h`
 }
 
-function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd, showLane = false, onQuickEdit }: {
-  task: Task; categoryColor?: string; timeSlot?: { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }
+function TaskCard({ task, timeSlot, onToggle, onSelect, onDragStart, onDropOnTask, draggable = true, onDragEnd, showLane = false, onQuickEdit }: {
+  task: Task; timeSlot?: { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
   draggable?: boolean; onDragEnd: () => void; showLane?: boolean
@@ -626,9 +622,7 @@ function TaskCard({ task, categoryColor, timeSlot, onToggle, onSelect, onDragSta
         <p className={cn("flex-1 text-sm font-medium leading-snug", task.completed && "line-through")}>{task.title}</p>
       </div>
       <div className="ml-6 flex flex-wrap items-center gap-1.5">
-        <Badge variant="secondary" className="text-[10px]" style={categoryColor ? { backgroundColor: categoryColor, color: "#fff" } : undefined}>
-          {task.category}
-        </Badge>
+        <CategoryBadge category={task.category} className="text-[10px]" />
         {showLane ? <Badge variant="outline" className="text-[10px]">{TASK_LANE_LABELS[task.lane ?? "backlog"]}</Badge> : null}
         {sourceLabel(task) ? <Badge variant="outline" className="text-[10px]" title={task.sourceId}>{sourceLabel(task)}</Badge> : null}
         {(task.repeat ?? "none") !== "none" ? <Badge variant="outline" className="text-[10px]">Repeats {task.repeat}</Badge> : null}

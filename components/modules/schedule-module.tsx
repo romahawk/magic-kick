@@ -21,8 +21,9 @@ import { detectConflicts, dayIndexToISO } from "@/lib/ai/conflict"
 import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel"
 import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
+import { resolveCategories } from "@/lib/categories"
+import { CategoryBadge } from "@/components/category-badge"
 
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 const HOUR_PX = 64
 const DAY_START = 5
@@ -985,7 +986,7 @@ export function ScheduleModule() {
               linkedTask={editTask}
               project={projects.find((p) => p.id === editBlock.projectId)}
               allProjects={activeProjects}
-              allCategories={taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES}
+              allCategories={resolveCategories(taskCategories)}
               onUpdateTask={(updates, timing) => {
                 if (!editBlock.linkedTaskId) return
                 updateTask(editBlock.linkedTaskId, updates, timing)
@@ -1102,9 +1103,7 @@ function UnscheduledTaskCard({
         <div className="min-w-0 flex-1">
           <TruncatedTooltip as="p" content={task.title} className="truncate text-sm font-medium" />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary" className="text-[10px]">
-              {task.category}
-            </Badge>
+            <CategoryBadge category={task.category} className="text-[10px]" />
             {task.dueDate ? (
               <span className="text-[10px] text-muted-foreground">{task.dueDate}</span>
             ) : (
@@ -1212,7 +1211,7 @@ function EditPanel({
       <div className="space-y-3">
         {linkedTask ? (
           <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-secondary/40 px-2 py-1.5">
-            <Badge variant="secondary" className="text-[10px]">{linkedTask.category}</Badge>
+            <CategoryBadge category={linkedTask.category} className="text-[10px]" />
             {linkedTask.lane ? (
               <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
             ) : null}

@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
+import { firstCategory, resolveCategories } from "@/lib/categories"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -13,7 +14,6 @@ import { Pencil, Plus, Settings2, Trash2 } from "lucide-react"
 import type { TaskCategory, TaskRepeat } from "@/lib/types"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 export function QuickAddDialog() {
   const [open, setOpen] = useState(false)
@@ -26,7 +26,7 @@ export function QuickAddDialog() {
   const deleteCategory = useAppStore((s) => s.deleteCategory)
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const categories = resolveCategories(taskCategories)
 
   const [taskTitle, setTaskTitle] = useState("")
   const [taskCategory, setTaskCategory] = useState<TaskCategory>("Learning")
@@ -43,10 +43,10 @@ export function QuickAddDialog() {
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const activeTaskCategory = useMemo(
-    () => (categories.includes(taskCategory) ? taskCategory : (categories[0] ?? "General")),
+    () => (categories.includes(taskCategory) ? taskCategory : firstCategory(categories)),
     [categories, taskCategory]
   )
-  const activeGoalCategory = categories[0] ?? "General"
+  const activeGoalCategory = firstCategory(categories)
 
   function handleAddTask() {
     if (!taskTitle.trim()) return

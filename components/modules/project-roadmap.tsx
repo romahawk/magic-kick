@@ -7,6 +7,7 @@
 import { useMemo, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
+import { firstCategory } from "@/lib/categories"
 import {
   buildProjectRoadmap,
   resolveResources,
@@ -547,7 +548,7 @@ function AddTaskInline({ projectId, milestoneId }: { projectId: string; mileston
     if (!next) return
     addTask({
       title: next.slice(0, 300),
-      category: categories?.[0] ?? "General",
+      category: firstCategory(categories),
       completed: false,
       lane: "backlog",
       linkedProjectId: projectId,

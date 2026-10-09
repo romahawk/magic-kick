@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-09 - One category model (P14)
+
+### Changed
+- Category labels look the same everywhere: Schedule and Journal now show each category in its color, as ToDo and Goals already did.
+
+---
+
 ## [Unreleased] - 2026-10-06 - Login and signup buttons after page load
 
 ### Fixed
