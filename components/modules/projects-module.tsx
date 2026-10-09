@@ -6,7 +6,7 @@ import { useAppStore } from "@/lib/store"
 import { getProjectStatus, selectThisWeekOutcomes } from "@/lib/execution-os"
 import { sourceLabel } from "@/lib/provenance"
 import { cn } from "@/lib/utils"
-import { resolveCategories } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
@@ -120,7 +120,7 @@ export function ProjectsModule() {
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
-  const categories = resolveCategories(useAppStore((s) => s.profile.taskCategories))
+  const categories = useCategories()
 
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)

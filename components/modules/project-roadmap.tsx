@@ -8,6 +8,7 @@ import { useMemo, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { defaultTaskCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import {
   buildProjectRoadmap,
   resolveResources,
@@ -538,7 +539,7 @@ function RoadmapTaskRow({
 
 function AddTaskInline({ projectId, milestoneId }: { projectId: string; milestoneId?: string }) {
   const addTask = useAppStore((s) => s.addTask)
-  const categories = useAppStore((s) => s.profile.taskCategories)
+  const categories = useCategories()
   const project = useAppStore((s) => s.projects.find((p) => p.id === projectId))
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")

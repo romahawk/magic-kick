@@ -358,12 +358,17 @@ carry a category, and tasks made from that project inherit it.
 4. The profile has `taskCategoryDomains: Record<string, OsDomain>`. The category manager lets each
    category be mapped to Work, Learning, Admin or Life, or left unmapped. Rename carries the mapping;
    delete removes it. A missing entry means unmapped, so existing data needs no migration.
-5. A new or renamed category is refused if it equals an existing one after normalization (case,
-   spaces, `&`, `/`, `-` and `_` ignored).
+5. A new category is refused if it equals an existing one after normalization (case, spaces, `&`,
+   `/`, `-` and `_` ignored). In the Categories manager, renaming onto an existing category merges
+   into it after a confirmation; Quick Add refuses it.
 6. Base XP no longer depends on the category name: every category gets the same base. XP already
    stored on tasks is not recalculated.
 7. No new module, no new store collection, no Firestore rules change. Old clients keep working:
    the new fields are optional.
+8. The category list shown everywhere is the profile's list plus every category a live task, goal
+   or project uses (added 2026-10-09). The profile syncs as one document and the newest copy wins,
+   so its list could lose names that tasks still carry; those names were then not editable.
+   Renaming or deleting a category leaves deleted tasks, goals and projects untouched.
 
 **Out of scope:** reading the domain list from the OS (P15); bulk re-categorising existing tasks;
 labels with more than one category per task.

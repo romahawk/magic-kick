@@ -9,7 +9,8 @@ import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 import { cn } from "@/lib/utils"
-import { firstCategory, resolveCategories } from "@/lib/categories"
+import { firstCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -78,14 +79,13 @@ export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
   const allTimeBlocks = useAppStore((s) => s.timeBlocks)
   const allScheduleItems = useAppStore((s) => s.schedule)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
   const toggleTask = useAppStore((s) => s.toggleTask)
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
   const updateTask = useAppStore((s) => s.updateTask)
   const deleteTask = useAppStore((s) => s.deleteTask)
-  const categories = resolveCategories(taskCategories)
+  const categories = useCategories()
   const tasks = useMemo(() => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [allTasks])
 
   const taskTimeSlots = useMemo(() => {

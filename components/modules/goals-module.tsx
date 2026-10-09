@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { OS_DOMAINS, categoryDomain, findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
+import { OS_DOMAINS, categoryDomain, findCategoryConflict, firstCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags, Trash2, Check, X } from "lucide-react"
 import type { Goal, OsDomain } from "@/lib/types"
@@ -31,9 +32,8 @@ const UNMAPPED = "__unmapped__"
 
 export function GoalsModule() {
   const allGoals = useAppStore((s) => s.goals)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const categories = resolveCategories(taskCategories)
+  const categories = useCategories()
   const categoryColors = taskCategoryColors ?? {}
   const addGoal = useAppStore((s) => s.addGoal)
   const updateGoal = useAppStore((s) => s.updateGoal)
@@ -46,6 +46,23 @@ export function GoalsModule() {
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
   const setCategoryDomain = useAppStore((s) => s.setCategoryDomain)
   const categoryDomains = useAppStore((s) => s.profile.taskCategoryDomains)
+  const allTasks = useAppStore((s) => s.tasks)
+  const allProjects = useAppStore((s) => s.projects)
+
+  /** Rename, or ask first when the new name matches an existing category (a merge). */
+  function submitRename(from: string) {
+    const next = editingValue.trim()
+    if (!next) return
+    const into = findCategoryConflict(categories, next, from)
+    if (into) {
+      const count = [...allTasks, ...allGoals, ...allProjects].filter((item) => !item.deleted && item.category === from).length
+      setPendingMerge({ from, into, count })
+    } else {
+      renameCategory(from, next)
+    }
+    setEditingCategory(null)
+  }
+
   const goals = useMemo(
     () => allGoals.filter((g) => !g.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allGoals]
@@ -53,6 +70,7 @@ export function GoalsModule() {
 
   const [open, setOpen] = useState(false)
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
+  const [pendingMerge, setPendingMerge] = useState<{ from: string; into: string; count: number } | null>(null)
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState(firstCategory(categories))
   const [notes, setNotes] = useState("")
@@ -169,6 +187,19 @@ export function GoalsModule() {
               <p className="text-xs text-muted-foreground">
                 The OS domain links a category to Work, Learning, Admin or Life in AI-Business-OS. Categories the OS does not have yet stay &ldquo;Not in OS&rdquo;.
               </p>
+              {pendingMerge ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="alert">
+                  <span className="flex-1">
+                    Merge &ldquo;{pendingMerge.from}&rdquo; into &ldquo;{pendingMerge.into}&rdquo;? {pendingMerge.count} item{pendingMerge.count === 1 ? "" : "s"} move over and &ldquo;{pendingMerge.from}&rdquo; is removed.
+                  </span>
+                  <Button type="button" size="sm" className="h-7" onClick={() => { renameCategory(pendingMerge.from, pendingMerge.into); setPendingMerge(null) }}>
+                    Merge
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setPendingMerge(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 {categories.map((c) => (
                   <div key={c} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
@@ -187,10 +218,7 @@ export function GoalsModule() {
                           onChange={(e) => setEditingValue(e.target.value)}
                           className="h-7 flex-1 text-sm"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && editingValue.trim()) {
-                              renameCategory(c, editingValue.trim())
-                              setEditingCategory(null)
-                            }
+                            if (e.key === "Enter") submitRename(c)
                             if (e.key === "Escape") setEditingCategory(null)
                           }}
                         />
@@ -199,11 +227,7 @@ export function GoalsModule() {
                           size="icon"
                           className="h-7 w-7 shrink-0"
                           disabled={!editingValue.trim()}
-                          onClick={() => {
-                            if (!editingValue.trim()) return
-                            renameCategory(c, editingValue.trim())
-                            setEditingCategory(null)
-                          }}
+                          onClick={() => submitRename(c)}
                           aria-label="Confirm rename"
                         >
                           <Check className="h-3.5 w-3.5" />

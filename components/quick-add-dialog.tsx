@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
-import { findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
+import { findCategoryConflict, firstCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -20,13 +21,12 @@ export function QuickAddDialog() {
   const addTask = useAppStore((s) => s.addTask)
   const addGoal = useAppStore((s) => s.addGoal)
   const addJournalEntry = useAppStore((s) => s.addJournalEntry)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const deleteCategory = useAppStore((s) => s.deleteCategory)
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const categories = resolveCategories(taskCategories)
+  const categories = useCategories()
 
   const [taskTitle, setTaskTitle] = useState("")
   const [taskCategory, setTaskCategory] = useState<TaskCategory>("Learning")

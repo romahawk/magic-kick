@@ -55,9 +55,15 @@ import {
   colorFromCategoryName,
   defaultTaskCategory,
   findCategoryConflict,
+  withUsedCategories,
 } from "@/lib/categories"
 
 export const STORE_KEY = "magic-kick-store"
+
+/** The full category list: the profile's list plus names still used by live items (P14). */
+function currentCategories(s: Pick<AppState, "profile" | "tasks" | "goals" | "projects">) {
+  return withUsedCategories(s.profile.taskCategories, [...s.tasks, ...s.goals, ...s.projects])
+}
 const DEFAULT_GOOGLE_CALENDAR_METADATA: GoogleCalendarMetadata = {
   enabled: false,
   selectedCalendarIds: [],
@@ -545,7 +551,7 @@ export const useAppStore = create<AppState>()(
         if (!normalized) return
         const ts = now()
         set((s) => {
-          const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
+          const categories = currentCategories(s)
           if (findCategoryConflict(categories, normalized)) return {}
           return {
             profile: {
@@ -574,44 +580,50 @@ export const useAppStore = create<AppState>()(
         if (!nextName || from === nextName) return
         const ts = now()
         set((s) => {
-          const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
+          const categories = currentCategories(s)
           if (!categories.includes(from)) return {}
-          if (findCategoryConflict(categories, nextName, from)) return {}
+          // Renaming onto an existing category merges into it: it keeps its own color and domain.
+          const mergeInto = findCategoryConflict(categories, nextName, from)
+          const target = mergeInto ?? nextName
 
-          const nextCategories = categories.map((item) => (item === from ? nextName : item))
+          const nextCategories = mergeInto
+            ? categories.filter((item) => item !== from)
+            : categories.map((item) => (item === from ? nextName : item))
           const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS
           const nextColors = { ...colors }
-          nextColors[nextName] = colors[from] ?? colorFromCategoryName(nextName)
+          if (!mergeInto) nextColors[nextName] = colors[from] ?? colorFromCategoryName(nextName)
           delete nextColors[from]
           const domains = s.profile.taskCategoryDomains ?? {}
-          const nextDomains = domains[from] ? { ...domains, [nextName]: domains[from], [from]: "" as const } : domains
+          const nextDomains = domains[from]
+            ? { ...domains, ...(mergeInto ? {} : { [nextName]: domains[from] }), [from]: "" as const }
+            : domains
           const changedTaskIds: string[] = []
           const changedGoalIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
-            if (task.category !== from) return task
+            if (task.deleted || task.category !== from) return task
             changedTaskIds.push(task.id)
             return {
               ...task,
-              category: nextName,
+              category: target,
               clientUpdatedAt: ts,
               deleted: false,
             }
           })
           const nextGoals = s.goals.map((goal) => {
-            if (goal.category !== from) return goal
+            if (goal.deleted || goal.category !== from) return goal
             changedGoalIds.push(goal.id)
             return {
               ...goal,
-              category: nextName,
+              category: target,
               clientUpdatedAt: ts,
               deleted: false,
             }
           })
           const changedProjectIds: string[] = []
           const nextProjects = s.projects.map((project) => {
-            if (project.category !== from) return project
+            if (project.deleted || project.category !== from) return project
             changedProjectIds.push(project.id)
-            return { ...project, category: nextName, clientUpdatedAt: ts, deleted: false }
+            return { ...project, category: target, clientUpdatedAt: ts, deleted: false }
           })
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const taskId of changedTaskIds) pendingTasks[taskId] = ts
@@ -649,7 +661,7 @@ export const useAppStore = create<AppState>()(
       deleteCategory: (name) => {
         const ts = now()
         set((s) => {
-          const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
+          const categories = currentCategories(s)
           if (!categories.includes(name)) return {}
           const remaining = categories.filter((item) => item !== name)
           const fallback = remaining[0] ?? FALLBACK_CATEGORY
@@ -666,7 +678,7 @@ export const useAppStore = create<AppState>()(
           const changedTaskIds: string[] = []
           const changedGoalIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
-            if (task.category !== name) return task
+            if (task.deleted || task.category !== name) return task
             changedTaskIds.push(task.id)
             return {
               ...task,
@@ -676,7 +688,7 @@ export const useAppStore = create<AppState>()(
             }
           })
           const nextGoals = s.goals.map((goal) => {
-            if (goal.category !== name) return goal
+            if (goal.deleted || goal.category !== name) return goal
             changedGoalIds.push(goal.id)
             return {
               ...goal,
@@ -687,7 +699,7 @@ export const useAppStore = create<AppState>()(
           })
           const changedProjectIds: string[] = []
           const nextProjects = s.projects.map((project) => {
-            if (project.category !== name) return project
+            if (project.deleted || project.category !== name) return project
             changedProjectIds.push(project.id)
             return { ...project, category: "", clientUpdatedAt: ts, deleted: false }
           })
@@ -2142,7 +2154,7 @@ export const useAppStore = create<AppState>()(
 
           if (isNew) {
             const project = block.projectId ? s.projects.find((entry) => entry.id === block.projectId) : undefined
-            const category = defaultTaskCategory(s.profile.taskCategories, project)
+            const category = defaultTaskCategory(currentCategories(s), project)
             const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
             const newTask = touchEntity({
               id: `block-${id}`,

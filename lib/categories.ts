@@ -73,3 +73,19 @@ export const OS_DOMAINS: Array<{ id: OsDomain; label: string; covers: string }> 
 export function categoryDomain(name: string, domains?: Record<string, OsDomain | "">) {
   return domains?.[name] || undefined
 }
+
+/**
+ * The category list the app shows: the profile's list plus every category a live task, goal or
+ * project still uses. The profile syncs as one document (newest wins), so its list can lose names
+ * that tasks still carry; this keeps those names visible and editable (P14).
+ */
+export function withUsedCategories(categories: string[] | undefined, items: Array<{ category?: string; deleted?: boolean }>) {
+  const list = [...resolveCategories(categories)]
+  const known = new Set(list)
+  const extra = new Set<string>()
+  for (const item of items) {
+    const name = item.category?.trim()
+    if (!item.deleted && name && !known.has(name)) extra.add(name)
+  }
+  return [...list, ...[...extra].sort((a, b) => a.localeCompare(b))]
+}

@@ -21,7 +21,7 @@ import { detectConflicts, dayIndexToISO } from "@/lib/ai/conflict"
 import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel"
 import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
-import { resolveCategories } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
 
 
@@ -199,7 +199,7 @@ interface DisplayBlock {
 }
 
 export function ScheduleModule() {
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
+  const categories = useCategories()
   const projects = useAppStore((s) => s.projects).filter((p) => !p.deleted)
   const tasks = useAppStore((s) => s.tasks).filter((t) => !t.deleted)
   const scheduleItems = useAppStore((s) => s.schedule)
@@ -986,7 +986,7 @@ export function ScheduleModule() {
               linkedTask={editTask}
               project={projects.find((p) => p.id === editBlock.projectId)}
               allProjects={activeProjects}
-              allCategories={resolveCategories(taskCategories)}
+              allCategories={categories}
               onUpdateTask={(updates, timing) => {
                 if (!editBlock.linkedTaskId) return
                 updateTask(editBlock.linkedTaskId, updates, timing)
