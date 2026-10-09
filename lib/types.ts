@@ -103,6 +103,8 @@ export interface Project extends SyncFields, Provenance {
   weekEndISO: string
   milestones: ProjectMilestone[]
   color: string
+  /** Default category for tasks made from this project (P14). "" = none; tasks get the first category. */
+  category?: string
   url?: string
   links?: Array<{
     label: string

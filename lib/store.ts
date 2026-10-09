@@ -52,8 +52,8 @@ import {
   FALLBACK_CATEGORY,
   buildCategoryColors,
   colorFromCategoryName,
+  defaultTaskCategory,
   findCategoryConflict,
-  firstCategory,
 } from "@/lib/categories"
 
 export const STORE_KEY = "magic-kick-store"
@@ -603,10 +603,18 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             }
           })
+          const changedProjectIds: string[] = []
+          const nextProjects = s.projects.map((project) => {
+            if (project.category !== from) return project
+            changedProjectIds.push(project.id)
+            return { ...project, category: nextName, clientUpdatedAt: ts, deleted: false }
+          })
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const taskId of changedTaskIds) pendingTasks[taskId] = ts
           const pendingGoals = { ...s.sync.pending.goals }
           for (const goalId of changedGoalIds) pendingGoals[goalId] = ts
+          const pendingProjects = { ...s.sync.pending.projects }
+          for (const projectId of changedProjectIds) pendingProjects[projectId] = ts
 
           return {
             profile: {
@@ -618,6 +626,7 @@ export const useAppStore = create<AppState>()(
             },
             tasks: nextTasks,
             goals: nextGoals,
+            projects: nextProjects,
             sync: {
               ...s.sync,
               pending: {
@@ -625,6 +634,7 @@ export const useAppStore = create<AppState>()(
                 profile: { ...s.sync.pending.profile, profile: ts },
                 tasks: pendingTasks,
                 goals: pendingGoals,
+                projects: pendingProjects,
               },
             },
           }
@@ -668,10 +678,18 @@ export const useAppStore = create<AppState>()(
               deleted: false,
             }
           })
+          const changedProjectIds: string[] = []
+          const nextProjects = s.projects.map((project) => {
+            if (project.category !== name) return project
+            changedProjectIds.push(project.id)
+            return { ...project, category: "", clientUpdatedAt: ts, deleted: false }
+          })
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const taskId of changedTaskIds) pendingTasks[taskId] = ts
           const pendingGoals = { ...s.sync.pending.goals }
           for (const goalId of changedGoalIds) pendingGoals[goalId] = ts
+          const pendingProjects = { ...s.sync.pending.projects }
+          for (const projectId of changedProjectIds) pendingProjects[projectId] = ts
 
           return {
             profile: {
@@ -683,6 +701,7 @@ export const useAppStore = create<AppState>()(
             },
             tasks: nextTasks,
             goals: nextGoals,
+            projects: nextProjects,
             sync: {
               ...s.sync,
               pending: {
@@ -690,6 +709,7 @@ export const useAppStore = create<AppState>()(
                 profile: { ...s.sync.pending.profile, profile: ts },
                 tasks: pendingTasks,
                 goals: pendingGoals,
+                projects: pendingProjects,
               },
             },
           }
@@ -1592,6 +1612,7 @@ export const useAppStore = create<AppState>()(
           weekStartISO: project.weekStartISO,
           weekEndISO: project.weekEndISO,
           color: project.color,
+          category: project.category || undefined,
           url: project.url,
           links: project.links,
           milestones,
@@ -2092,7 +2113,8 @@ export const useAppStore = create<AppState>()(
           let tasksPending = s.sync.pending.tasks
 
           if (isNew) {
-            const category = firstCategory(s.profile.taskCategories)
+            const project = block.projectId ? s.projects.find((entry) => entry.id === block.projectId) : undefined
+            const category = defaultTaskCategory(s.profile.taskCategories, project)
             const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
             const newTask = touchEntity({
               id: `block-${id}`,

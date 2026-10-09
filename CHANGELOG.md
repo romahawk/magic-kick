@@ -12,6 +12,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - A new or renamed category is refused when it only differs from an existing one by case, spaces or the characters & / - _ (for example "Job / Career" and "job-career").
 - New tasks get the same base XP whatever their category, so custom categories are no longer worth less. Changing a task's category no longer changes its XP. XP already on existing tasks is unchanged.
 
+### Added
+- Projects have an optional task category (Projects → Edit Project → Task category). Tasks added from the project's roadmap, or from a Schedule block linked to the project, get that category instead of always the first one in your list ("Learning" by default).
+
 ---
 
 ## [Unreleased] - 2026-10-06 - Login and signup buttons after page load

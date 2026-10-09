@@ -57,7 +57,7 @@ export default function OnboardingPage() {
     if (firstTask.trim()) {
       addTask({
         title: firstTask.trim(),
-        category: "Learning",
+        category: defaultCategory,
         completed: false,
       })
     }

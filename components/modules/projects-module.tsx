@@ -6,6 +6,7 @@ import { useAppStore } from "@/lib/store"
 import { getProjectStatus, selectThisWeekOutcomes } from "@/lib/execution-os"
 import { sourceLabel } from "@/lib/provenance"
 import { cn } from "@/lib/utils"
+import { resolveCategories } from "@/lib/categories"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -107,6 +109,9 @@ function daysLeftInfo(project: Project): { label: string; className: string } {
   return { label: `${days}d`, className: "text-muted-foreground" }
 }
 
+// Select item value for "no category"; Radix Select does not allow "" as a value.
+const NO_CATEGORY = "__none__"
+
 export function ProjectsModule() {
   const allProjects = useAppStore((s) => s.projects)
   const allTasks = useAppStore((s) => s.tasks)
@@ -115,6 +120,7 @@ export function ProjectsModule() {
   const addProject = useAppStore((s) => s.addProject)
   const updateProject = useAppStore((s) => s.updateProject)
   const deleteProject = useAppStore((s) => s.deleteProject)
+  const categories = resolveCategories(useAppStore((s) => s.profile.taskCategories))
 
   const projects = allProjects.filter((p) => !p.deleted)
   const tasks = allTasks.filter((t) => !t.deleted)
@@ -126,13 +132,15 @@ export function ProjectsModule() {
   const [objective, setObjective] = useState("")
   const [status, setStatus] = useState<Project["status"]>("active")
   const [color, setColor] = useState(DEFAULT_PROJECT_COLOR)
+  // "" = no category: tasks made from the project get the first category.
+  const [category, setCategory] = useState("")
   const [milestones, setMilestones] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
   const [startDateOpen, setStartDateOpen] = useState(false)
   const [endDateOpen, setEndDateOpen] = useState(false)
-  const [formSnapshot, setFormSnapshot] = useState<{ title: string; objective: string; status: string; startDate: string; endDate: string; color: string } | null>(null)
+  const [formSnapshot, setFormSnapshot] = useState<{ title: string; objective: string; status: string; startDate: string; endDate: string; color: string; category: string } | null>(null)
 
   // Module state
   const [view, setView] = useState<"list" | "timeline">("list")
@@ -163,6 +171,7 @@ export function ProjectsModule() {
     setObjective("")
     setStatus("active")
     setColor(DEFAULT_PROJECT_COLOR)
+    setCategory("")
     setStartDate(defaultWeekRange.start)
     setEndDate(defaultWeekRange.end)
     setMilestones("")
@@ -179,11 +188,12 @@ export function ProjectsModule() {
     setObjective(project.objective)
     setStatus(s)
     setColor(c)
+    setCategory(project.category ?? "")
     setStartDate(project.weekStartISO)
     setEndDate(project.weekEndISO)
     setMilestones(project.milestones.map((m) => m.title).join(", "))
     setFormError(null)
-    setFormSnapshot({ title: project.title, objective: project.objective, status: s, startDate: project.weekStartISO, endDate: project.weekEndISO, color: c })
+    setFormSnapshot({ title: project.title, objective: project.objective, status: s, startDate: project.weekStartISO, endDate: project.weekEndISO, color: c, category: project.category ?? "" })
     setOpen(true)
   }
 
@@ -205,6 +215,7 @@ export function ProjectsModule() {
         weekStartISO,
         weekEndISO,
         color: selectedColor,
+        category,
         milestones: parseMilestones(milestones),
       })
     } else {
@@ -215,6 +226,7 @@ export function ProjectsModule() {
         weekStartISO,
         weekEndISO,
         color: selectedColor,
+        category,
       })
     }
     setFormError(null)
@@ -237,7 +249,7 @@ export function ProjectsModule() {
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault()
-                const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color || category !== formSnapshot.category
                 const isValid = !!title.trim() && (startDate <= endDate)
                 if (isValid && (!editingId || isDirty)) saveProject()
               }
@@ -335,6 +347,17 @@ export function ProjectsModule() {
                   })}
                 </div>
               </div>
+              <div>
+                <Label className="text-sm font-medium">Task category</Label>
+                <Select value={category || NO_CATEGORY} onValueChange={(v) => setCategory(v === NO_CATEGORY ? "" : v)}>
+                  <SelectTrigger className="mt-1.5 w-full" aria-label="Task category"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CATEGORY}>No default</SelectItem>
+                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">Tasks added from this project get this category.</p>
+              </div>
               {!editingId ? (
                 <div>
                   <Label htmlFor="project-milestones" className="text-sm font-medium">Milestones (optional)</Label>
@@ -382,7 +405,7 @@ export function ProjectsModule() {
                   size="sm"
                   onClick={saveProject}
                   disabled={(() => {
-                    const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color
+                    const isDirty = !formSnapshot || title !== formSnapshot.title || objective !== formSnapshot.objective || status !== formSnapshot.status || startDate !== formSnapshot.startDate || endDate !== formSnapshot.endDate || color !== formSnapshot.color || category !== formSnapshot.category
                     const isValid = !!title.trim() && (startDate <= endDate)
                     return !isValid || (!!editingId && !isDirty)
                   })()}

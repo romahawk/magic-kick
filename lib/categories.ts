@@ -52,3 +52,9 @@ export function findCategoryConflict(categories: string[], name: string, ignore?
   const key = categoryKey(name)
   return categories.find((item) => item !== ignore && categoryKey(item) === key)
 }
+
+/** The category a new task gets: its project's category when that still exists, else the first one. */
+export function defaultTaskCategory(categories: string[] | undefined, project?: { category?: string }) {
+  const list = resolveCategories(categories)
+  return project?.category && list.includes(project.category) ? project.category : firstCategory(categories)
+}
