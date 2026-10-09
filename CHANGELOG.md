@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-09 - One category model (P14)
+
+### Changed
+- Category labels look the same everywhere: Schedule and Journal now show each category in its color, as ToDo and Goals already did.
+- A new category is refused when it only differs from an existing one by case, spaces or the characters & / - _ (for example "Job / Career" and "job-career").
+- New tasks get the same base XP whatever their category, so custom categories are no longer worth less. Changing a task's category no longer changes its XP. XP already on existing tasks is unchanged.
+
+### Added
+- Projects have an optional task category (Projects → Edit Project → Task category). Tasks added from the project's roadmap, or from a Schedule block linked to the project, get that category instead of always the first one in your list ("Learning" by default).
+- Categories that tasks, goals or projects still use now always appear in the category list, filter and pickers, even if they had dropped out of the saved list (for example after another device synced an older list). They can be renamed, recoloured, linked or deleted like any other.
+- In Goals → Categories, renaming a category to the name of an existing one merges them after you confirm.
+- Each category can be linked to an AI-Business-OS domain (Work, Learning, Admin, Life) in Goals → Categories, or left as "Not in OS". Renaming a category keeps its link; deleting it removes the link.
+
+### Fixed
+- Renaming or deleting a category no longer brings back deleted tasks, goals or projects that used it.
+
+---
+
 ## [Unreleased] - 2026-10-06 - Login and signup buttons after page load
 
 ### Fixed

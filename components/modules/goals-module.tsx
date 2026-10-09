@@ -15,8 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { OS_DOMAINS, categoryDomain, findCategoryConflict, firstCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
+import { CategoryBadge } from "@/components/category-badge"
 import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags, Trash2, Check, X } from "lucide-react"
-import type { Goal } from "@/lib/types"
+import type { Goal, OsDomain } from "@/lib/types"
 
 const PRIORITY_STYLES = {
   high: "bg-destructive/10 text-destructive border-destructive/20",
@@ -24,13 +27,13 @@ const PRIORITY_STYLES = {
   low: "bg-muted text-muted-foreground border-muted",
 }
 
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
+// Select item value for an unmapped category; Radix Select does not allow "" as a value.
+const UNMAPPED = "__unmapped__"
 
 export function GoalsModule() {
   const allGoals = useAppStore((s) => s.goals)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const categories = useCategories()
   const categoryColors = taskCategoryColors ?? {}
   const addGoal = useAppStore((s) => s.addGoal)
   const updateGoal = useAppStore((s) => s.updateGoal)
@@ -41,6 +44,25 @@ export function GoalsModule() {
   const renameCategory = useAppStore((s) => s.renameCategory)
   const removeCategory = useAppStore((s) => s.deleteCategory)
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
+  const setCategoryDomain = useAppStore((s) => s.setCategoryDomain)
+  const categoryDomains = useAppStore((s) => s.profile.taskCategoryDomains)
+  const allTasks = useAppStore((s) => s.tasks)
+  const allProjects = useAppStore((s) => s.projects)
+
+  /** Rename, or ask first when the new name matches an existing category (a merge). */
+  function submitRename(from: string) {
+    const next = editingValue.trim()
+    if (!next) return
+    const into = findCategoryConflict(categories, next, from)
+    if (into) {
+      const count = [...allTasks, ...allGoals, ...allProjects].filter((item) => !item.deleted && item.category === from).length
+      setPendingMerge({ from, into, count })
+    } else {
+      renameCategory(from, next)
+    }
+    setEditingCategory(null)
+  }
+
   const goals = useMemo(
     () => allGoals.filter((g) => !g.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allGoals]
@@ -48,8 +70,9 @@ export function GoalsModule() {
 
   const [open, setOpen] = useState(false)
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
+  const [pendingMerge, setPendingMerge] = useState<{ from: string; into: string; count: number } | null>(null)
   const [title, setTitle] = useState("")
-  const [category, setCategory] = useState(categories[0] ?? "General")
+  const [category, setCategory] = useState(firstCategory(categories))
   const [notes, setNotes] = useState("")
   const [horizon, setHorizon] = useState<Goal["horizon"]>("mid")
   const [status, setStatus] = useState<Goal["status"]>("active")
@@ -59,7 +82,7 @@ export function GoalsModule() {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState("")
-  const [editCategory, setEditCategory] = useState(categories[0] ?? "General")
+  const [editCategory, setEditCategory] = useState(firstCategory(categories))
   const [editNotes, setEditNotes] = useState("")
   const [editHorizon, setEditHorizon] = useState<Goal["horizon"]>("mid")
   const [editStatus, setEditStatus] = useState<Goal["status"]>("active")
@@ -70,11 +93,11 @@ export function GoalsModule() {
   const [editingValue, setEditingValue] = useState("")
 
   const activeCreateCategory = useMemo(
-    () => (categories.includes(category) ? category : (categories[0] ?? "General")),
+    () => (categories.includes(category) ? category : firstCategory(categories)),
     [categories, category]
   )
   const activeEditCategory = useMemo(
-    () => (categories.includes(editCategory) ? editCategory : (categories[0] ?? "General")),
+    () => (categories.includes(editCategory) ? editCategory : firstCategory(categories)),
     [categories, editCategory]
   )
 
@@ -84,7 +107,7 @@ export function GoalsModule() {
 
   function resetCreateForm() {
     setTitle("")
-    setCategory(categories[0] ?? "General")
+    setCategory(firstCategory(categories))
     setNotes("")
     setHorizon("mid")
     setStatus("active")
@@ -161,6 +184,22 @@ export function GoalsModule() {
                   Categories
                 </DialogTitle>
               </DialogHeader>
+              <p className="text-xs text-muted-foreground">
+                The OS domain links a category to Work, Learning, Admin or Life in AI-Business-OS. Categories the OS does not have yet stay &ldquo;Not in OS&rdquo;.
+              </p>
+              {pendingMerge ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="alert">
+                  <span className="flex-1">
+                    Merge &ldquo;{pendingMerge.from}&rdquo; into &ldquo;{pendingMerge.into}&rdquo;? {pendingMerge.count} item{pendingMerge.count === 1 ? "" : "s"} move over and &ldquo;{pendingMerge.from}&rdquo; is removed.
+                  </span>
+                  <Button type="button" size="sm" className="h-7" onClick={() => { renameCategory(pendingMerge.from, pendingMerge.into); setPendingMerge(null) }}>
+                    Merge
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7" onClick={() => setPendingMerge(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 {categories.map((c) => (
                   <div key={c} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
@@ -179,10 +218,7 @@ export function GoalsModule() {
                           onChange={(e) => setEditingValue(e.target.value)}
                           className="h-7 flex-1 text-sm"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && editingValue.trim()) {
-                              renameCategory(c, editingValue.trim())
-                              setEditingCategory(null)
-                            }
+                            if (e.key === "Enter") submitRename(c)
                             if (e.key === "Escape") setEditingCategory(null)
                           }}
                         />
@@ -191,11 +227,7 @@ export function GoalsModule() {
                           size="icon"
                           className="h-7 w-7 shrink-0"
                           disabled={!editingValue.trim()}
-                          onClick={() => {
-                            if (!editingValue.trim()) return
-                            renameCategory(c, editingValue.trim())
-                            setEditingCategory(null)
-                          }}
+                          onClick={() => submitRename(c)}
                           aria-label="Confirm rename"
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -213,7 +245,21 @@ export function GoalsModule() {
                       </>
                     ) : (
                       <>
-                        <span className="flex-1 text-sm">{c}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm">{c}</span>
+                        <Select
+                          value={categoryDomain(c, categoryDomains) ?? UNMAPPED}
+                          onValueChange={(v) => setCategoryDomain(c, v === UNMAPPED ? "" : (v as OsDomain))}
+                        >
+                          <SelectTrigger size="sm" className="h-7 w-[118px] shrink-0 text-xs" aria-label={`OS domain for ${c}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNMAPPED}>Not in OS</SelectItem>
+                            {OS_DOMAINS.map((d) => (
+                              <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                           type="button"
                           size="icon"
@@ -257,7 +303,7 @@ export function GoalsModule() {
                   type="button"
                   size="sm"
                   className="shrink-0 gap-1"
-                  disabled={!newCategory.trim()}
+                  disabled={!newCategory.trim() || Boolean(findCategoryConflict(categories, newCategory))}
                   onClick={() => {
                     if (!newCategory.trim()) return
                     addCategory(newCategory.trim())
@@ -357,7 +403,6 @@ export function GoalsModule() {
         <TabsContent value="mid" className="mt-4">
           <GoalList
             goals={midTermGoals}
-            categoryColors={categoryColors}
             onProgressChange={updateGoalProgress}
             onEdit={openGoal}
             onDragStart={setDraggedGoalId}
@@ -373,7 +418,6 @@ export function GoalsModule() {
         <TabsContent value="long" className="mt-4">
           <GoalList
             goals={longTermGoals}
-            categoryColors={categoryColors}
             onProgressChange={updateGoalProgress}
             onEdit={openGoal}
             onDragStart={setDraggedGoalId}
@@ -389,7 +433,6 @@ export function GoalsModule() {
         <TabsContent value="wishlist" className="mt-4">
           <GoalList
             goals={wishlist}
-            categoryColors={categoryColors}
             onProgressChange={updateGoalProgress}
             onEdit={openGoal}
             onDragStart={setDraggedGoalId}
@@ -483,13 +526,7 @@ export function GoalsModule() {
                 <Badge variant="outline" className={cn("text-[10px]", PRIORITY_STYLES[selectedGoal.priority])}>
                   {selectedGoal.priority}
                 </Badge>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px]"
-                  style={categoryColors[selectedGoal.category] ? { backgroundColor: categoryColors[selectedGoal.category], color: "#ffffff" } : undefined}
-                >
-                  {selectedGoal.category}
-                </Badge>
+                <CategoryBadge category={selectedGoal.category} className="text-[10px]" />
                 <Badge variant="outline" className="text-[10px] capitalize">
                   {selectedGoal.status}
                 </Badge>
@@ -567,7 +604,6 @@ export function GoalsModule() {
 
 function GoalList({
   goals,
-  categoryColors,
   onProgressChange,
   onEdit,
   onDragStart,
@@ -577,7 +613,6 @@ function GoalList({
   emptyState,
 }: {
   goals: Goal[]
-  categoryColors: Record<string, string>
   onProgressChange: (id: string, progress: number) => void
   onEdit: (goal: Goal) => void
   onDragStart: (goalId: string) => void
@@ -643,13 +678,7 @@ function GoalList({
           <CardContent className="flex flex-col gap-3">
             <p className="min-h-4 text-xs text-muted-foreground">{goal.notes}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant="secondary"
-                className="text-[10px]"
-                style={categoryColors[goal.category] ? { backgroundColor: categoryColors[goal.category], color: "#ffffff" } : undefined}
-              >
-                {goal.category}
-              </Badge>
+              <CategoryBadge category={goal.category} className="text-[10px]" />
               {goal.targetDate ? <span className="text-[10px] text-muted-foreground">Target: {goal.targetDate}</span> : null}
               {goal.status === "wishlist" ? <Badge variant="outline" className="text-[10px]">Wishlist</Badge> : null}
             </div>

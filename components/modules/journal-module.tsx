@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { CategoryBadge } from "@/components/category-badge"
 import { format, parseISO, isToday } from "date-fns"
 import { buildCurrentMonthRetrospective, buildCurrentWeekRetrospective, type RetrospectiveSummary } from "@/lib/retrospective"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -324,7 +325,7 @@ function RetrospectiveCard({ title, summary, emptyLabel }: { title: string; summ
                         ) : null}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className="text-[10px]">{task.category}</Badge>
+                        <CategoryBadge category={task.category} className="text-[10px]" />
                         {task.linkedProjectId ? (
                           <Badge variant="secondary" className="text-[10px]">
                             {summary.tasksByProject.find((item) => item.projectId === task.linkedProjectId)?.projectTitle ?? "Project"}

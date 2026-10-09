@@ -7,6 +7,8 @@
 import { useMemo, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
+import { defaultTaskCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import {
   buildProjectRoadmap,
   resolveResources,
@@ -537,7 +539,8 @@ function RoadmapTaskRow({
 
 function AddTaskInline({ projectId, milestoneId }: { projectId: string; milestoneId?: string }) {
   const addTask = useAppStore((s) => s.addTask)
-  const categories = useAppStore((s) => s.profile.taskCategories)
+  const categories = useCategories()
+  const project = useAppStore((s) => s.projects.find((p) => p.id === projectId))
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
@@ -547,7 +550,7 @@ function AddTaskInline({ projectId, milestoneId }: { projectId: string; mileston
     if (!next) return
     addTask({
       title: next.slice(0, 300),
-      category: categories?.[0] ?? "General",
+      category: defaultTaskCategory(categories, project),
       completed: false,
       lane: "backlog",
       linkedProjectId: projectId,

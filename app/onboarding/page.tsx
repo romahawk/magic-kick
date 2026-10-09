@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 import { useAppStore } from "@/lib/store"
+import { firstCategory } from "@/lib/categories"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,7 +20,7 @@ export default function OnboardingPage() {
   const addGoal = useAppStore((s) => s.addGoal)
   const addTask = useAppStore((s) => s.addTask)
   const taskCategories = useAppStore((s) => s.profile.taskCategories)
-  const firstCategory = taskCategories?.[0] ?? "General"
+  const defaultCategory = firstCategory(taskCategories)
 
   const [name, setName] = useState(profile.name === "New Player" ? "" : profile.name)
   const [firstGoal, setFirstGoal] = useState("")
@@ -45,7 +46,7 @@ export default function OnboardingPage() {
       addGoal({
         title: firstGoal.trim(),
         horizon: firstGoalHorizon,
-        category: firstCategory,
+        category: defaultCategory,
         priority: "medium",
         notes: "",
         status: firstGoalStatus,
@@ -56,7 +57,7 @@ export default function OnboardingPage() {
     if (firstTask.trim()) {
       addTask({
         title: firstTask.trim(),
-        category: "Learning",
+        category: defaultCategory,
         completed: false,
       })
     }

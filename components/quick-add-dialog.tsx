@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
+import { findCategoryConflict, firstCategory } from "@/lib/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -13,20 +15,18 @@ import { Pencil, Plus, Settings2, Trash2 } from "lucide-react"
 import type { TaskCategory, TaskRepeat } from "@/lib/types"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 
-const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 
 export function QuickAddDialog() {
   const [open, setOpen] = useState(false)
   const addTask = useAppStore((s) => s.addTask)
   const addGoal = useAppStore((s) => s.addGoal)
   const addJournalEntry = useAppStore((s) => s.addJournalEntry)
-  const taskCategories = useAppStore((s) => s.profile.taskCategories)
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const deleteCategory = useAppStore((s) => s.deleteCategory)
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
   const taskCategoryColors = useAppStore((s) => s.profile.taskCategoryColors)
-  const categories = taskCategories?.length ? taskCategories : DEFAULT_TASK_CATEGORIES
+  const categories = useCategories()
 
   const [taskTitle, setTaskTitle] = useState("")
   const [taskCategory, setTaskCategory] = useState<TaskCategory>("Learning")
@@ -43,10 +43,10 @@ export function QuickAddDialog() {
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const activeTaskCategory = useMemo(
-    () => (categories.includes(taskCategory) ? taskCategory : (categories[0] ?? "General")),
+    () => (categories.includes(taskCategory) ? taskCategory : firstCategory(categories)),
     [categories, taskCategory]
   )
-  const activeGoalCategory = categories[0] ?? "General"
+  const activeGoalCategory = firstCategory(categories)
 
   function handleAddTask() {
     if (!taskTitle.trim()) return
@@ -81,7 +81,7 @@ export function QuickAddDialog() {
 
   function handleAddCategory() {
     const name = newCatName.trim()
-    if (!name || categories.includes(name)) return
+    if (!name || findCategoryConflict(categories, name)) return
     addCategory(name)
     setNewCatName("")
   }
@@ -95,7 +95,7 @@ export function QuickAddDialog() {
   function commitRename() {
     if (!renamingCat) return
     const next = renameVal.trim()
-    if (next && next !== renamingCat && !categories.includes(next)) {
+    if (next && next !== renamingCat && !findCategoryConflict(categories, next, renamingCat)) {
       renameCategory(renamingCat, next)
       if (taskCategory === renamingCat) setTaskCategory(next as TaskCategory)
     }
@@ -159,7 +159,7 @@ export function QuickAddDialog() {
                       onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
                       className="h-7 text-xs"
                     />
-                    <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddCategory} disabled={!newCatName.trim() || categories.includes(newCatName.trim())}>
+                    <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddCategory} disabled={!newCatName.trim() || Boolean(findCategoryConflict(categories, newCatName))}>
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>

@@ -1,4 +1,6 @@
 export type TaskCategory = string
+/** The OS life domains (OS lifeos-architecture.md §3). Lower-case, as in the OS dates.md tags. */
+export type OsDomain = "work" | "learning" | "admin" | "life"
 export type TaskLane = "daily-focus" | "backlog" | "parking-lot"
 export type TaskRepeat = "none" | "daily" | "weekly" | "monthly" | "custom"
 
@@ -103,6 +105,8 @@ export interface Project extends SyncFields, Provenance {
   weekEndISO: string
   milestones: ProjectMilestone[]
   color: string
+  /** Default category for tasks made from this project (P14). "" = none; tasks get the first category. */
+  category?: string
   url?: string
   links?: Array<{
     label: string
@@ -260,6 +264,9 @@ export interface Profile extends SyncFields {
   onboardingCompleted: boolean
   taskCategories?: string[]
   taskCategoryColors?: Record<string, string>
+  /** OS domain per category (P14, ADR-029). Missing or "" = unmapped. "" is stored instead of deleting a key,
+   *  because the profile is written with merge and a deleted map key would not reach Firestore. */
+  taskCategoryDomains?: Record<string, OsDomain | "">
   focusedProjectId?: string
   systemConfig?: SystemConfig
   googleCalendar?: GoogleCalendarMetadata
