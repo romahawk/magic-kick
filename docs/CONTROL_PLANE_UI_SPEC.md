@@ -328,7 +328,9 @@ Roman).
 
 ### P14 — One category model across modules · M
 
-**Status:** open
+**Status:** done
+
+**Note:** merged on 2026-10-09 (#152, `66c3bf6`). Criterion 8 was added during the build.
 
 **Why:** the same task shows different labels, colors and XP depending on where it was made and
 which module shows it. Verified in the code on 2026-10-09:

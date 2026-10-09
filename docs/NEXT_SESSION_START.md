@@ -1,35 +1,93 @@
 # Next Session Start
 
-**Last updated:** 2026-10-06 (session of 2026-10-06, late morning: `/login` and `/signup` hydration bug fixed; #148 merged, the signup half is waiting in a recovery PR; no roadmap item open)
-**Resume on:** `main` after `fix/signup-hydration-to-main` (`4a387e1`) and this `docs/session-close-2026-10-06d` PR merge. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-06 — `npm run build` exit 0 on `4a387e1` (`main` `5e49a90` + the signup fix), run by hand (Next.js 16.1.6, Turbopack, Node 22.19.0). Also exit 0 on `97c9f21` and `8d43bef` (P8 hook and by hand)
-**Typecheck status:** passing as of 2026-10-06 — `npm run typecheck` exit 0 (same runs)
-**Lint status:** passing as of 2026-10-06 — `npm run lint` exit 0 (same runs)
+**Last updated:** 2026-10-09 (P14 "One category model across modules" built and merged as #152; no roadmap item open)
+**Resume on:** `main` after this `docs/session-close-2026-10-09` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-09 — `npm run build` exit 0 on `3bd2f34`, run by hand; `main` `66c3bf6` has the identical tree (Next.js 16.1.6, Turbopack, Node 22.19.0). The P8 hook also passed on each of the 7 commits
+**Typecheck status:** passing as of 2026-10-09 — `npm run typecheck` exit 0 (same run)
+**Lint status:** passing as of 2026-10-09 — `npm run lint` exit 0 (same run)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** one bug-fix session on the auth pages. No dependency, store, data-model or Firestore-rules change.
+**Note:** one feature session (P14). Data model change: optional `Project.category` and `Profile.taskCategoryDomains`; no migration, no Firestore rules change, no dependency change.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **First check that the signup fix reached `main`:** `git show origin/main:app/signup/page.tsx | grep authReady`.
-   If it is empty, the recovery PR from `fix/signup-hydration-to-main` is not merged yet (see Where we left off).
-3. **Working order:** P1 → P12 → P13 → P2 → P3 → P7 → P11 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P8, P6, P9, P4, P5. **P7, P11:** `queued` but blocked (step 4).
-   **P10:** `gated` on P7. **No roadmap item is open and none is unblocked.** A session must name a
-   bug from Open items or a new item Roman adds to the spec; otherwise it stops.
+2. **Open the app on the real account → Goals → Categories** and check that categories only tasks
+   still used ("Trading", "Job / Career", "Self-performance") are listed. Merge or map them (rename
+   onto an existing name merges after a confirm). This is the first real-data check of P14.
+3. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P8, P6, P9, P4, P5. **P7, P11:** `queued` but blocked (step 4).
+   **P10, P15:** `gated` on P7. **No roadmap item is open and none is unblocked.**
+   A session must name a bug from Open items or a new item Roman adds to the spec; otherwise it stops.
 4. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
    - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
      document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
-5. Read ADR-024, ADR-027 and ADR-028 before any control-plane or scope decision.
+5. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
 6. **Commit gate (P8):** every `git commit` from Claude Code goes through
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
-   lines and typecheck, lint and build pass (about 31 s, measured 2026-10-05). Commits typed in a
-   terminal are not checked, and neither is `git cherry-pick`: run the gates by hand after one.
+   lines and typecheck, lint and build pass. Commits typed in a terminal are not checked, and
+   neither is `git cherry-pick`: run the gates by hand after one.
+
+---
+
+## Where we left off (2026-10-09) — P14 one category model
+
+**Why:** task labels differed between ToDo, Schedule and Projects. Project and Schedule tasks always
+got the first category ("Learning"), Schedule badges were grey, XP was keyed on five category names,
+and categories still used by tasks had dropped out of the profile's list (the profile syncs as one
+document, newest wins), so they could not be edited. Roman chose flexible Magic Kick categories with
+an optional OS domain (ADR-029) over adopting the four OS domains only.
+
+**What changed (squash `66c3bf6`, #152):**
+- `docs/CONTROL_PLANE_UI_SPEC.md`: P14 (now `done`, 8 criteria) and P15 (`gated` on P7: read OS
+  domains); working order. `docs/DECISIONS_LOG.md`: ADR-029; ADR-004 superseded.
+- `lib/categories.ts` (new): defaults, colors, `categoryKey`/`findCategoryConflict`,
+  `defaultTaskCategory`, `OS_DOMAINS` (hard-coded until P15), `withUsedCategories`.
+- `components/category-badge.tsx`, `hooks/use-categories.ts` (new): the one badge and the full list.
+- `lib/types.ts`: `OsDomain`; `Project.category` ("" = none); `Profile.taskCategoryDomains`
+  ("" = unmapped, because the profile is written with `merge: true` and a removed key would not sync).
+- `lib/store.ts`: category actions use the full list; rename onto an existing name merges; rename and
+  delete skip deleted items (**they used to set `deleted: false`, resurrecting deleted tasks and
+  goals**) and update projects; `setCategoryDomain`; Schedule block tasks take the project's category.
+- `lib/xp-engine.ts`: base XP 20 for every category; a category change no longer recalculates XP.
+- Projects dialog "Task category"; Goals → Categories: OS domain select, merge confirmation.
+  ToDo, Schedule, Journal, Quick Add, onboarding use the shared list, badge and defaults.
+- `CHANGELOG.md`: "One category model (P14)", dated 2026-10-09.
+
+**Branch map:**
+- `feat/categories-single-source` off `main` `45f25c9`, head `3bd2f34` (7 commits) → **#152 merged**
+  (squash `66c3bf6`). Branch deleted on origin and locally on 2026-10-09.
+- `docs/session-close-2026-10-09` off `main` `66c3bf6`: this handoff, PR #153. Not stacked.
+
+**Branch cleanup (2026-10-09, confirmed):** deleted on origin and locally after checking each PR is
+MERGED with the branch at the PR head: `feat/categories-single-source` (#152),
+`fix/signup-hydration-to-main` (#150), `docs/session-close-2026-10-06d` (#151),
+`fix/signup-hydration-mismatch` (#149, local only). `fix/login-hydration-mismatch` was at `3148374`
+(#148 head plus the stray #149 merge); its tree equals `4a387e1` (#150), so nothing was lost.
+
+**Verified (confirmed):**
+- Gates exit 0 by hand on `3bd2f34` (typecheck, lint, build) and by the P8 hook on every commit;
+  `git diff 3bd2f34 origin/main` is empty.
+- Headless Edge on the dev server, demo mode, 1400 px, no page errors: badges colored in ToDo,
+  Schedule, Goals; domain mapping survives a rename; "family-home" refused next to "Family/Home";
+  project category Sport → roadmap task got Sport, XP 25; categories used only by demo tasks listed
+  in the manager; rename Sales → "marketing" prompted and merged; a deleted task stayed deleted after
+  its category was renamed.
+
+**Not verified:**
+- Anything on a real account: Firestore round-trip of the new fields, two devices syncing, the
+  orphaned categories in Roman's data.
+- A Schedule block linked to a project creating its task with the project's category (code only).
+- 375 px, light theme, keyboard use of the new selects. No screenshots in #152.
+
+**Process notes:**
+- The dev server rewrites `next-env.d.ts` (`.next/dev/types`); it was restored before the push.
+- Stopping `next dev` by killing the parent left the `start-server.js` child on :3001; stop the
+  process that owns the port.
 
 ---
 
@@ -81,56 +139,19 @@ Continue with Google) and `/signup` (Create account).
 
 ---
 
-## Where we left off (2026-10-06) — Daily Focus count and duplicate overdue rows fixed
-
-**Merged to `main` (by Roman, on GitHub):**
-- **#144** `7d15add` — the previous session-close handoff.
-- **#145** `4b2d4ef` — bug fix from the P1 UI findings (branch `fix/daily-focus-overdue`, `a990cee`):
-  - `lib/execution-os.ts`: `selectDailyFocus` marks each entry `chosen` (Daily Focus lane) or not
-    (derived fill); `selectAttentionItems` skips overdue tasks already in today's focus.
-  - `components/modules/attention-block.tsx`: header "n of limit chosen" (was "n of limit today",
-    counting derived fill); derived rows say "suggested"; an overdue focus row says
-    "overdue, due d MMM" in red; due date parsed with `parseISO` (was `new Date`, read as UTC).
-  - `CHANGELOG.md`: Fixed entry dated 2026-10-06.
-
-**Rule chosen in #145 (Roman to confirm; no ADR):** an overdue task in Daily Focus counts as being
-dealt with, so Needs attention does not repeat it. The alternative was to keep the attention row and
-stop the derived fill from picking overdue tasks.
-
-**Branch map:** `fix/daily-focus-overdue` off `main` `7d15add`, not stacked, merged as #145. The
-closes were #146 (`bb41dcb`) and #147 (`f21f4c1`, branch cleanup).
-
-**Branch cleanup (2026-10-06, confirmed):** 15 merged branches deleted on origin and locally, each
-checked first (PR `MERGED`, remote head = PR head): the #132–#146 branches.
-
-**Verified (confirmed):**
-- #145: lint, typecheck, build exit 0 on `a990cee`, by the P8 hook and again by hand.
-- Selectors: the real `lib/execution-os.ts` under `node --experimental-strip-types` on 10 sample cases,
-  all passing.
-- Browser: headless Edge on the dev server in demo mode, 1280×800 and 375×812: "0 of 3 chosen" with
-  suggested rows; an overdue task in the Daily Focus lane shows once, in focus, in red; an overdue
-  backlog task keeps its attention row.
-- The `@AGENTS.md` import works in a fresh Claude Code session.
-
-**Not verified:**
-- #145 on a real (non-demo) account; light theme; keyboard walk.
-- Derived fill picking an overdue task, seen in a browser (selector cases only).
-- No before screenshots in #145.
-- From 2026-10-05 (see git history of this file): only P5 and P6's profile card were opened in a
-  browser; the ToDo Done view, P2/P3 attention rows and actions, the Review tab flow, the avatar
-  menu and Achievements were not. P4 store guards and Firestore round-trip, P12 migration v11 → v12
-  on real data, and the hook's `--amend --no-edit` path were not checked.
-
----
-
 ## Open items
 
-- **Merge the signup recovery PR** (`fix/signup-hydration-to-main`, `4a387e1`), then delete
-  `fix/login-hydration-mismatch` on origin (at `3148374`, holds only the stray #149 merge) and the
-  local `fix/login-hydration-mismatch`, `fix/signup-hydration-mismatch`, `fix/signup-hydration-to-main`.
+- **Real-data check of P14** (Start here, step 2): orphaned categories listed, merged or mapped;
+  then confirm the new fields round-trip through Firestore on a second device.
 - **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked. Candidates:
-  the dev/preview login failure (now worth re-testing after the auth-button fix), the overdue
-  ranking in derived focus, or a new spec item.
+  the dev/preview login failure (worth re-testing after the auth-button fix), the overdue ranking in
+  derived focus, or a new spec item.
+- **ADR-029 in the OS:** Magic Kick categories may map to OS domains, and P15 will read the domain
+  list from the OS. Not recorded in the OS decision log (MK sessions do not edit it); raise it in the
+  next OS session.
+- **Category leftovers from P14:** Quick Add's category manager has no OS domain select and refuses
+  (does not merge) a rename onto an existing name; an unused category can still drop out of the list
+  when an older profile wins a sync; resource categories are a separate list on purpose.
 - **Confirm the #145 rule** (an overdue task in Daily Focus is not repeated in Needs attention), Roman.
 - **Derived Daily Focus ranks overdue tasks below anything due this week:** once past due a task gets
   no due-date score (`selectDailyFocus`). Found 2026-10-06; Roman to decide whether overdue tasks
