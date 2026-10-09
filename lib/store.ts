@@ -12,6 +12,7 @@ import type {
   Insight,
   JournalEntry,
   ModuleId,
+  OsDomain,
   Profile,
   Project,
   ProjectMilestone,
@@ -353,6 +354,7 @@ export interface AppState {
   renameCategory: (from: string, to: string) => void
   deleteCategory: (name: string) => void
   setCategoryColor: (name: string, color: string) => void
+  setCategoryDomain: (name: string, domain: OsDomain | "") => void
   toggleTask: (id: string) => void
   toggleTaskOccurrence: (id: string, dateISO: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
@@ -581,6 +583,8 @@ export const useAppStore = create<AppState>()(
           const nextColors = { ...colors }
           nextColors[nextName] = colors[from] ?? colorFromCategoryName(nextName)
           delete nextColors[from]
+          const domains = s.profile.taskCategoryDomains ?? {}
+          const nextDomains = domains[from] ? { ...domains, [nextName]: domains[from], [from]: "" as const } : domains
           const changedTaskIds: string[] = []
           const changedGoalIds: string[] = []
           const nextTasks = s.tasks.map((task) => {
@@ -621,6 +625,7 @@ export const useAppStore = create<AppState>()(
               ...s.profile,
               taskCategories: nextCategories,
               taskCategoryColors: nextColors,
+              taskCategoryDomains: nextDomains,
               clientUpdatedAt: ts,
               deleted: false,
             },
@@ -652,6 +657,8 @@ export const useAppStore = create<AppState>()(
           const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS
           const nextColors = { ...colors }
           delete nextColors[name]
+          const domains = s.profile.taskCategoryDomains ?? {}
+          const nextDomains = domains[name] ? { ...domains, [name]: "" as const } : domains
           if (!nextColors[fallback]) {
             nextColors[fallback] = DEFAULT_TASK_CATEGORY_COLORS[fallback] ?? colorFromCategoryName(fallback)
           }
@@ -696,6 +703,7 @@ export const useAppStore = create<AppState>()(
               ...s.profile,
               taskCategories: nextCategories,
               taskCategoryColors: nextColors,
+              taskCategoryDomains: nextDomains,
               clientUpdatedAt: ts,
               deleted: false,
             },
@@ -727,6 +735,26 @@ export const useAppStore = create<AppState>()(
               ...(s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS),
               [name]: normalized,
             },
+            clientUpdatedAt: ts,
+            deleted: false,
+          },
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              profile: { ...s.sync.pending.profile, profile: ts },
+            },
+          },
+        }))
+      },
+
+      setCategoryDomain: (name, domain) => {
+        if (!name) return
+        const ts = now()
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            taskCategoryDomains: { ...s.profile.taskCategoryDomains, [name]: domain },
             clientUpdatedAt: ts,
             deleted: false,
           },

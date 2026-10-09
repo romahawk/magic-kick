@@ -1,5 +1,7 @@
 // The single home for task and goal category rules (P14, ADR-029).
-// Categories are defined in Magic Kick; the profile keeps the list and the colors.
+// Categories are defined in Magic Kick; the profile keeps the list, the colors and the OS domains.
+
+import type { OsDomain } from "@/lib/types"
 
 export const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 export const FALLBACK_CATEGORY = "General"
@@ -57,4 +59,17 @@ export function findCategoryConflict(categories: string[], name: string, ignore?
 export function defaultTaskCategory(categories: string[] | undefined, project?: { category?: string }) {
   const list = resolveCategories(categories)
   return project?.category && list.includes(project.category) ? project.category : firstCategory(categories)
+}
+
+/** The four OS domains a category can map to (ADR-029). Hard-coded until P15 reads them from the OS. */
+export const OS_DOMAINS: Array<{ id: OsDomain; label: string; covers: string }> = [
+  { id: "work", label: "Work", covers: "projects, builds, career" },
+  { id: "learning", label: "Learning", covers: "Master's, German, courses" },
+  { id: "admin", label: "Admin", covers: "money, legal, bureaucracy" },
+  { id: "life", label: "Life", covers: "health, family, home" },
+]
+
+/** The OS domain a category maps to, or undefined when it is unmapped. */
+export function categoryDomain(name: string, domains?: Record<string, OsDomain | "">) {
+  return domains?.[name] || undefined
 }

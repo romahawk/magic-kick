@@ -14,6 +14,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Added
 - Projects have an optional task category (Projects → Edit Project → Task category). Tasks added from the project's roadmap, or from a Schedule block linked to the project, get that category instead of always the first one in your list ("Learning" by default).
+- Each category can be linked to an AI-Business-OS domain (Work, Learning, Admin, Life) in Goals → Categories, or left as "Not in OS". Renaming a category keeps its link; deleting it removes the link.
 
 ---
 

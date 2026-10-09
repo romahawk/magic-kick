@@ -15,16 +15,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
+import { OS_DOMAINS, categoryDomain, findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags, Trash2, Check, X } from "lucide-react"
-import type { Goal } from "@/lib/types"
+import type { Goal, OsDomain } from "@/lib/types"
 
 const PRIORITY_STYLES = {
   high: "bg-destructive/10 text-destructive border-destructive/20",
   medium: "bg-streak/10 text-foreground border-streak/20",
   low: "bg-muted text-muted-foreground border-muted",
 }
+
+// Select item value for an unmapped category; Radix Select does not allow "" as a value.
+const UNMAPPED = "__unmapped__"
 
 export function GoalsModule() {
   const allGoals = useAppStore((s) => s.goals)
@@ -41,6 +44,8 @@ export function GoalsModule() {
   const renameCategory = useAppStore((s) => s.renameCategory)
   const removeCategory = useAppStore((s) => s.deleteCategory)
   const setCategoryColor = useAppStore((s) => s.setCategoryColor)
+  const setCategoryDomain = useAppStore((s) => s.setCategoryDomain)
+  const categoryDomains = useAppStore((s) => s.profile.taskCategoryDomains)
   const goals = useMemo(
     () => allGoals.filter((g) => !g.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [allGoals]
@@ -161,6 +166,9 @@ export function GoalsModule() {
                   Categories
                 </DialogTitle>
               </DialogHeader>
+              <p className="text-xs text-muted-foreground">
+                The OS domain links a category to Work, Learning, Admin or Life in AI-Business-OS. Categories the OS does not have yet stay &ldquo;Not in OS&rdquo;.
+              </p>
               <div className="space-y-2">
                 {categories.map((c) => (
                   <div key={c} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
@@ -213,7 +221,21 @@ export function GoalsModule() {
                       </>
                     ) : (
                       <>
-                        <span className="flex-1 text-sm">{c}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm">{c}</span>
+                        <Select
+                          value={categoryDomain(c, categoryDomains) ?? UNMAPPED}
+                          onValueChange={(v) => setCategoryDomain(c, v === UNMAPPED ? "" : (v as OsDomain))}
+                        >
+                          <SelectTrigger size="sm" className="h-7 w-[118px] shrink-0 text-xs" aria-label={`OS domain for ${c}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNMAPPED}>Not in OS</SelectItem>
+                            {OS_DOMAINS.map((d) => (
+                              <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                           type="button"
                           size="icon"
