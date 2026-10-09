@@ -62,7 +62,7 @@ Architecture Decision Records (ADR-style). Each entry explains a real choice mad
 ## ADR-004: Hardcoded XP Category Base Values
 
 **Date:** 2025 (xp-engine.ts)
-**Status:** Technical debt — needs revisit
+**Status:** Superseded by ADR-029 (2026-10-09): every category has the same base XP (20).
 
 **Context:** Task XP is calculated from a category baseline (`CATEGORY_BASE_XP` in `lib/xp-engine.ts`). The hardcoded categories (Learning, Sport, Family/Home, Hobby, Travel) match the default task categories, but users can add custom categories that fall back to `15 XP`.
 

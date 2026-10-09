@@ -1076,7 +1076,6 @@ export const useAppStore = create<AppState>()(
             deleted: false,
           }
           const shouldRecalculateXP =
-            updates.category !== undefined ||
             updates.estimateMin !== undefined ||
             updates.pomodorosPlanned !== undefined ||
             updates.linkedProjectId !== undefined
@@ -2107,7 +2106,7 @@ export const useAppStore = create<AppState>()(
               estimateMin: Math.round(plannedHours * 60),
               completed: false,
               linkedProjectId: block.projectId,
-              xpValue: calculateTaskXP({ category, estimateMin: Math.round(plannedHours * 60), pomodorosPlanned: undefined, linkedProjectId: block.projectId }),
+              xpValue: calculateTaskXP({ estimateMin: Math.round(plannedHours * 60), pomodorosPlanned: undefined, linkedProjectId: block.projectId }),
               deleted: false,
             })
             nextTasks = [...s.tasks, newTask]

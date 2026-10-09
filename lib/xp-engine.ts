@@ -1,14 +1,10 @@
 import { format, isSameDay, parseISO, startOfWeek, subDays } from "date-fns"
-import type { Profile, Task, TaskCategory } from "@/lib/types"
+import type { Profile, Task } from "@/lib/types"
 import { levelFromXP } from "@/lib/game-utils"
 
-const CATEGORY_BASE_XP: Record<TaskCategory, number> = {
-  Learning: 24,
-  Sport: 22,
-  "Family/Home": 14,
-  Hobby: 16,
-  Travel: 18,
-}
+// The same base for every category (ADR-029): categories are user-defined, so a name must not set XP.
+// 20 is roughly the mean of the old per-name values (14–24), so typical XP stays about the same.
+const BASE_TASK_XP = 20
 
 export function getWeekKey(inputDate: Date) {
   return format(startOfWeek(inputDate, { weekStartsOn: 1 }), "yyyy-MM-dd")
@@ -22,8 +18,8 @@ function roundTo5(value: number) {
   return Math.round(value / 5) * 5
 }
 
-export function calculateTaskXP(task: Pick<Task, "category" | "estimateMin" | "pomodorosPlanned" | "linkedProjectId">) {
-  const base = CATEGORY_BASE_XP[task.category] ?? 15
+export function calculateTaskXP(task: Pick<Task, "estimateMin" | "pomodorosPlanned" | "linkedProjectId">) {
+  const base = BASE_TASK_XP
   const estimateBonus = clamp(Math.floor((task.estimateMin ?? 0) / 15) * 2, 0, 18)
   const pomodoroBonus = clamp((task.pomodorosPlanned ?? 0) * 4, 0, 20)
   const projectBonus = task.linkedProjectId ? 6 : 0
