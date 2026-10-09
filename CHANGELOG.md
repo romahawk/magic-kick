@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Changed
 - Category labels look the same everywhere: Schedule and Journal now show each category in its color, as ToDo and Goals already did.
+- A new or renamed category is refused when it only differs from an existing one by case, spaces or the characters & / - _ (for example "Job / Career" and "job-career").
 
 ---
 

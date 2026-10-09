@@ -41,3 +41,14 @@ export function buildCategoryColors(categories: string[], existing?: Record<stri
   for (const category of categories) result[category] = categoryColor(category, existing)
   return result
 }
+
+/** Comparison key: case, spaces, "&", "/", "-" and "_" do not make a category different. */
+export function categoryKey(name: string) {
+  return name.trim().toLowerCase().replace(/[\s&/_-]+/g, "")
+}
+
+/** The existing category `name` would duplicate, if any. `ignore` is the category being renamed. */
+export function findCategoryConflict(categories: string[], name: string, ignore?: string) {
+  const key = categoryKey(name)
+  return categories.find((item) => item !== ignore && categoryKey(item) === key)
+}

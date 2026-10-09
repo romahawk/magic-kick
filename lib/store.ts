@@ -52,6 +52,7 @@ import {
   FALLBACK_CATEGORY,
   buildCategoryColors,
   colorFromCategoryName,
+  findCategoryConflict,
   firstCategory,
 } from "@/lib/categories"
 
@@ -543,7 +544,7 @@ export const useAppStore = create<AppState>()(
         const ts = now()
         set((s) => {
           const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
-          if (categories.some((item) => item.toLowerCase() === normalized.toLowerCase())) return {}
+          if (findCategoryConflict(categories, normalized)) return {}
           return {
             profile: {
               ...s.profile,
@@ -573,7 +574,7 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const categories = s.profile.taskCategories ?? DEFAULT_TASK_CATEGORIES
           if (!categories.includes(from)) return {}
-          if (categories.some((item) => item.toLowerCase() === nextName.toLowerCase())) return {}
+          if (findCategoryConflict(categories, nextName, from)) return {}
 
           const nextCategories = categories.map((item) => (item === from ? nextName : item))
           const colors = s.profile.taskCategoryColors ?? DEFAULT_TASK_CATEGORY_COLORS

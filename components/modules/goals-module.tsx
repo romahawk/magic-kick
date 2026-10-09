@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { firstCategory, resolveCategories } from "@/lib/categories"
+import { findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { Target, ArrowRight, Sparkles, Plus, Pencil, Save, Tags, Trash2, Check, X } from "lucide-react"
 import type { Goal } from "@/lib/types"
@@ -257,7 +257,7 @@ export function GoalsModule() {
                   type="button"
                   size="sm"
                   className="shrink-0 gap-1"
-                  disabled={!newCategory.trim()}
+                  disabled={!newCategory.trim() || Boolean(findCategoryConflict(categories, newCategory))}
                   onClick={() => {
                     if (!newCategory.trim()) return
                     addCategory(newCategory.trim())

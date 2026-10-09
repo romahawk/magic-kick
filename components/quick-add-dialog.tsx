@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
-import { firstCategory, resolveCategories } from "@/lib/categories"
+import { findCategoryConflict, firstCategory, resolveCategories } from "@/lib/categories"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -81,7 +81,7 @@ export function QuickAddDialog() {
 
   function handleAddCategory() {
     const name = newCatName.trim()
-    if (!name || categories.includes(name)) return
+    if (!name || findCategoryConflict(categories, name)) return
     addCategory(name)
     setNewCatName("")
   }
@@ -95,7 +95,7 @@ export function QuickAddDialog() {
   function commitRename() {
     if (!renamingCat) return
     const next = renameVal.trim()
-    if (next && next !== renamingCat && !categories.includes(next)) {
+    if (next && next !== renamingCat && !findCategoryConflict(categories, next, renamingCat)) {
       renameCategory(renamingCat, next)
       if (taskCategory === renamingCat) setTaskCategory(next as TaskCategory)
     }
@@ -159,7 +159,7 @@ export function QuickAddDialog() {
                       onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
                       className="h-7 text-xs"
                     />
-                    <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddCategory} disabled={!newCatName.trim() || categories.includes(newCatName.trim())}>
+                    <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddCategory} disabled={!newCatName.trim() || Boolean(findCategoryConflict(categories, newCatName))}>
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
