@@ -424,9 +424,12 @@ the left sidebar, no tasks from inactive projects, and a more polished planning 
    Dragging a task block onto the panel (or the rail) removes it from the schedule, the same as
    "Remove from schedule", with Undo.
 8. No new module, store collection, data field or Firestore rules change.
+9. Project colors saved as a legacy class name (`bg-chart-1` … `bg-chart-5`) are drawn in their hex
+   equivalent everywhere, through one helper (`lib/project-colors.ts`). Schedule drew them as
+   invalid colors, so those blocks were almost invisible (added 2026-10-13). Stored values are not
+   rewritten; saving the project in Projects already stores hex.
 
-**Out of scope:** the AI Suggest request (still sends every task); fixing calendar blocks of
-projects whose color is a legacy class name rather than hex (they render faint in Schedule).
+**Out of scope:** the AI Suggest request (still sends every task).
 
 ---
 

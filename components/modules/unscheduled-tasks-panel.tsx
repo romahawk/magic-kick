@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns"
 import { CalendarClock, Clock, ListTodo, PanelRightClose, Search, Undo2, X } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { categoryColor } from "@/lib/categories"
+import { normalizeProjectColor } from "@/lib/project-colors"
 import { useCategories } from "@/hooks/use-categories"
 import type { Project, Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -148,7 +149,7 @@ export function UnscheduledTasksPanel({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setQuery("")}
-              placeholder="Search tasks"
+              placeholder="Search"
               aria-label="Search unscheduled tasks"
               className="h-8 pl-8 pr-7 text-xs"
             />
@@ -164,7 +165,7 @@ export function UnscheduledTasksPanel({
             ) : null}
           </div>
           <Select value={sort} onValueChange={(v) => setSort(v as TaskSort)}>
-            <SelectTrigger size="sm" className="h-8 w-34 shrink-0 text-xs" aria-label="Sort unscheduled tasks">
+            <SelectTrigger size="sm" className="h-8 w-32 shrink-0 text-xs" aria-label="Sort unscheduled tasks">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -312,8 +313,7 @@ function UnscheduledTaskCard({
         "group relative flex w-full cursor-grab flex-col gap-2 rounded-lg border border-l-[3px] border-border/70 bg-secondary/20 px-3 py-2 text-left transition-[background-color,box-shadow,opacity] hover:bg-secondary/35 hover:shadow-sm active:cursor-grabbing",
         isDragging && "opacity-50"
       )}
-      // Legacy projects store a class name ("bg-chart-1") instead of a hex color; they get no accent.
-      style={{ borderLeftColor: project && /^#[0-9a-f]{3,8}$/i.test(project.color) ? project.color : "transparent" }}
+      style={{ borderLeftColor: project ? normalizeProjectColor(project.color) : "transparent" }}
     >
       <div className="flex items-start gap-2">
         <ListTodo className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />

@@ -18,6 +18,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - While dragging a task onto the calendar, a ghost block shows where it will land and how long it is.
 - Drag a task block from the calendar back onto the panel to unschedule it, with Undo.
 
+### Fixed
+- Calendar blocks of older projects (created before the color picker) were almost invisible in Schedule. They now show in the project's color, as they already did in Projects. The same fix applies to the project dots in Resources and the AI prediction list.
+
 ---
 
 ## [Unreleased] - 2026-10-09 - One category model (P14)

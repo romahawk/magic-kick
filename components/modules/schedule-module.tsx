@@ -24,6 +24,7 @@ import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
 import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
+import { normalizeProjectColor } from "@/lib/project-colors"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 
 
@@ -101,7 +102,7 @@ function hexToRgb(hex: string) {
 }
 
 function blockStyle(color: string) {
-  const [r, g, b] = hexToRgb(color || "#6366f1")
+  const [r, g, b] = hexToRgb(normalizeProjectColor(color || "#6366f1"))
   return {
     backgroundColor: `rgba(${r},${g},${b},0.18)`,
     borderColor: `rgba(${r},${g},${b},0.7)`,
@@ -1177,7 +1178,7 @@ export function ScheduleModule() {
                           className="h-full rounded-full transition-all"
                           style={{
                             width: `${pct}%`,
-                            backgroundColor: project?.color ?? "#6366f1",
+                            backgroundColor: normalizeProjectColor(project?.color ?? "#6366f1"),
                           }}
                         />
                       </div>
@@ -1304,7 +1305,7 @@ function EditPanel({
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#94a3b8" }} />
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project ? normalizeProjectColor(project.color) : "#94a3b8" }} />
           <TruncatedTooltip
             as="p"
             content={project?.title ?? "No project"}

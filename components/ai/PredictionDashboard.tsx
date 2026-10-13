@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { Project } from "@/lib/types"
+import { normalizeProjectColor } from "@/lib/project-colors"
 import type { ProjectPrediction } from "@/lib/ai/predictor"
 import type { RiskyProject } from "@/lib/ai/risk"
 
@@ -35,7 +36,7 @@ function PredictionRow({ project, prediction }: PredictionRowProps) {
     <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
       <div
         className="h-2.5 w-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: project.color ?? "#888" }}
+        style={{ backgroundColor: normalizeProjectColor(project.color) }}
       />
       <span className="min-w-0 flex-1 truncate text-sm">{project.title}</span>
       <TrendIcon className={cn("h-4 w-4 shrink-0", trendColor)} />

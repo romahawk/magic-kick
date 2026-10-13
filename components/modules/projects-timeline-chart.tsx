@@ -4,20 +4,7 @@ import { useMemo } from "react"
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns"
 import { cn } from "@/lib/utils"
 import type { Project, ProjectMilestone } from "@/lib/types"
-
-const LEGACY_COLOR_MAP: Record<string, string> = {
-  "bg-chart-1": "#3b82f6",
-  "bg-chart-2": "#22c55e",
-  "bg-chart-3": "#06b6d4",
-  "bg-chart-4": "#f97316",
-  "bg-chart-5": "#a855f7",
-}
-
-function normalizeColor(color: string | undefined) {
-  const trimmed = color?.trim() ?? ""
-  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed
-  return LEGACY_COLOR_MAP[trimmed] ?? "#3b82f6"
-}
+import { normalizeProjectColor } from "@/lib/project-colors"
 
 // §3 — Month-axis milestone timeline replacing the 52-week Gantt
 export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
@@ -90,7 +77,7 @@ export function ProjectsTimelineChart({ projects }: { projects: Project[] }) {
       {/* Project rows */}
       <div className="flex flex-col gap-2">
         {visibleProjects.map((project) => {
-          const color = normalizeColor(project.color)
+          const color = normalizeProjectColor(project.color)
           const { startPct, endPct } = barPct(project)
 
           return (
