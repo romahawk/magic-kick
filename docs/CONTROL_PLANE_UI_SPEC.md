@@ -39,12 +39,13 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
 P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028). P14 and P15 were added on
 2026-10-09 by Roman (ADR-029): P14 straight after P3, P15 after P11 because it reads through P7.
+P16 was added on 2026-10-13 by Roman, ranked straight after P14 (nothing else was unblocked).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -393,6 +394,39 @@ raised at the next OS review.
    the fallback when the OS cannot be reached.
 2. Settings lists unmapped categories with their open-task count.
 3. Magic Kick never creates or proposes an OS domain by itself (OS `AGENTS.md` rule 9).
+
+---
+
+### P16 — Schedule: unscheduled-tasks panel · S
+
+**Status:** open
+
+**Why:** Schedule's "Unscheduled tasks" list shows every open task without a time slot, including
+tasks of paused, parked and completed projects. It has no filter, always takes 320 px next to the
+calendar, and placing a task needs a drag. Roman asked for a category filter, a close option like
+the left sidebar, no tasks from inactive projects, and a more polished planning flow (2026-10-13).
+
+**Acceptance criteria**
+
+1. Tasks linked to a project that is not `active` (paused, parked, completed or deleted) are not
+   listed. The panel says how many were left out. Tasks without a project are still listed.
+2. Category chips filter the list (several can be selected; "All" clears). Only categories with an
+   unscheduled task are offered, with their count, in the shared list's order (P14).
+3. A search field matches task and project titles. Sort by due date (default), project, or shortest
+   estimate first.
+4. The panel can be hidden into a narrow rail showing the task count, like the left sidebar. The
+   choice is kept per browser (`localStorage`). Opening a calendar block still shows its edit panel.
+5. Each card shows its project's color and name; a due date before today shows as "Overdue".
+6. A card button puts the task into the next free slot that fits its length (estimate, else 60 min,
+   the same as a drop) between 08:00 and 20:00, today from now on, searching up to 14 days. Busy
+   time is blocks, recurring tasks and busy calendar events. A toast confirms it, with Undo.
+7. Dragging a task over the calendar shows a ghost block of its length at the drop position.
+   Dragging a task block onto the panel (or the rail) removes it from the schedule, the same as
+   "Remove from schedule", with Undo.
+8. No new module, store collection, data field or Firestore rules change.
+
+**Out of scope:** the AI Suggest request (still sends every task); fixing calendar blocks of
+projects whose color is a legacy class name rather than hex (they render faint in Schedule).
 
 ---
 
