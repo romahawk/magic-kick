@@ -1,36 +1,91 @@
 # Next Session Start
 
-**Last updated:** 2026-10-09 (P14 "One category model across modules" built and merged as #152; no roadmap item open)
-**Resume on:** `main` after this `docs/session-close-2026-10-09` PR merges. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-09 — `npm run build` exit 0 on `3bd2f34`, run by hand; `main` `66c3bf6` has the identical tree (Next.js 16.1.6, Turbopack, Node 22.19.0). The P8 hook also passed on each of the 7 commits
-**Typecheck status:** passing as of 2026-10-09 — `npm run typecheck` exit 0 (same run)
-**Lint status:** passing as of 2026-10-09 — `npm run lint` exit 0 (same run)
+**Last updated:** 2026-10-13 (P16 "Schedule: unscheduled-tasks panel" added, built and merged as #154; no roadmap item open)
+**Resume on:** `main` after this `docs/session-close-2026-10-13` PR merges. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-13 — `npm run build` exit 0 on `148c983`, by hand and by the P8 hook; `main` `ae78927` (squash of #154) has the identical tree (`git diff 148c983 origin/main` empty)
+**Typecheck status:** passing as of 2026-10-13 — `npm run typecheck` exit 0 (same run)
+**Lint status:** passing as of 2026-10-13 — `npm run lint` exit 0 (same run)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** one feature session (P14). Data model change: optional `Project.category` and `Profile.taskCategoryDomains`; no migration, no Firestore rules change, no dependency change.
+**Note:** one feature session (P16) plus a bug fix (legacy project colors). No data model, Firestore rules or dependency change; one new `localStorage` key (`magic-kick-schedule-tasks-collapsed`).
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Open the app on the real account → Goals → Categories** and check that categories only tasks
-   still used ("Trading", "Job / Career", "Self-performance") are listed. Merge or map them (rename
-   onto an existing name merges after a confirm). This is the first real-data check of P14.
-3. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P8, P6, P9, P4, P5. **P7, P11:** `queued` but blocked (step 4).
+2. **Open the app on the real account → Schedule** and check P16 on real data: tasks of paused,
+   parked or completed projects are gone from "Unscheduled tasks" (the count line at the bottom),
+   the category chips, the clock button (next free slot) and both Undo buttons. Demo mode only so far.
+3. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
+   tasks still use ("Trading", "Job / Career", "Self-performance").
+4. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P16, P8, P6, P9, P4, P5. **P7, P11:** `queued` but blocked (step 5).
    **P10, P15:** `gated` on P7. **No roadmap item is open and none is unblocked.**
    A session must name a bug from Open items or a new item Roman adds to the spec; otherwise it stops.
-4. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
+5. **P7 and P11 still need two things from outside this repo** (checked 2026-10-05):
    - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
      document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
-5. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
-6. **Commit gate (P8):** every `git commit` from Claude Code goes through
+6. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
+7. **Commit gate (P8):** every `git commit` from Claude Code goes through
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
    lines and typecheck, lint and build pass. Commits typed in a terminal are not checked, and
    neither is `git cherry-pick`: run the gates by hand after one.
+
+---
+
+## Where we left off (2026-10-13) — P16 unscheduled-tasks panel
+
+**Why:** Roman asked (with a screenshot) for a category filter on Schedule's "Unscheduled tasks", a
+close option like the left sidebar, no tasks from inactive projects, and other UX polish. Nothing was
+open or unblocked, so Roman added it as P16, ranked straight after P14, and chose four extras:
+search and sort, project accent and overdue, one-click next free slot, drag preview and drop-back.
+
+**What changed (squash `ae78927`, #154; two commits `cea24be`, `148c983`):**
+- `components/modules/unscheduled-tasks-panel.tsx` (new): category chips with counts, search, sort
+  (due / project / shortest), project color bar and name, "Overdue", next-free-slot button, drop
+  zone, hidden-task count, hide button.
+- `components/modules/schedule-module.tsx`: lists only tasks with no project or an active one; side
+  column collapses to a count rail (`localStorage`); next free slot 08:00–20:00, from now, 14 days,
+  task length = estimate or 60 min (same as a drop), Undo toast (first use of `sonner` in a module);
+  ghost block while dragging a task; dragging a task block onto the panel or rail unschedules it
+  (same as "Remove from schedule", which also clears `repeat`), with Undo.
+- **Bug fix (P16 criterion 9):** `lib/project-colors.ts` (new) holds the legacy `bg-chart-1…5` → hex
+  map and `normalizeProjectColor`. Schedule parsed class-name colors as hex (NaN), so those projects'
+  blocks were nearly invisible. Now used by Schedule, the panel, Projects, the timeline chart,
+  `lib/roadmap.ts` (Resources backlinks) and `PredictionDashboard`; the two local copies are gone.
+  Stored colors are not rewritten.
+- `docs/CONTROL_PLANE_UI_SPEC.md`: P16 (now `done`, 9 criteria), working order. `CHANGELOG.md`: P16 entry
+  dated 2026-10-13 (Added, Changed, Fixed).
+
+**Branch map:**
+- `feat/schedule-unscheduled-panel` off `main` `a80a14d`, head `148c983` (2 commits) → **#154 merged**
+  (squash `ae78927`). Remote and local branches still exist; safe to delete.
+- `docs/session-close-2026-10-13` off `main` `ae78927`: this handoff and P16 → `done`. Not stacked.
+- `docs/session-close-2026-10-09` (local and origin, head `811df50`): #153 merged; its tree equals
+  `a80a14d`. Safe to delete.
+
+**Verified (confirmed):**
+- Gates exit 0 on `cea24be` and `148c983` (by hand and by the P8 hook); `main` tree identical.
+- Headless Edge (playwright-core in the session scratchpad) against Roman's dev server on :3000,
+  demo mode, 1600×900, no page or console errors: search "stripe" 8 → 1; one category chip 8 → 2;
+  sort "Shortest first"; next free slot placed a task today 13:00–13:25 with an Undo toast; drag
+  ghost shown and the drop scheduled the task; a block dragged onto the panel showed "Drop here to
+  unschedule" and was unscheduled; hide → rail (7) → expand, `localStorage` set; project p1 paused in
+  stored state: 7 → 3 cards, "4 tasks … hidden"; "SaaS MVP Launch" (`bg-chart-1`) blocks render blue.
+
+**Not verified:**
+- Real account data; clicking either Undo button.
+- Light theme; 375 px or other narrow widths; keyboard-only use. No screenshots in #154.
+- Resources backlink dots and the AI prediction list in a browser (code changed, screens not opened).
+- A production build (`next start`) or Vercel preview in a browser.
+
+**Process notes:**
+- Roman's dev server already held `.next/dev/lock`, so a second `next dev` on :3001 refused to start;
+  the check ran against :3000 (reach it as `127.0.0.1`, not `localhost`, from curl).
+- `python` on this machine is the Windows Store stub; use Node for scripts.
 
 ---
 
@@ -91,59 +146,13 @@ MERGED with the branch at the PR head: `feat/categories-single-source` (#152),
 
 ---
 
-## Where we left off (2026-10-06, late morning) — login and signup buttons stuck disabled
-
-**Bug:** `/login` logged a React hydration mismatch on `disabled` (open item from the P1 UI check).
-Cause (confirmed): `lib/firebase/client.ts` creates `auth` only in the browser, so the server
-rendered the auth buttons `disabled={… || !auth}` and the client rendered them enabled. React does
-not patch mismatched attributes, so **the buttons stayed disabled after load**, on `/login` (Sign in,
-Continue with Google) and `/signup` (Create account).
-
-**What changed:**
-- `app/login/page.tsx`, `app/signup/page.tsx`: `authReady = useSyncExternalStore(noop, () => auth !== null, () => false)`;
-  the buttons use `!authReady`. Submit handlers still check `auth`.
-- `CHANGELOG.md`: Fixed entry "Login and signup buttons after page load", dated 2026-10-06.
-
-**Branch map:**
-- `fix/login-hydration-mismatch` off `main` `f21f4c1`, head `97c9f21` → **#148 merged** into `main` as `5e49a90`.
-- `fix/signup-hydration-mismatch` stacked on it, head `8d43bef` → **#149 merged into
-  `fix/login-hydration-mismatch`, not `main`** (13 s after #148; its base was not retargeted). So
-  `origin/fix/login-hydration-mismatch` is at `3148374` and the signup fix is **not on `main`**.
-  Same trap as #118/#120. The remote `fix/signup-hydration-mismatch` was deleted on merge; the local
-  copy remains.
-- `fix/signup-hydration-to-main` off `main` `5e49a90`, head `4a387e1` = `8d43bef` cherry-picked;
-  tree identical to `origin/fix/login-hydration-mismatch`. **Not pushed at close; PR to `main` pending.**
-- `docs/session-close-2026-10-06d` off `main` `5e49a90`: this handoff. Not stacked.
-
-**Verified (confirmed):**
-- Session start: `main` `f21f4c1` passed lint, typecheck, build (exit 0).
-- Gates exit 0 on `97c9f21` and `8d43bef` (P8 hook and by hand) and on `4a387e1` (by hand).
-  One hook run on `8d43bef` failed first with build exit 134 / "memory allocation … failed" at
-  1.2 GB free commit memory; it passed at 7.9 GB free. Not a code fault.
-- Browser: headless Edge (playwright-core in the session scratchpad) on the dev server at :3001,
-  1280×800, console and every button's `disabled` read 2 s after `networkidle`. With the fix stashed:
-  1 hydration error on each page, the auth buttons `disabled=true`. With the fix: no console errors,
-  `disabled=false`.
-
-**Not verified:**
-- A production build (`next start`) or Vercel preview in a browser.
-- An actual sign-in (email or Google) or account creation with the now-enabled buttons.
-- Whether this caused the reported dev/preview login failure (plausible: it would affect production
-  too, yet production login was reported working, so likely not the whole story).
-- 375 px; light theme; keyboard. No screenshots in #148/#149.
-
-**Process notes:**
-- The first blocked commit (memory) left the files unstaged; the retry found nothing to commit until
-  they were re-added. Check `git status` after a blocked commit.
-- Another project's dev server (DeutschOn-AI, :3000, ~1.3 GB) and Brave were the big memory users.
-
----
-
 ## Open items
 
-- **Real-data check of P14** (Start here, step 2): orphaned categories listed, merged or mapped;
+- **Real-data check of P16** (Start here, step 2): inactive-project tasks hidden, chips, next free
+  slot, both Undo buttons, collapse rail; also light theme and a narrow window.
+- **Real-data check of P14** (Start here, step 3): orphaned categories listed, merged or mapped;
   then confirm the new fields round-trip through Firestore on a second device.
-- **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked. Candidates:
+- **Pick the next piece of work (Roman).** The roadmap has nothing open or unblocked (again, after P16). Candidates:
   the dev/preview login failure (worth re-testing after the auth-button fix), the overdue ranking in
   derived focus, or a new spec item.
 - **ADR-029 in the OS:** Magic Kick categories may map to OS domains, and P15 will read the domain
@@ -156,8 +165,10 @@ Continue with Google) and `/signup` (Create account).
 - **Derived Daily Focus ranks overdue tasks below anything due this week:** once past due a task gets
   no due-date score (`selectDailyFocus`). Found 2026-10-06; Roman to decide whether overdue tasks
   should be suggested first.
+- **AI Suggest in Schedule still sends every task**, including tasks of paused, parked or completed
+  projects (left out of P16 on purpose). Roman to decide whether it should use the same filter.
 - **P7 / P11 blockers:** the OS context feed (OS session) and the GitHub PAT in Vercel (Roman).
-  See Start here, step 4.
+  See Start here, step 5.
 - **OS session** (prompt drafted 2026-10-04; Roman holds it). Deliverables: decision-template field
   "Repo decisions affected"; one generic `repo-sync` skill with the old sync skills as aliases; an
   amendment line on `DEC-2026-10-03-001` (MK ADR-023 superseded); an OS decision removing the
@@ -175,6 +186,8 @@ Continue with Google) and `/signup` (Create account).
 - **Positioning docs** `docs/PUBLIC_PRESENTATION.md` and `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` still use
   the sandbox wording (left on purpose by ADR-024).
 - **The `roadmap` label** in `.github/ISSUE_TEMPLATE/feature.md` may not exist on GitHub.
+- **Merged branches safe to delete (confirmed 2026-10-13):** `feat/schedule-unscheduled-panel`
+  (#154) and `docs/session-close-2026-10-09` (#153, tree equals `a80a14d`), local and origin.
 - **Older branches.** Local `dev` is merged into `origin/main` (confirmed 2026-10-06) and can be
   deleted. Not confirmed merged: local `ai-control-tower` (origin gone),
   `feat/projects-tab-density-redesign`, `feat/schedule-block-editor-improvements`,
