@@ -4,6 +4,7 @@
 
 import { differenceInCalendarDays, parseISO } from "date-fns"
 import type { Project, ProjectMilestone, Resource, Task } from "./types"
+import { normalizeProjectColor } from "./project-colors"
 
 /** Fallback rank for milestones without `order`: after every ordered one, in legacy weekday order. */
 const LEGACY_ORDER_BASE = 1_000_000
@@ -183,14 +184,14 @@ export function selectResourceBacklinks(resourceId: string, projects: Project[])
     // Legacy projects store Tailwind tokens ("bg-chart-1") instead of hex colours.
     const project = { ...source, color: source.color?.startsWith("#") ? source.color : "#3b82f6" }
     if (project.resourceIds?.includes(resourceId)) {
-      links.push({ projectId: project.id, projectTitle: project.title, projectColor: project.color })
+      links.push({ projectId: project.id, projectTitle: project.title, projectColor: normalizeProjectColor(project.color) })
     }
     for (const milestone of sortMilestones(project.milestones ?? [])) {
       if (milestone.resourceIds?.includes(resourceId)) {
         links.push({
           projectId: project.id,
           projectTitle: project.title,
-          projectColor: project.color,
+          projectColor: normalizeProjectColor(project.color),
           milestoneId: milestone.id,
           milestoneTitle: milestone.title,
         })

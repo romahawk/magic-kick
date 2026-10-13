@@ -23,17 +23,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { AlertTriangle, CalendarIcon, Check, ExternalLink, Link as LinkIcon, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import type { Project, ProjectStatus, Task } from "@/lib/types"
+import { DEFAULT_PROJECT_COLOR, normalizeProjectColor } from "@/lib/project-colors"
 import { ProjectsTimelineChart } from "./projects-timeline-chart"
 import { ProjectResourceLinks, ProjectRoadmap } from "./project-roadmap"
-
-const DEFAULT_PROJECT_COLOR = "#3b82f6"
-const LEGACY_COLOR_MAP: Record<string, string> = {
-  "bg-chart-1": "#3b82f6",
-  "bg-chart-2": "#22c55e",
-  "bg-chart-3": "#06b6d4",
-  "bg-chart-4": "#f97316",
-  "bg-chart-5": "#a855f7",
-}
 
 const PRESET_COLORS = [
   { name: "blue",   value: "#3b82f6" },
@@ -60,11 +52,6 @@ function normalizeUrl(url: string) {
   return `https://${trimmed}`
 }
 
-function normalizeProjectColor(color: string | undefined) {
-  const trimmed = color?.trim() ?? ""
-  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed
-  return LEGACY_COLOR_MAP[trimmed] ?? DEFAULT_PROJECT_COLOR
-}
 
 function getProjectLinks(project: { url?: string; links?: Array<{ label: string; url: string }> }) {
   if (project.links && project.links.length > 0) return project.links

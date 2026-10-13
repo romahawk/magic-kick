@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, ListTodo, Clock, Sparkles } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
+import { toast } from "sonner"
 import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
@@ -23,6 +24,8 @@ import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
 import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
+import { normalizeProjectColor } from "@/lib/project-colors"
+import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 
 
 const HOUR_PX = 64
@@ -32,6 +35,11 @@ const SNAP_MIN = 15
 const TOTAL_HOURS = DAY_END - DAY_START
 const GRID_HEIGHT = TOTAL_HOURS * HOUR_PX
 const AUTO_CALENDAR_SYNC_INTERVAL_MS = 60_000
+const TASKS_PANEL_COLLAPSED_KEY = "magic-kick-schedule-tasks-collapsed"
+// "Next free slot" looks inside these hours, not the whole grid, so a task never lands at 05:00.
+const NEXT_SLOT_START_HOUR = 8
+const NEXT_SLOT_END_HOUR = 20
+const NEXT_SLOT_SEARCH_DAYS = 14
 
 function toMin(time: string) {
   const [h, m] = time.split(":").map(Number)
@@ -72,6 +80,11 @@ function clampMin(m: number) {
   return Math.max(DAY_START * 60, Math.min(DAY_END * 60, m))
 }
 
+/** Length of the block a task gets when it is placed on the calendar. */
+function taskDurationMin(task: Task) {
+  return Math.max(SNAP_MIN, task.estimateMin ?? 60)
+}
+
 function todayISO() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -89,7 +102,7 @@ function hexToRgb(hex: string) {
 }
 
 function blockStyle(color: string) {
-  const [r, g, b] = hexToRgb(color || "#6366f1")
+  const [r, g, b] = hexToRgb(normalizeProjectColor(color || "#6366f1"))
   return {
     backgroundColor: `rgba(${r},${g},${b},0.18)`,
     borderColor: `rgba(${r},${g},${b},0.7)`,
@@ -156,6 +169,7 @@ function externalBlockToBusyBlock(block: ExternalCalendarBlock, weekDays: Array<
 
 interface DragState {
   blockId: string
+  linkedTaskId?: string
   mode: "move" | "resize"
   origStart: string
   origEnd: string
@@ -235,13 +249,24 @@ export function ScheduleModule() {
   const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(new Set())
+  const [taskDropPreview, setTaskDropPreview] = useState<HoverSlot | null>(null)
+  const [unscheduleDrop, setUnscheduleDrop] = useState<UnscheduleDropState>(null)
+  const [tasksPanelCollapsed, setTasksPanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false
+    return window.localStorage.getItem(TASKS_PANEL_COLLAPSED_KEY) === "true"
+  })
 
   const dragRef = useRef<DragState | null>(null)
+  const tasksPanelRef = useRef<HTMLDivElement | null>(null)
   const externalCalendarBlocksRef = useRef(allExternalCalendarBlocks)
 
   useEffect(() => {
     externalCalendarBlocksRef.current = allExternalCalendarBlocks
   }, [allExternalCalendarBlocks])
+
+  useEffect(() => {
+    window.localStorage.setItem(TASKS_PANEL_COLLAPSED_KEY, String(tasksPanelCollapsed))
+  }, [tasksPanelCollapsed])
 
   const weekStartISO = useMemo(() => getCurrentWeekStartISO(parseISO(`${selectedDateISO}T00:00:00`)), [selectedDateISO])
   const activePlan = getActiveWeeklyPlan(weeklyPlans, weekStartISO)
@@ -450,14 +475,12 @@ export function ScheduleModule() {
     })
   })()
 
-  const unscheduledTasks = tasks
-    .filter((task) => !task.completed && !taskTimeSlots[task.id])
-    .sort((a, b) => {
-      const aTs = a.dueDate ? new Date(`${a.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
-      const bTs = b.dueDate ? new Date(`${b.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
-      if (aTs !== bTs) return aTs - bTs
-      return (a.order ?? 0) - (b.order ?? 0)
-    })
+  // P16: tasks of paused, parked, completed or deleted projects stay off the planning list.
+  const activeProjectIds = new Set(activeProjects.map((p) => p.id))
+  const openUnscheduledTasks = tasks.filter((task) => !task.completed && !taskTimeSlots[task.id])
+  const unscheduledTasks = openUnscheduledTasks.filter((task) => !task.linkedProjectId || activeProjectIds.has(task.linkedProjectId))
+  const hiddenUnscheduledCount = openUnscheduledTasks.length - unscheduledTasks.length
+  const showSideColumn = !tasksPanelCollapsed || editBlock !== null
 
   const visibleDateLabel =
     view === "week"
@@ -518,24 +541,102 @@ export function ScheduleModule() {
     setNewDesc("")
   }
 
+  function taskDropSlot(task: Task, dayISO: string, clientY: number, containerTop: number): HoverSlot {
+    const y = Math.max(0, clientY - containerTop)
+    const startMin = clampMin(yToMin(y))
+    const endMin = clampMin(startMin + taskDurationMin(task))
+    const safeEndMin = endMin > startMin ? endMin : Math.min(DAY_END * 60, startMin + SNAP_MIN)
+    return { dateISO: dayISO, startTime: toTime(startMin), endTime: toTime(safeEndMin) }
+  }
+
   function scheduleTaskFromDrop(taskId: string, dayISO: string, clientY: number, containerTop: number) {
     const task = tasks.find((entry) => entry.id === taskId)
     if (!task) return
-    const y = Math.max(0, clientY - containerTop)
-    const startMin = clampMin(yToMin(y))
-    const estimateMin = Math.max(15, task.estimateMin ?? 60)
-    const endMin = clampMin(startMin + estimateMin)
-    const safeEndMin = endMin > startMin ? endMin : Math.min(DAY_END * 60, startMin + 15)
-
-    updateTask(
-      taskId,
-      { dueDate: dayISO },
-      {
-        startHHmm: toTime(startMin),
-        endHHmm: toTime(safeEndMin),
-      }
-    )
+    const slot = taskDropSlot(task, dayISO, clientY, containerTop)
+    updateTask(taskId, { dueDate: dayISO }, { startHHmm: slot.startTime, endHHmm: slot.endTime })
   }
+
+  /** Minutes taken on a date by blocks, recurring tasks and busy calendar events, sorted by start. */
+  function busyIntervalsOn(dateISO: string) {
+    const intervals: Array<[number, number]> = []
+    for (const block of timeBlocks) {
+      if (!block.deleted && block.dateISO === dateISO) intervals.push([toMin(block.startTime), toMin(block.endTime)])
+    }
+    for (const task of tasks) {
+      const slot = taskTimeSlots[task.id]
+      if (slot && !task.completed && isRecurringTask(task) && taskRepeatsOnDate(task, dateISO)) {
+        intervals.push([toMin(slot.startTime), toMin(slot.endTime)])
+      }
+    }
+    for (const block of externalCalendarBlocks) {
+      if (!block.blocksTime) continue
+      const parts = externalBlockDateParts(block, dateISO)
+      if (parts) intervals.push([toMin(parts.startTime), toMin(parts.endTime)])
+    }
+    return intervals.sort((a, b) => a[0] - b[0])
+  }
+
+  function findNextFreeSlot(durationMin: number) {
+    const now = new Date()
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    for (let offset = 0; offset < NEXT_SLOT_SEARCH_DAYS; offset++) {
+      const dateISO = format(addDays(now, offset), "yyyy-MM-dd")
+      let start = NEXT_SLOT_START_HOUR * 60
+      if (offset === 0) start = Math.max(start, Math.ceil(nowMin / SNAP_MIN) * SNAP_MIN)
+      for (const [busyStart, busyEnd] of busyIntervalsOn(dateISO)) {
+        if (busyStart >= start + durationMin) break
+        if (busyEnd > start) start = Math.ceil(busyEnd / SNAP_MIN) * SNAP_MIN
+      }
+      if (start + durationMin <= NEXT_SLOT_END_HOUR * 60) return { dateISO, startMin: start }
+    }
+    return null
+  }
+
+  function scheduleTaskInNextSlot(task: Task) {
+    const durationMin = taskDurationMin(task)
+    const slot = findNextFreeSlot(durationMin)
+    if (!slot) {
+      toast.error(`No free ${durationMin}-minute slot in the next ${NEXT_SLOT_SEARCH_DAYS} days`)
+      return
+    }
+    const previousDueDate = task.dueDate
+    const startTime = toTime(slot.startMin)
+    const endTime = toTime(slot.startMin + durationMin)
+    updateTask(task.id, { dueDate: slot.dateISO }, { startHHmm: startTime, endHHmm: endTime })
+    if (!visibleDays.some((day) => day.iso === slot.dateISO)) setSelectedDateISO(slot.dateISO)
+    toast.success(`Scheduled ${format(parseISO(`${slot.dateISO}T12:00:00`), "EEE, MMM d")} · ${startTime}–${endTime}`, {
+      description: task.title,
+      action: {
+        label: "Undo",
+        onClick: () => updateTask(task.id, { dueDate: previousDueDate }, { clearTimeSlot: true }),
+      },
+    })
+  }
+
+  /** Same as "Remove from schedule" in the edit panel, with an undo. */
+  function unscheduleTaskBlock(taskId: string) {
+    const task = tasks.find((entry) => entry.id === taskId)
+    const slot = taskTimeSlots[taskId]
+    if (!task) return
+    updateTask(taskId, { dueDate: undefined, repeat: "none" }, { clearTimeSlot: true })
+    if (editBlock?.linkedTaskId === taskId) setEditId(null)
+    toast("Moved back to unscheduled tasks", {
+      description: task.title,
+      action: slot
+        ? {
+            label: "Undo",
+            onClick: () =>
+              updateTask(taskId, { dueDate: task.dueDate, repeat: task.repeat }, { startHHmm: slot.startTime, endHHmm: slot.endTime }),
+          }
+        : undefined,
+    })
+  }
+
+  // The mouse listeners below call the latest unscheduleTaskBlock without re-subscribing for it.
+  const unscheduleTaskBlockRef = useRef(unscheduleTaskBlock)
+  useEffect(() => {
+    unscheduleTaskBlockRef.current = unscheduleTaskBlock
+  })
 
   function blockMouseDown(e: React.MouseEvent, block: DisplayBlock, mode: "move" | "resize") {
     e.stopPropagation()
@@ -544,6 +645,7 @@ export function ScheduleModule() {
     const colTop = colEl?.getBoundingClientRect().top ?? 0
     dragRef.current = {
       blockId: block.id,
+      linkedTaskId: block.linkedTaskId,
       mode,
       origStart: block.startTime,
       origEnd: block.endTime,
@@ -555,6 +657,11 @@ export function ScheduleModule() {
   }
 
   useEffect(() => {
+    function isOverTasksPanel(clientX: number, clientY: number) {
+      const rect = tasksPanelRef.current?.getBoundingClientRect()
+      return Boolean(rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom)
+    }
+
     function onMove(e: MouseEvent) {
       const drag = dragRef.current
       if (!drag) return
@@ -572,6 +679,11 @@ export function ScheduleModule() {
       if (!colEl) return
       const colTop = colEl.getBoundingClientRect().top
 
+      // A task block dragged over the side panel can be dropped there to unschedule it (P16).
+      if (drag.mode === "move" && drag.linkedTaskId && Math.abs(e.clientY - drag.mouseStartY) > 4) {
+        setUnscheduleDrop(isOverTasksPanel(e.clientX, e.clientY) ? "over" : "near")
+      }
+
       if (drag.mode === "move") {
         const blockTop = e.clientY - colTop - drag.blockOffsetY
         const startMin = clampMin(yToMin(Math.max(0, blockTop)))
@@ -585,9 +697,11 @@ export function ScheduleModule() {
       }
     }
 
-    function onUp() {
+    function onUp(e: MouseEvent) {
       const drag = dragRef.current
-      if (drag && preview) {
+      if (drag?.linkedTaskId && drag.mode === "move" && unscheduleDrop && isOverTasksPanel(e.clientX, e.clientY)) {
+        unscheduleTaskBlockRef.current(drag.linkedTaskId)
+      } else if (drag && preview) {
         const block = displayBlocks.find((entry) => entry.id === drag.blockId)
         if (block?.linkedTaskId) {
           updateTask(
@@ -605,6 +719,7 @@ export function ScheduleModule() {
       }
       dragRef.current = null
       setPreview(null)
+      setUnscheduleDrop(null)
     }
 
     window.addEventListener("mousemove", onMove)
@@ -613,7 +728,7 @@ export function ScheduleModule() {
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
-  }, [displayBlocks, preview, updateTask, updateTimeBlock])
+  }, [displayBlocks, preview, unscheduleDrop, updateTask, updateTimeBlock])
 
   return (
     <div className="flex h-full flex-col gap-0">
@@ -773,12 +888,23 @@ export function ScheduleModule() {
                         onDragOver={(e) => {
                           if (!draggedTaskId) return
                           e.preventDefault()
+                          const task = tasks.find((entry) => entry.id === draggedTaskId)
+                          if (!task) return
+                          const slot = taskDropSlot(task, day.iso, e.clientY, e.currentTarget.getBoundingClientRect().top)
+                          setTaskDropPreview((current) =>
+                            current?.dateISO === slot.dateISO && current.startTime === slot.startTime ? current : slot
+                          )
+                        }}
+                        onDragLeave={(e) => {
+                          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+                          setTaskDropPreview((current) => (current?.dateISO === day.iso ? null : current))
                         }}
                         onDrop={(e) => {
                           if (!draggedTaskId) return
                           e.preventDefault()
                           scheduleTaskFromDrop(draggedTaskId, day.iso, e.clientY, e.currentTarget.getBoundingClientRect().top)
                           setDraggedTaskId(null)
+                          setTaskDropPreview(null)
                         }}
                       >
                         {HOUR_LABELS.map(({ h }) => (
@@ -802,6 +928,26 @@ export function ScheduleModule() {
                             }}
                           />
                         ) : null}
+
+                        {taskDropPreview?.dateISO === day.iso && draggedTaskId ? (() => {
+                          const task = tasks.find((entry) => entry.id === draggedTaskId)
+                          const project = projects.find((p) => p.id === task?.linkedProjectId)
+                          return (
+                            <div
+                              className="pointer-events-none absolute inset-x-1 z-20 overflow-hidden rounded-md border border-dashed border-l-[3px] bg-primary/10 px-2 py-1 text-xs text-foreground shadow-sm ring-1 ring-primary/50"
+                              style={{
+                                top: toY(taskDropPreview.startTime),
+                                height: blockH(taskDropPreview.startTime, taskDropPreview.endTime),
+                                ...blockStyle(project?.color ?? "#6366f1"),
+                              }}
+                            >
+                              <p className="truncate font-medium leading-tight">{task?.title}</p>
+                              <p className="truncate opacity-75">
+                                {taskDropPreview.startTime}–{taskDropPreview.endTime}
+                              </p>
+                            </div>
+                          )
+                        })() : null}
 
                         {isToday && nowY !== null && (
                           <div className="pointer-events-none absolute inset-x-0 z-10" style={{ top: nowY }}>
@@ -978,6 +1124,7 @@ export function ScheduleModule() {
           ) : null}
         </div>
 
+        {showSideColumn ? (
         <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
           {editBlock ? (
             <EditPanel
@@ -1011,7 +1158,7 @@ export function ScheduleModule() {
             />
           ) : null}
 
-          {activePlan && projectHours.length > 0 ? (
+          {!tasksPanelCollapsed && activePlan && projectHours.length > 0 ? (
             <div className="rounded-xl border bg-card p-4">
               <p className="mb-3 text-sm font-semibold">Week allocation</p>
               <div className="space-y-3">
@@ -1031,7 +1178,7 @@ export function ScheduleModule() {
                           className="h-full rounded-full transition-all"
                           style={{
                             width: `${pct}%`,
-                            backgroundColor: project?.color ?? "#6366f1",
+                            backgroundColor: normalizeProjectColor(project?.color ?? "#6366f1"),
                           }}
                         />
                       </div>
@@ -1042,88 +1189,49 @@ export function ScheduleModule() {
             </div>
           ) : null}
 
-          <div className="rounded-xl border bg-card p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">Unscheduled tasks</p>
-                <p className="text-xs text-muted-foreground">Drag to a day and time slot on the calendar.</p>
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
+          {!tasksPanelCollapsed ? (
+            <UnscheduledTasksPanel
+              tasks={unscheduledTasks}
+              hiddenCount={hiddenUnscheduledCount}
+              projects={activeProjects}
+              todayISO={nowDayISO}
+              draggedTaskId={draggedTaskId}
+              dropState={unscheduleDrop}
+              panelRef={tasksPanelRef}
+              onDragStart={setDraggedTaskId}
+              onDragEnd={() => {
+                setDraggedTaskId(null)
+                setTaskDropPreview(null)
+              }}
+              onScheduleNext={scheduleTaskInNextSlot}
+              onCollapse={() => setTasksPanelCollapsed(true)}
+            />
+          ) : null}
+        </div>
+        ) : (
+          // Collapsed rail. It is also the drop target for unscheduling while the panel is hidden.
+          <div ref={tasksPanelRef} className="flex w-11 shrink-0">
+            <button
+              type="button"
+              onClick={() => setTasksPanelCollapsed(false)}
+              className={cn(
+                "flex w-full flex-col items-center gap-3 rounded-xl border bg-card py-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                unscheduleDrop === "near" && "border-dashed border-primary/60",
+                unscheduleDrop === "over" && "border-primary bg-primary/10 text-primary ring-2 ring-primary/40"
+              )}
+              aria-label={`Show unscheduled tasks (${unscheduledTasks.length})`}
+              title="Show unscheduled tasks"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+              <Badge variant="secondary" className="px-1.5 text-[10px] tabular-nums">
                 {unscheduledTasks.length}
               </Badge>
-            </div>
-            <div className="space-y-2">
-              {unscheduledTasks.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
-                  All open tasks already have an assigned time slot.
-                </div>
-              ) : (
-                unscheduledTasks.map((task) => (
-                  <UnscheduledTaskCard
-                    key={task.id}
-                    task={task}
-                    isDragging={draggedTaskId === task.id}
-                    onDragStart={() => setDraggedTaskId(task.id)}
-                    onDragEnd={() => setDraggedTaskId(null)}
-                  />
-                ))
-              )}
-            </div>
+              <span className="text-xs font-medium [writing-mode:vertical-rl]">Unscheduled tasks</span>
+            </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
-  )
-}
-
-function UnscheduledTaskCard({
-  task,
-  isDragging,
-  onDragStart,
-  onDragEnd,
-}: {
-  task: Task
-  isDragging: boolean
-  onDragStart: () => void
-  onDragEnd: () => void
-}) {
-  return (
-    <button
-      type="button"
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={cn(
-        "flex w-full flex-col gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 text-left transition-colors hover:bg-secondary/35",
-        isDragging && "opacity-60"
-      )}
-    >
-      <div className="flex items-start gap-2">
-        <ListTodo className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <TruncatedTooltip as="p" content={task.title} className="truncate text-sm font-medium" />
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <CategoryBadge category={task.category} className="text-[10px]" />
-            {task.dueDate ? (
-              <span className="text-[10px] text-muted-foreground">{task.dueDate}</span>
-            ) : (
-              <span className="text-[10px] text-muted-foreground">No date</span>
-            )}
-            {(task.repeat ?? "none") !== "none" ? (
-              <Badge variant="outline" className="text-[10px]">
-                Repeats {task.repeat}
-              </Badge>
-            ) : null}
-            {task.estimateMin ? (
-              <Badge variant="outline" className="gap-1 text-[10px]">
-                <Clock className="h-2.5 w-2.5" />
-                {task.estimateMin}m
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </button>
   )
 }
 
@@ -1197,7 +1305,7 @@ function EditPanel({
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project?.color ?? "#94a3b8" }} />
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project ? normalizeProjectColor(project.color) : "#94a3b8" }} />
           <TruncatedTooltip
             as="p"
             content={project?.title ?? "No project"}

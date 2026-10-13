@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-13 - Schedule unscheduled-tasks panel (P16)
+
+### Changed
+- Schedule's "Unscheduled tasks" no longer lists tasks of paused, parked or completed projects. A line at the bottom says how many are hidden.
+- Task cards show the project's color and name, and a due date in the past shows as "Overdue".
+
+### Added
+- Filter the list by category (tap one or more chips), search by task or project name, and sort by due date, project or shortest estimate.
+- Hide the panel to give the calendar more room, like the left sidebar. A slim rail with the task count brings it back, and the choice is remembered in this browser.
+- The clock button on a card puts the task in the next free slot (08:00–20:00, from now on), with Undo.
+- While dragging a task onto the calendar, a ghost block shows where it will land and how long it is.
+- Drag a task block from the calendar back onto the panel to unschedule it, with Undo.
+
+### Fixed
+- Calendar blocks of older projects (created before the color picker) were almost invisible in Schedule. They now show in the project's color, as they already did in Projects. The same fix applies to the project dots in Resources and the AI prediction list.
+
+---
+
 ## [Unreleased] - 2026-10-09 - One category model (P14)
 
 ### Changed
