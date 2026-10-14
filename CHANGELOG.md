@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-14 - Current focus from AI-Business-OS canon (P7, rescoped)
+
+### Added
+- Command Center shows current focus from AI-Business-OS under Daily Focus, marked "From canon": the primary outcomes, the lanes at primary or protected, and the date the canon is from. It is read-only, has no actions and does not count towards the Daily Focus limit. If GitHub cannot be reached it shows the last result fetched, marked "Last known" with its time.
+
+### Removed
+- The "From plan" list from the entry below. It read daily plan files that stay local in AI-Business-OS, so it never showed anything. Daily Focus is the day plan (ADR-031).
+
+---
+
 ## [Unreleased] - 2026-10-14 - Today's plan from AI-Business-OS (P7, first slice)
 
 ### Added

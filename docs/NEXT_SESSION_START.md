@@ -22,13 +22,11 @@
    tasks still use ("Trading", "Job / Career", "Self-performance").
 4. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
    Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P8, P6, P9, P4, P5.
-   **P7:** `open` (2026-10-14). First slice, today's plan only, on `feat/p7-plan-feed` (ADR-030);
-   current focus is a later slice. **P11:** `queued`, needs a write token (step 5). **P10, P15:**
-   `gated` on P7.
-5. **P7's first slice no longer needs these (ADR-030):** it reads the daily plan file with a read-only
-   `AIOS_GITHUB_TOKEN`. P11 and P7's current-focus slice still need, as checked 2026-10-05:
-   - The OS context feed: no feed script in `AI-Business-OS/10_AUTOMATION/scripts/` and no feed-shape
-     document. An OS session owns it (OS `current-focus.md`, P7 path step 2).
+   **P7:** `open` (2026-10-14). Rescoped by ADR-031 (supersedes ADR-030, OS `DEC-2026-10-14-003`):
+   reads current focus from tracked canon on `feat/p7-canon-feed`; the plan-file slice is paused and
+   its code removed. **P11:** `queued`, needs a write token (step 5). **P10, P15:** `gated` on P7.
+5. **P7 needs no OS feed script (ADR-031):** it reads `01_CONTEXT/current-focus.md` and the
+   `00_HOME/context-pack.md` front matter with a read-only `AIOS_GITHUB_TOKEN`. P11 still needs:
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.

@@ -195,19 +195,24 @@ npm run test:unit
 NEXT_PUBLIC_FIREBASE_USE_EMULATOR=true
 ```
 
-### OS plan feed (P7)
+### OS canon feed (P7)
 
-Command Center's Daily Focus shows today's plan from the private AI-Business-OS repo, marked
-"From plan". A server route (`GET /api/os/plan`, signed-in users only) reads
-`07_INBOX/agent/plans/YYYY-MM-DD.md` on `main` through the GitHub API, with today's date in
-Europe/Berlin. The file format is documented in the OS repo (`07_INBOX/agent/README.md`).
+Command Center shows current focus from the private AI-Business-OS repo under Daily Focus, marked
+"From canon" (ADR-031). A server route (`GET /api/os/canon`, signed-in users only) reads two tracked
+files on `main` through the GitHub API, cached for 5 minutes:
+
+- `01_CONTEXT/current-focus.md`: the primary outcomes (bold titles) and the execution-allocation
+  lanes at `primary` and `protected`, plus its `reconciled_with_git` date.
+- `00_HOME/context-pack.md`: only the `generated` date from its front matter, shown as
+  "Canon as of <generated>, reconciled <date>".
 
 - **Env var:** `AIOS_GITHUB_TOKEN`, a fine-grained PAT for `romahawk/AI-Business-OS` only with
   `Contents: read`. Server-side only; it is never sent to the browser or logged.
-- **Read-only.** Nothing from the plan is written to Firestore or the local store. Plan tasks
-  already in Magic Kick (same title, or an agent task with the plan task's id) are hidden.
-- **States:** no file for today shows "No plan for today yet"; no token shows nothing; GitHub
-  down or refusing shows the last plan fetched as "Plan from <date>, last fetched <time>".
+- **Read-only.** Nothing from canon is written to Firestore, the local store or sync. The block has
+  no actions and does not count against the Daily Focus limit.
+- **States:** no token shows nothing; no `current-focus.md` shows "Current focus not found in canon";
+  GitHub down or refusing shows the last good result as "Last known, fetched <time>", or one muted
+  line if nothing was fetched yet; an unreadable context pack only drops the date stamp.
 
 ### Local Development
 

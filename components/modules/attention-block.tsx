@@ -16,9 +16,8 @@ import { localDateISO, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import type { TaskTimeSlot } from "@/lib/weekly-plan"
 import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
-import { useOsPlan } from "@/hooks/use-os-plan"
-import { selectUnmatchedPlanTasks } from "@/lib/os-feed/plan-parser"
-import type { PlanFeedResult, PlanTask } from "@/lib/os-feed/plan-parser"
+import { useOsCanon } from "@/hooks/use-os-canon"
+import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -163,7 +162,7 @@ function DailyFocusCard({
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
   const planInNextSlot = usePlanInNextSlot()
-  const osPlan = useOsPlan()
+  const canon = useOsCanon()
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
 
   const focus = selectDailyFocus(tasks, projects, systemConfig, { weeklyPlans, taskTimeSlots })
@@ -267,14 +266,14 @@ function DailyFocusCard({
         </ul>
       ) : null}
 
-      <OsPlanList plan={osPlan} tasks={tasks} className={chosen.length > 0 ? "mt-4" : undefined} />
-
       <SuggestedFocusList
         entries={suggested}
         taskTimeSlots={taskTimeSlots}
         onAdd={(taskId) => moveTaskToLane(taskId, "daily-focus")}
         className={chosen.length > 0 ? "mt-4" : undefined}
       />
+
+      <CanonFocus canon={canon} className="mt-4 border-t border-border pt-3" />
     </div>
   )
 }
@@ -303,65 +302,64 @@ function FocusTaskMeta({ task, linkedProject, timeSlot }: { task: Task; linkedPr
 }
 
 /**
- * P7: today's plan from AI-Business-OS, read-only. Not counted against the Daily Focus limit, no
- * actions, and hidden when the same task is already in Magic Kick. A failed fetch shows the last
- * plan with its date, never a blank.
+ * P7: current focus from AI-Business-OS canon (ADR-031), read-only: the primary outcomes and the
+ * lanes at primary or protected. Outcomes, not tasks, so no actions and not counted against the
+ * Daily Focus limit. A failed fetch shows the last known canon with its fetch time, never a blank.
  */
-function OsPlanList({ plan, tasks, className }: { plan: PlanFeedResult | null; tasks: Task[]; className?: string }) {
-  if (!plan || plan.status === "not-configured") return null
+function CanonFocus({ canon, className }: { canon: CanonFeedResult | null; className?: string }) {
+  if (!canon || canon.status === "not-configured") return null
 
-  if (plan.status === "missing") {
-    return <p className={cn("text-xs text-muted-foreground", className)}>No plan for today yet.</p>
+  if (canon.status === "missing") {
+    return <p className={cn("text-xs text-muted-foreground", className)}>Current focus not found in canon.</p>
   }
 
-  if (plan.status === "error" && !plan.stale) {
-    return <p className={cn("text-xs text-muted-foreground", className)}>The plan could not be loaded.</p>
+  if (canon.status === "error" && !canon.stale) {
+    return <p className={cn("text-xs text-muted-foreground", className)}>Canon could not be loaded.</p>
   }
 
-  const entries = selectUnmatchedPlanTasks(plan.tasks, tasks)
-  const staleNote =
-    plan.stale && plan.date && plan.fetchedAt
-      ? "Plan from " + format(parseISO(plan.date), "d MMM") + ", last fetched " + format(new Date(plan.fetchedAt), "HH:mm")
-      : null
-  if (entries.length === 0 && !staleNote) return null
+  const lanes = canon.allocation.filter((lane) => lane.level === "primary" || lane.level === "protected")
+  const asOf = [
+    canon.packGenerated ? "Canon as of " + canon.packGenerated : null,
+    canon.reconciledWithGit ? "reconciled " + canon.reconciledWithGit : null,
+  ].filter(Boolean)
+  const asOfLine = asOf.join(", ")
 
   return (
     <div className={className}>
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">From plan</p>
-      {staleNote ? <p className="mb-2 text-xs font-medium text-muted-foreground">{staleNote}</p> : null}
-      <ul className="flex flex-col gap-2.5">
-        {entries.map((planTask) => (
-          <OsPlanRow key={planTask.id} planTask={planTask} />
-        ))}
-      </ul>
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">From canon</p>
+      {canon.stale && canon.fetchedAt ? (
+        <p className="mb-2 text-xs font-medium text-muted-foreground">
+          Last known, fetched {format(new Date(canon.fetchedAt), "d MMM HH:mm")}
+        </p>
+      ) : null}
+      {canon.outcomes.length > 0 ? (
+        <ul className="flex flex-col gap-1">
+          {canon.outcomes.map((outcome) => (
+            <li key={outcome.id} className="text-sm leading-snug">
+              {outcome.title}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {lanes.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {lanes.map((lane) => (
+            <Badge
+              key={lane.id}
+              variant={lane.level === "primary" ? "secondary" : "outline"}
+              className="text-[11px] font-normal"
+              title={lane.level}
+            >
+              {lane.lane.replace(/_/g, " ")}
+              {lane.level === "protected" ? " · protected" : ""}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+      {asOfLine ? (
+        <p className="mt-2 text-xs text-muted-foreground">{asOfLine.charAt(0).toUpperCase() + asOfLine.slice(1)}</p>
+      ) : null}
     </div>
-  )
-}
-
-function OsPlanRow({ planTask }: { planTask: PlanTask }) {
-  return (
-    <li className="min-w-0">
-      <p className={cn("text-sm leading-snug", planTask.done && "text-muted-foreground line-through")}>{planTask.title}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <Badge variant="secondary" className="text-[11px] font-normal">
-          From plan
-        </Badge>
-        <Badge variant="outline" className="text-[11px] font-normal">
-          {planTask.project}
-        </Badge>
-        {planTask.start ? (
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {planTask.start}
-            {planTask.end ? "–" + planTask.end : ""}
-          </span>
-        ) : null}
-        {planTask.due ? (
-          <span className={cn("text-xs", !planTask.done && isOverdue(planTask.due) ? "font-medium text-destructive" : "text-muted-foreground")}>
-            {!planTask.done && isOverdue(planTask.due) ? "overdue, " : ""}due {format(parseISO(planTask.due), "d MMM")}
-          </span>
-        ) : null}
-      </div>
-    </li>
   )
 }
 

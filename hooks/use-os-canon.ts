@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
-import type { PlanFeedResult } from "@/lib/os-feed/plan-parser"
+import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
 
 const REFETCH_AFTER_MS = 5 * 60 * 1000
 
 /**
- * P7: today's plan from AI-Business-OS, for display only. Kept in component state, never in the
- * store, so nothing from the plan reaches Firestore. Null until the first answer, and when signed out.
+ * P7: current focus from AI-Business-OS canon, for display only. Kept in component state, never in
+ * the store, so nothing from canon reaches Firestore. Null until the first answer, and when signed out.
  */
-export function useOsPlan(): PlanFeedResult | null {
+export function useOsCanon(): CanonFeedResult | null {
   const { user } = useAuth()
-  const [plan, setPlan] = useState<PlanFeedResult | null>(null)
+  const [canon, setCanon] = useState<CanonFeedResult | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -23,14 +23,14 @@ export function useOsPlan(): PlanFeedResult | null {
       lastFetch = Date.now()
       try {
         const token = await user!.getIdToken()
-        const response = await fetch("/api/os/plan", { headers: { Authorization: `Bearer ${token}` } })
+        const response = await fetch("/api/os/canon", { headers: { Authorization: `Bearer ${token}` } })
         if (!response.ok) return
-        const next = (await response.json()) as PlanFeedResult
+        const next = (await response.json()) as CanonFeedResult
         if (cancelled) return
         if (next.status === "not-configured" && process.env.NODE_ENV === "development") {
-          console.info("[os-feed] AIOS_GITHUB_TOKEN is not set; the OS plan is not shown.")
+          console.info("[os-feed] AIOS_GITHUB_TOKEN is not set; canon focus is not shown.")
         }
-        setPlan(next)
+        setCanon(next)
       } catch {
         // Offline or the route is unreachable: keep what is on screen.
       }
@@ -48,5 +48,5 @@ export function useOsPlan(): PlanFeedResult | null {
     }
   }, [user])
 
-  return user ? plan : null
+  return user ? canon : null
 }
