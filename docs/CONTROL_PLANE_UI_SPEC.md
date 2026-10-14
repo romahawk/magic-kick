@@ -399,7 +399,9 @@ raised at the next OS review.
 
 ### P16 — Schedule: unscheduled-tasks panel · S
 
-**Status:** open
+**Status:** done
+
+**Note:** merged on 2026-10-13 (#154, `ae78927`). Criterion 9 (legacy project colors) was added during the build.
 
 **Why:** Schedule's "Unscheduled tasks" list shows every open task without a time slot, including
 tasks of paused, parked and completed projects. It has no filter, always takes 320 px next to the
