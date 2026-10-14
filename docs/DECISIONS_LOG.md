@@ -974,10 +974,10 @@ custom categories earn less XP. The OS defines four life domains (Work, Learning
 
 ---
 
-## ADR-030: P7's first slice reads the daily plan file, plan only
+## ADR-030: P7's first slice reads the daily plan file, plan only (superseded by ADR-031)
 
 **Date:** 2026-10-14
-**Status:** Accepted (Roman, 2026-10-14).
+**Status:** Superseded by ADR-031 (2026-10-14). Was accepted (Roman, 2026-10-14).
 **Relates to:** ADR-024 §5 (server-side read of the OS repo), P7 in `docs/CONTROL_PLANE_UI_SPEC.md`,
 OS `DEC-2026-10-03-001` (P7 path).
 
@@ -1016,3 +1016,54 @@ in the OS. The OS coordinator (Vincent) already writes a daily plan, and the OS 
 - **Rollback:** revert the P7 PR and remove `AIOS_GITHUB_TOKEN` from Vercel.
 
 **Revisit trigger:** the OS adds a feed script, or current focus is picked up as the next P7 slice.
+
+---
+
+## ADR-031: P7 reads tracked canon, supersedes ADR-030
+
+**Date:** 2026-10-14
+**Status:** Accepted (Roman, 2026-10-14, through OS `DEC-2026-10-14-003`).
+**Supersedes:** ADR-030.
+**Relates to:** OS `DEC-2026-10-14-003` (OS commit `a5d9cfa`), ADR-024 §5, P7 and P18 in
+`docs/CONTROL_PLANE_UI_SPEC.md`.
+
+### Context
+
+ADR-030 made P7 read `07_INBOX/agent/plans/<date>.md` from OS `main`. Those files are gitignored and
+stay local (OS `DEC-2026-10-04-001`), so they never reach `main` and the "From plan" list (#162)
+always rendered nothing. OS `DEC-2026-10-14-003` rules that Magic Kick's Daily Focus (P18) is the day
+plan, pauses P7's plan-file slice, and points P7 at files already tracked on OS `main`.
+
+### Decision
+
+1. **P7 reads two tracked canon files on OS `main`:** `01_CONTEXT/current-focus.md` (required) and
+   the front matter of `00_HOME/context-pack.md` (optional, only its `generated` date).
+2. **What is shown:** the primary outcomes (bold titles only), the execution-allocation lanes at
+   `primary` and `protected` (`limited` and `none` hidden), and "Canon as of <pack generated>,
+   reconciled <reconciled_with_git>". In Command Center, under Daily Focus, labelled "From canon".
+3. **The plan-file code is removed,** not kept beside it: `plan-parser`, `GET /api/os/plan`,
+   `use-os-plan` and the "From plan" list. The route is now `GET /api/os/canon`.
+4. **Unchanged from ADR-030:** the read-only `AIOS_GITHUB_TOKEN` (server-only, never returned or
+   logged), render-only component state (nothing to Firestore, the persisted store or sync), not
+   counted against the Daily Focus limit, no actions, `vitest` for the parser tests.
+5. **States:** no token renders nothing; current focus missing says "Current focus not found in
+   canon"; a GitHub failure shows the last good result marked "Last known, fetched <time>", or one
+   muted line when nothing was fetched yet. A failed context-pack read only drops the date stamp.
+
+### Rationale
+
+- These files already exist on `main` and are kept current by OS sessions and the pre-commit pack
+  build, so P7 shows real canon without a feed script or a new file format.
+- Outcomes and lanes answer "what matters this quarter" next to "what I do today" without competing
+  with Daily Focus for its limit.
+
+### Consequences
+
+- The parser depends on the headings `## Primary Outcomes` and `## Execution Allocation`, bold
+  outcome titles and the `execution_allocation:` yaml block. A changed structure shows warnings in
+  the route's body and an emptier block, never an error.
+- The context pack is about 76 KB and is fetched whole (cached 5 minutes) to read its front matter.
+- **Rollback:** revert the P7 canon PR; ADR-030's code returns with it.
+
+**Revisit trigger:** the OS changes the structure of `current-focus.md`, or P7's next slice (another
+canon file) is picked up.

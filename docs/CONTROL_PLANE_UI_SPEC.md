@@ -512,12 +512,15 @@ suggestions; changing ToDo's kanban cards.
 
 ### P7 — Read the OS context feed · M
 
-**Status:** open
+**Status:** open (until the canon block is checked on the deployed app with the token set)
 
-**First slice, 2026-10-14 (ADR-030):** today's plan only, read from the OS daily plan file
-`07_INBOX/agent/plans/YYYY-MM-DD.md` (format documented in the OS `07_INBOX/agent/README.md`), shown
-in Command Center's Daily Focus. Current focus (allocation) is a later slice; criterion 2 is met for
-the plan only until then. Token: `AIOS_GITHUB_TOKEN`, `Contents: read`.
+**First slice, rescoped 2026-10-14 (ADR-031, supersedes ADR-030; OS `DEC-2026-10-14-003`):** current
+focus from tracked canon on OS `main`: the primary outcomes and the `primary` and `protected` lanes
+from `01_CONTEXT/current-focus.md`, dated by the `generated` front matter of `00_HOME/context-pack.md`.
+Shown read-only in Command Center under Daily Focus as "From canon". Token: `AIOS_GITHUB_TOKEN`,
+`Contents: read`. The plan-file slice (ADR-030) is paused and its code removed: the plan files stay
+local in the OS, and Daily Focus (P18) is the day plan, so criterion 2's "today's plan" is Daily
+Focus itself. Criterion 5: the files are canon, documented in the OS; there is no separate feed.
 
 **Why:** the brain is invisible from the deployed app. Everything Magic Kick shows today is what was
 typed into Magic Kick. Until it can read OS context, "accessible everywhere on any device" gets you a
