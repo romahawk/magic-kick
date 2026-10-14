@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { format, isToday, parseISO } from "date-fns"
-import { Plus } from "lucide-react"
+import { CalendarPlus, GripVertical, Plus } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { isOverdue } from "@/lib/game-utils"
 import {
@@ -13,7 +14,8 @@ import {
 import type { AttentionEffect, AttentionItem } from "@/lib/execution-os"
 import { localDateISO, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import type { TaskTimeSlot } from "@/lib/weekly-plan"
-import type { Project, Task } from "@/lib/types"
+import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
+import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -33,8 +35,6 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const timeBlocks = useAppStore((s) => s.timeBlocks)
   const scheduleItems = useAppStore((s) => s.schedule)
-  const toggleTask = useAppStore((s) => s.toggleTask)
-  const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
   const updateProject = useAppStore((s) => s.updateProject)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
 
@@ -42,9 +42,6 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   const liveTasks = tasks.filter((task) => !task.deleted)
   const liveProjects = projects.filter((project) => !project.deleted)
 
-  const focus = selectDailyFocus(liveTasks, liveProjects, config, { weeklyPlans })
-  const chosen = focus.filter((entry) => entry.chosen)
-  const suggested = focus.filter((entry) => !entry.chosen)
   const taskTimeSlots = selectTaskTimeSlots(scheduleItems, timeBlocks)
   const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, weeklyPlans, config })
 
@@ -65,69 +62,14 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
 
       <div className="grid gap-3 md:grid-cols-2">
         {/* Focus — what next */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {TASK_LANE_LABELS["daily-focus"]}
-            </h3>
-            <span className={cn("text-xs", chosen.length > config.dailyFocusLimit ? "font-medium text-destructive" : "text-muted-foreground")}>
-              {chosen.length} of {config.dailyFocusLimit} chosen
-            </span>
-            <button
-              type="button"
-              onClick={() => setActiveModule("todo")}
-              className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Open in ToDo
-            </button>
-          </div>
-
-          {chosen.length === 0 && suggested.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nothing chosen for today.{" "}
-              <button
-                type="button"
-                onClick={() => setActiveModule("todo")}
-                className="underline underline-offset-4 hover:text-foreground"
-              >
-                Pick up to {config.dailyFocusLimit} tasks
-              </button>
-              .
-            </p>
-          ) : null}
-
-          {chosen.length > 0 ? (
-            <ul className="flex flex-col gap-2.5">
-              {chosen.map(({ task, linkedProject }) => (
-                <li key={task.id} className="flex items-start gap-3">
-                  <Checkbox
-                    id={`focus-${task.id}`}
-                    checked={task.completed}
-                    onCheckedChange={() => toggleTask(task.id)}
-                    className="mt-0.5"
-                    aria-label={`Complete ${task.title}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <label
-                      htmlFor={`focus-${task.id}`}
-                      className="block cursor-pointer text-sm font-medium leading-snug"
-                    >
-                      {task.title}
-                    </label>
-                    <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <SuggestedFocusList
-            entries={suggested}
-            taskTimeSlots={taskTimeSlots}
-            onAdd={(taskId) => moveTaskToLane(taskId, "daily-focus")}
-            className={chosen.length > 0 ? "mt-4" : undefined}
-          />
-        </div>
+        <DailyFocusCard
+          tasks={liveTasks}
+          projects={liveProjects}
+          weeklyPlans={weeklyPlans}
+          taskTimeSlots={taskTimeSlots}
+          dailyFocusLimit={config.dailyFocusLimit}
+          systemConfig={config}
+        />
 
         {/* Attention — what is wrong */}
         <div className="rounded-xl border border-border bg-card p-4">
@@ -191,6 +133,143 @@ function AttentionRow({ item, onAction }: { item: AttentionItem; onAction: (effe
         </div>
       </div>
     </li>
+  )
+}
+
+/**
+ * P18 — Daily Focus as the day plan: chosen tasks (today's timed ones first, in time order), then
+ * the suggestions. Untimed chosen tasks can be dragged to reorder and planned into the next free slot.
+ */
+function DailyFocusCard({
+  tasks,
+  projects,
+  weeklyPlans,
+  taskTimeSlots,
+  dailyFocusLimit,
+  systemConfig,
+}: {
+  tasks: Task[]
+  projects: Project[]
+  weeklyPlans: WeeklyPlan[]
+  taskTimeSlots: Record<string, TaskTimeSlot>
+  dailyFocusLimit: number
+  systemConfig: SystemConfig
+}) {
+  const toggleTask = useAppStore((s) => s.toggleTask)
+  const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
+  const reorderTasks = useAppStore((s) => s.reorderTasks)
+  const setActiveModule = useAppStore((s) => s.setActiveModule)
+  const planInNextSlot = usePlanInNextSlot()
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+
+  const focus = selectDailyFocus(tasks, projects, systemConfig, { weeklyPlans, taskTimeSlots })
+  const chosen = focus.filter((entry) => entry.chosen)
+  const suggested = focus.filter((entry) => !entry.chosen)
+  const todayISO = localDateISO()
+  const isTimedToday = (task: Task) => task.dueDate === todayISO && Boolean(taskTimeSlots[task.id])
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {TASK_LANE_LABELS["daily-focus"]}
+        </h3>
+        <span className={cn("text-xs", chosen.length > dailyFocusLimit ? "font-medium text-destructive" : "text-muted-foreground")}>
+          {chosen.length} of {dailyFocusLimit} chosen
+        </span>
+        <button
+          type="button"
+          onClick={() => setActiveModule("todo")}
+          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          Open in ToDo
+        </button>
+      </div>
+
+      {chosen.length === 0 && suggested.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nothing chosen for today.{" "}
+          <button
+            type="button"
+            onClick={() => setActiveModule("todo")}
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Pick up to {dailyFocusLimit} tasks
+          </button>
+          .
+        </p>
+      ) : null}
+
+      {chosen.length > 0 ? (
+        <ul className="flex flex-col gap-1.5">
+          {chosen.map(({ task, linkedProject }) => {
+            // Timed tasks sit in time order, so only untimed ones take a manual position.
+            const draggable = !isTimedToday(task)
+            return (
+              <li
+                key={task.id}
+                className={cn(
+                  "group flex items-start gap-2 rounded-md py-1 pr-1",
+                  draggedTaskId === task.id && "opacity-50"
+                )}
+                draggable={draggable}
+                onDragStart={() => setDraggedTaskId(task.id)}
+                onDragEnd={() => setDraggedTaskId(null)}
+                onDragOver={(e) => {
+                  if (draggable && draggedTaskId) e.preventDefault()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (draggable && draggedTaskId && draggedTaskId !== task.id) reorderTasks(draggedTaskId, task.id)
+                  setDraggedTaskId(null)
+                }}
+              >
+                <span
+                  className={cn("mt-0.5 shrink-0 text-muted-foreground/60", draggable ? "cursor-grab" : "invisible")}
+                  aria-hidden="true"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
+                <Checkbox
+                  id={`focus-${task.id}`}
+                  checked={task.completed}
+                  onCheckedChange={() => toggleTask(task.id)}
+                  className="mt-0.5"
+                  aria-label={`Complete ${task.title}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`focus-${task.id}`} className="block cursor-pointer text-sm font-medium leading-snug">
+                    {task.title}
+                  </label>
+                  <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} />
+                </div>
+                {taskTimeSlots[task.id] ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-2 text-xs"
+                    onClick={() => planInNextSlot(task)}
+                    title="Put in the next free slot on the calendar"
+                    aria-label={`Plan ${task.title} in the next free slot`}
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5" />
+                    Plan
+                  </Button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+
+      <SuggestedFocusList
+        entries={suggested}
+        taskTimeSlots={taskTimeSlots}
+        onAdd={(taskId) => moveTaskToLane(taskId, "daily-focus")}
+        className={chosen.length > 0 ? "mt-4" : undefined}
+      />
+    </div>
   )
 }
 

@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-14 - Daily Focus as the day plan (P18)
+
+### Added
+- Command Center's Daily Focus has a "Plan" button on tasks with no time yet. It puts the task in the next free slot on the calendar, with Undo.
+- Drag Daily Focus tasks in Command Center to reorder them. ToDo uses the same order.
+- The first time you open the app each day, a dialog lists the tasks still in Daily Focus. Untick any that should go back to Backlog. Closing it keeps them all. It shows once a day on each device.
+- Schedule: a calendar block's panel shows whether its task is in Daily Focus, with a button to add it or send it back to Backlog.
+
+### Changed
+- Daily Focus lists tasks with a time today first, earliest first. ToDo's Daily Focus column does the same when sorted by "Manual order".
+
+---
+
 ## [Unreleased] - 2026-10-14 - Tasks read the same across Execution tabs
 
 ### Fixed
