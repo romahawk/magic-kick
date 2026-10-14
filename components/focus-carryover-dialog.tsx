@@ -136,12 +136,9 @@ export function FocusCarryoverDialog() {
             </li>
           ))}
         </ul>
-        <DialogFooter className="gap-2">
-          <Button type="button" variant="ghost" onClick={close}>
-            Keep all
-          </Button>
+        <DialogFooter>
           <Button type="button" onClick={apply}>
-            {returning > 0 ? `Return ${returning} to Backlog` : "Keep these"}
+            {returning > 0 ? `Return ${returning} to Backlog` : "Keep all"}
           </Button>
         </DialogFooter>
       </DialogContent>
