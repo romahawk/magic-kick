@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -47,6 +47,7 @@ P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028). P14 a
 2026-10-09 by Roman (ADR-029): P14 straight after P3, P15 after P11 because it reads through P7.
 P16 was added on 2026-10-13 by Roman, ranked straight after P14 (nothing else was unblocked).
 P17 was added on 2026-10-14 by Roman, ranked straight after P16 (nothing else was unblocked).
+P18 was added on 2026-10-14 by Roman, ranked straight after P17 (nothing else was unblocked).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -467,6 +468,41 @@ category, project and estimate, and completing from the sheet only.
 7. No new module, store collection, data field or Firestore rules change.
 
 **Out of scope:** a project field in the task sheet; Undo for delete in ToDo; AI Suggest.
+
+---
+
+### P18 — Daily Focus as the day plan · S
+
+**Status:** open
+
+**Why:** after the Execution sync fix (#158), Daily Focus means one thing everywhere, but it is
+still a flat list: the tasks with a time today are not in time order, a focus task cannot be put
+on the calendar from the Command Center, nothing asks whether yesterday's focus still applies, and
+Schedule does not show whether a block's task is in Daily Focus. Roman asked for all four
+(2026-10-14) and chose: a dismissed carry-over prompt keeps the tasks.
+
+**Acceptance criteria**
+
+1. **Order by time.** Daily Focus lists chosen tasks with a time today first, earliest start
+   first, then the rest in manual order. The ordering is one shared selector, used by the Command
+   Center and by ToDo's Daily Focus column when ToDo's sort is "Manual order".
+2. **Shared focus list.** The Command Center's Daily Focus is one component: chosen rows, then
+   the "Suggested" list (#158). Chosen rows without a time today can be dragged to reorder them
+   (the same `order` ToDo uses). Chosen rows with no time at all have a "Plan" button that puts the
+   task in the next free slot on the calendar (the P16 rule, now one shared function, also used by
+   Schedule) with an Undo toast. ToDo keeps its kanban cards, because moving tasks between lanes
+   happens there.
+3. **Carry-over prompt.** The first time the app opens on a new day, if the Daily Focus lane has
+   open tasks, a dialog lists them, each ticked "keep". Applying sends unticked tasks to Backlog.
+   Closing the dialog without applying keeps them all. It shows at most once per day per device
+   (local storage, not a data field) and waits until the first sync has finished.
+4. **Focus on Schedule.** The edit panel of a calendar block linked to a task shows whether the
+   task is in Daily Focus, with a button to add it (refused with a message at the limit) or send
+   it back to Backlog.
+5. No new module, store collection, data field or Firestore rules change.
+
+**Out of scope:** a Daily Focus history; cross-device "prompt already shown"; AI-ranked
+suggestions; changing ToDo's kanban cards.
 
 ---
 

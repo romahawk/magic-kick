@@ -5,7 +5,7 @@ import type { ElementType, ReactNode } from "react"
 import { differenceInCalendarDays, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS, selectDailyFocus } from "@/lib/execution-os"
-import { selectTaskTimeSlots } from "@/lib/weekly-plan"
+import { orderDailyFocusTasks, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
@@ -138,12 +138,16 @@ export function TodoModule() {
   const doneGroups = useMemo(() => groupDoneTasks(doneTasks, new Date()), [doneTasks])
   const hasAnyDone = useMemo(() => tasks.some((task) => task.completed), [tasks])
   const backlogTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "backlog"), [openTasks])
-  const dailyFocusTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus"), [openTasks])
+  // "Manual order" shows Daily Focus as the Command Center does: today's timed tasks first (P18).
+  const dailyFocusTasks = useMemo(() => {
+    const lane = openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus")
+    return sortBy === "manual" ? orderDailyFocusTasks(lane, taskTimeSlots) : lane
+  }, [openTasks, sortBy, taskTimeSlots])
   // The same suggestions the Command Center shows, from all open tasks (not the search or filter).
   const suggestedFocus = useMemo(
     () =>
-      selectDailyFocus(tasks, allProjects.filter((p) => !p.deleted), systemConfig, { weeklyPlans }).filter((entry) => !entry.chosen),
-    [tasks, allProjects, systemConfig, weeklyPlans]
+      selectDailyFocus(tasks, allProjects.filter((p) => !p.deleted), systemConfig, { weeklyPlans, taskTimeSlots }).filter((entry) => !entry.chosen),
+    [tasks, allProjects, systemConfig, weeklyPlans, taskTimeSlots]
   )
   const parkingLotTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "parking-lot"), [openTasks])
 
