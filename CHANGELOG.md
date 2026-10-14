@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-14 - Today's plan from AI-Business-OS (P7, first slice)
+
+### Added
+- Command Center's Daily Focus shows today's plan from AI-Business-OS under "From plan", with each task's project, time and due date. It is read-only: plan tasks are not saved in Magic Kick, have no tick box, and are hidden when the same task already exists. With no plan for today it says so; if GitHub cannot be reached it shows the last plan fetched, with its date and time.
+
+---
+
 ## [Unreleased] - 2026-10-14 - Daily Focus as the day plan (P18)
 
 ### Added

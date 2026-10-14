@@ -181,6 +181,7 @@ npm run dev
 npm run build
 npm run typecheck
 npm run lint
+npm run test:unit
 ```
 
 ### Environment
@@ -193,6 +194,20 @@ npm run lint
 ```text
 NEXT_PUBLIC_FIREBASE_USE_EMULATOR=true
 ```
+
+### OS plan feed (P7)
+
+Command Center's Daily Focus shows today's plan from the private AI-Business-OS repo, marked
+"From plan". A server route (`GET /api/os/plan`, signed-in users only) reads
+`07_INBOX/agent/plans/YYYY-MM-DD.md` on `main` through the GitHub API, with today's date in
+Europe/Berlin. The file format is documented in the OS repo (`07_INBOX/agent/README.md`).
+
+- **Env var:** `AIOS_GITHUB_TOKEN`, a fine-grained PAT for `romahawk/AI-Business-OS` only with
+  `Contents: read`. Server-side only; it is never sent to the browser or logged.
+- **Read-only.** Nothing from the plan is written to Firestore or the local store. Plan tasks
+  already in Magic Kick (same title, or an agent task with the plan task's id) are hidden.
+- **States:** no file for today shows "No plan for today yet"; no token shows nothing; GitHub
+  down or refusing shows the last plan fetched as "Plan from <date>, last fetched <time>".
 
 ### Local Development
 

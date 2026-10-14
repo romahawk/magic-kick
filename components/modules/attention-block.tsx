@@ -16,6 +16,9 @@ import { localDateISO, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import type { TaskTimeSlot } from "@/lib/weekly-plan"
 import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
+import { useOsPlan } from "@/hooks/use-os-plan"
+import { selectUnmatchedPlanTasks } from "@/lib/os-feed/plan-parser"
+import type { PlanFeedResult, PlanTask } from "@/lib/os-feed/plan-parser"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -160,6 +163,7 @@ function DailyFocusCard({
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
   const planInNextSlot = usePlanInNextSlot()
+  const osPlan = useOsPlan()
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
 
   const focus = selectDailyFocus(tasks, projects, systemConfig, { weeklyPlans, taskTimeSlots })
@@ -263,6 +267,8 @@ function DailyFocusCard({
         </ul>
       ) : null}
 
+      <OsPlanList plan={osPlan} tasks={tasks} className={chosen.length > 0 ? "mt-4" : undefined} />
+
       <SuggestedFocusList
         entries={suggested}
         taskTimeSlots={taskTimeSlots}
@@ -293,6 +299,69 @@ function FocusTaskMeta({ task, linkedProject, timeSlot }: { task: Task; linkedPr
         </span>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * P7: today's plan from AI-Business-OS, read-only. Not counted against the Daily Focus limit, no
+ * actions, and hidden when the same task is already in Magic Kick. A failed fetch shows the last
+ * plan with its date, never a blank.
+ */
+function OsPlanList({ plan, tasks, className }: { plan: PlanFeedResult | null; tasks: Task[]; className?: string }) {
+  if (!plan || plan.status === "not-configured") return null
+
+  if (plan.status === "missing") {
+    return <p className={cn("text-xs text-muted-foreground", className)}>No plan for today yet.</p>
+  }
+
+  if (plan.status === "error" && !plan.stale) {
+    return <p className={cn("text-xs text-muted-foreground", className)}>The plan could not be loaded.</p>
+  }
+
+  const entries = selectUnmatchedPlanTasks(plan.tasks, tasks)
+  const staleNote =
+    plan.stale && plan.date && plan.fetchedAt
+      ? "Plan from " + format(parseISO(plan.date), "d MMM") + ", last fetched " + format(new Date(plan.fetchedAt), "HH:mm")
+      : null
+  if (entries.length === 0 && !staleNote) return null
+
+  return (
+    <div className={className}>
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">From plan</p>
+      {staleNote ? <p className="mb-2 text-xs font-medium text-muted-foreground">{staleNote}</p> : null}
+      <ul className="flex flex-col gap-2.5">
+        {entries.map((planTask) => (
+          <OsPlanRow key={planTask.id} planTask={planTask} />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function OsPlanRow({ planTask }: { planTask: PlanTask }) {
+  return (
+    <li className="min-w-0">
+      <p className={cn("text-sm leading-snug", planTask.done && "text-muted-foreground line-through")}>{planTask.title}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="text-[11px] font-normal">
+          From plan
+        </Badge>
+        <Badge variant="outline" className="text-[11px] font-normal">
+          {planTask.project}
+        </Badge>
+        {planTask.start ? (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {planTask.start}
+            {planTask.end ? "–" + planTask.end : ""}
+          </span>
+        ) : null}
+        {planTask.due ? (
+          <span className={cn("text-xs", !planTask.done && isOverdue(planTask.due) ? "font-medium text-destructive" : "text-muted-foreground")}>
+            {!planTask.done && isOverdue(planTask.due) ? "overdue, " : ""}due {format(parseISO(planTask.due), "d MMM")}
+          </span>
+        ) : null}
+      </div>
+    </li>
   )
 }
 

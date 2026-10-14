@@ -512,7 +512,12 @@ suggestions; changing ToDo's kanban cards.
 
 ### P7 — Read the OS context feed · M
 
-**Status:** queued
+**Status:** open
+
+**First slice, 2026-10-14 (ADR-030):** today's plan only, read from the OS daily plan file
+`07_INBOX/agent/plans/YYYY-MM-DD.md` (format documented in the OS `07_INBOX/agent/README.md`), shown
+in Command Center's Daily Focus. Current focus (allocation) is a later slice; criterion 2 is met for
+the plan only until then. Token: `AIOS_GITHUB_TOKEN`, `Contents: read`.
 
 **Why:** the brain is invisible from the deployed app. Everything Magic Kick shows today is what was
 typed into Magic Kick. Until it can read OS context, "accessible everywhere on any device" gets you a

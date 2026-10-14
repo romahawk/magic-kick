@@ -971,3 +971,48 @@ custom categories earn less XP. The OS defines four life domains (Work, Learning
 - **Rollback:** revert the P14 PR. The optional fields are ignored by older code.
 
 **Revisit trigger:** the OS adds a domain, or more than a few categories stay unmapped for a month.
+
+---
+
+## ADR-030: P7's first slice reads the daily plan file, plan only
+
+**Date:** 2026-10-14
+**Status:** Accepted (Roman, 2026-10-14).
+**Relates to:** ADR-024 §5 (server-side read of the OS repo), P7 in `docs/CONTROL_PLANE_UI_SPEC.md`,
+OS `DEC-2026-10-03-001` (P7 path).
+
+### Context
+
+P7's spec says the OS generates a versioned context feed with a script, and that the first slice
+shows today's plan **and** current focus. Neither the feed script nor a feed-shape document exists
+in the OS. The OS coordinator (Vincent) already writes a daily plan, and the OS has a
+`07_INBOX/agent/plans/` folder for dated plans.
+
+### Decision
+
+1. **The feed for this slice is the daily plan file,** `07_INBOX/agent/plans/YYYY-MM-DD.md` on the OS
+   `main`: YAML front matter, then a `## Tasks` list. Its format is documented in the OS repo
+   (`07_INBOX/agent/README.md`), which keeps criterion 5. No feed-generating script for now.
+2. **Plan only; current focus is deferred** to a later P7 slice. P7 stays `open` until it ships.
+3. **Read-only token, separate name.** `AIOS_GITHUB_TOKEN`, a fine-grained PAT with `Contents: read`
+   on `romahawk/AI-Business-OS` only. P11's write access is a separate grant when P11 starts.
+4. **Render only.** Plan tasks are kept in component state; nothing reaches Firestore, the persisted
+   store or sync. They do not count against the Daily Focus limit and have no actions.
+5. **Unit tests.** `vitest` (dev dependency) runs the parser tests; `npm test` runs typecheck and
+   `test:unit`. Considered: Node's built-in test runner, which needs a TypeScript loader and the
+   `@/` path alias set up by hand. `server-only` is added so the token module fails the build if a
+   client component imports it.
+
+### Rationale
+
+- A hand-written file in a fixed format puts the plan on screen now; a generator can replace the
+  writer later without changing the reader, as long as the format holds.
+- A read-only token limits what a leaked token can do while nothing writes back.
+
+### Consequences
+
+- New route `app/api/os/plan`, `lib/os-feed/`, `hooks/use-os-plan.ts`; no Firestore or rules change.
+- Plans reach Magic Kick only when a plan file is committed to the OS repo.
+- **Rollback:** revert the P7 PR and remove `AIOS_GITHUB_TOKEN` from Vercel.
+
+**Revisit trigger:** the OS adds a feed script, or current focus is picked up as the next P7 slice.
