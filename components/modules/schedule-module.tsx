@@ -26,6 +26,7 @@ import { useCategories } from "@/hooks/use-categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
+import { TaskDetailSheet } from "@/components/task-detail-sheet"
 
 
 const HOUR_PX = 64
@@ -227,6 +228,7 @@ export function ScheduleModule() {
   const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
   const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const updateTask = useAppStore((s) => s.updateTask)
+  const restoreTask = useAppStore((s) => s.restoreTask)
   const toggleTaskOccurrence = useAppStore((s) => s.toggleTaskOccurrence)
   const deleteTimeBlock = useAppStore((s) => s.deleteTimeBlock)
   const saveExternalCalendarBlock = useAppStore((s) => s.saveExternalCalendarBlock)
@@ -244,6 +246,7 @@ export function ScheduleModule() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [hoverSlot, setHoverSlot] = useState<HoverSlot | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [nowY, setNowY] = useState<number | null>(null)
   const [nowDayISO, setNowDayISO] = useState(todayISO())
   const [suggestions, setSuggestions] = useState<ScheduleSuggestion[]>([])
@@ -629,6 +632,13 @@ export function ScheduleModule() {
               updateTask(taskId, { dueDate: task.dueDate, repeat: task.repeat }, { startHHmm: slot.startTime, endHHmm: slot.endTime }),
           }
         : undefined,
+    })
+  }
+
+  function announceDeletedTask(task: Task) {
+    toast("Task deleted", {
+      description: task.title,
+      action: { label: "Undo", onClick: () => restoreTask(task.id) },
     })
   }
 
@@ -1204,6 +1214,7 @@ export function ScheduleModule() {
                 setTaskDropPreview(null)
               }}
               onScheduleNext={scheduleTaskInNextSlot}
+              onOpenTask={setOpenTaskId}
               onCollapse={() => setTasksPanelCollapsed(true)}
             />
           ) : null}
@@ -1231,6 +1242,13 @@ export function ScheduleModule() {
           </div>
         )}
       </div>
+
+      <TaskDetailSheet
+        taskId={openTaskId}
+        timeSlot={openTaskId ? taskTimeSlots[openTaskId] : undefined}
+        onClose={() => setOpenTaskId(null)}
+        onDeleted={announceDeletedTask}
+      />
     </div>
   )
 }

@@ -2,14 +2,15 @@
 
 import { useMemo, useState } from "react"
 import { format, parseISO } from "date-fns"
-import { CalendarClock, Clock, ListTodo, PanelRightClose, Search, Undo2, X } from "lucide-react"
+import { CalendarClock, Clock, ListTodo, PanelRightClose, Plus, Search, Undo2, X } from "lucide-react"
 import { useAppStore } from "@/lib/store"
-import { categoryColor } from "@/lib/categories"
+import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { useCategories } from "@/hooks/use-categories"
 import type { Project, Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
@@ -39,8 +40,11 @@ interface UnscheduledTasksPanelProps {
   onDragStart: (taskId: string) => void
   onDragEnd: () => void
   onScheduleNext: (task: Task) => void
+  onOpenTask: (taskId: string) => void
   onCollapse: () => void
 }
+
+const NO_PROJECT = "none"
 
 function dueValue(task: Task) {
   return task.dueDate ? new Date(`${task.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
@@ -57,6 +61,7 @@ export function UnscheduledTasksPanel({
   onDragStart,
   onDragEnd,
   onScheduleNext,
+  onOpenTask,
   onCollapse,
 }: UnscheduledTasksPanelProps) {
   const allCategories = useCategories()
@@ -64,6 +69,7 @@ export function UnscheduledTasksPanel({
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<TaskSort>("due")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [adding, setAdding] = useState(false)
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects])
 
@@ -131,16 +137,33 @@ export function UnscheduledTasksPanel({
             </div>
             <p className="text-xs text-muted-foreground">Drag onto the calendar, or use the clock for the next free slot.</p>
           </div>
-          <button
-            type="button"
-            onClick={onCollapse}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Hide unscheduled tasks"
-            title="Hide unscheduled tasks"
-          >
-            <PanelRightClose className="h-4 w-4" />
-          </button>
+          <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={() => setAdding((v) => !v)}
+              aria-expanded={adding}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                adding && "bg-muted text-foreground"
+              )}
+              aria-label="Add task"
+              title="Add task"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Hide unscheduled tasks"
+              title="Hide unscheduled tasks"
+            >
+              <PanelRightClose className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+
+        {adding ? <AddTaskForm projects={projects} categories={allCategories} onDone={() => setAdding(false)} /> : null}
 
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
@@ -260,6 +283,7 @@ export function UnscheduledTasksPanel({
               onDragStart={() => onDragStart(task.id)}
               onDragEnd={onDragEnd}
               onScheduleNext={() => onScheduleNext(task)}
+              onOpen={() => onOpenTask(task.id)}
             />
           ))
         )}
@@ -290,6 +314,7 @@ function UnscheduledTaskCard({
   onDragStart,
   onDragEnd,
   onScheduleNext,
+  onOpen,
 }: {
   task: Task
   project?: Project
@@ -298,6 +323,7 @@ function UnscheduledTaskCard({
   onDragStart: () => void
   onDragEnd: () => void
   onScheduleNext: () => void
+  onOpen: () => void
 }) {
   const due = dueLabel(task.dueDate, todayISO)
 
@@ -309,6 +335,8 @@ function UnscheduledTaskCard({
         onDragStart()
       }}
       onDragEnd={onDragEnd}
+      // A click (not a drag) opens the task sheet; the title button below is the keyboard path.
+      onClick={onOpen}
       className={cn(
         "group relative flex w-full cursor-grab flex-col gap-2 rounded-lg border border-l-[3px] border-border/70 bg-secondary/20 px-3 py-2 text-left transition-[background-color,box-shadow,opacity] hover:bg-secondary/35 hover:shadow-sm active:cursor-grabbing",
         isDragging && "opacity-50"
@@ -318,7 +346,17 @@ function UnscheduledTaskCard({
       <div className="flex items-start gap-2">
         <ListTodo className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1 pr-6">
-          <TruncatedTooltip as="p" content={task.title} className="truncate text-sm font-medium" />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+            className="block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`Open "${task.title}"`}
+          >
+            <TruncatedTooltip as="p" content={task.title} className="truncate text-sm font-medium" />
+          </button>
           {project ? (
             <p className="truncate text-[11px] text-muted-foreground" title={project.title}>
               {project.title}
@@ -343,7 +381,10 @@ function UnscheduledTaskCard({
       </div>
       <button
         type="button"
-        onClick={onScheduleNext}
+        onClick={(e) => {
+          e.stopPropagation()
+          onScheduleNext()
+        }}
         className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,background-color,color] hover:bg-primary/10 hover:text-primary focus-visible:opacity-100 group-hover:opacity-100"
         aria-label={`Schedule "${task.title}" in the next free slot`}
         title="Schedule in the next free slot"
@@ -351,5 +392,100 @@ function UnscheduledTaskCard({
         <CalendarClock className="h-4 w-4" />
       </button>
     </div>
+  )
+}
+
+/** Inline create form (P17). The task gets no date or time, so it lands in this list ready to place. */
+function AddTaskForm({ projects, categories, onDone }: { projects: Project[]; categories: string[]; onDone: () => void }) {
+  const addTask = useAppStore((s) => s.addTask)
+  const [title, setTitle] = useState("")
+  const [projectId, setProjectId] = useState(NO_PROJECT)
+  const [category, setCategory] = useState(() => defaultTaskCategory(categories))
+  const [estimate, setEstimate] = useState("")
+
+  function chooseProject(id: string) {
+    setProjectId(id)
+    // A project's tasks take its category (P14), unless it has none.
+    setCategory(defaultTaskCategory(categories, projects.find((p) => p.id === id)))
+  }
+
+  function submit() {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    const minutes = Number(estimate)
+    addTask({
+      title: trimmed.slice(0, 300),
+      category: categories.includes(category) ? category : defaultTaskCategory(categories),
+      completed: false,
+      lane: "backlog",
+      ...(projectId !== NO_PROJECT ? { linkedProjectId: projectId, milestoneId: "" } : {}),
+      estimateMin: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : undefined,
+    })
+    // Stay open for rapid entry; project and category carry over.
+    setTitle("")
+    setEstimate("")
+  }
+
+  return (
+    <form
+      className="space-y-2 rounded-lg border bg-secondary/20 p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
+      <Input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onDone()}
+        placeholder="Task title"
+        aria-label="New task title"
+        maxLength={300}
+        className="h-8 text-xs"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={projectId} onValueChange={chooseProject}>
+          <SelectTrigger size="sm" className="h-8 w-full text-xs" aria-label="New task project">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_PROJECT} className="text-xs">No project</SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id} className="text-xs">{p.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger size="sm" className="h-8 w-full text-xs" aria-label="New task category">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={1}
+          value={estimate}
+          onChange={(e) => setEstimate(e.target.value)}
+          placeholder="Minutes"
+          aria-label="Estimate in minutes"
+          className="h-8 w-24 text-xs"
+        />
+        <div className="ml-auto flex gap-1.5">
+          <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" className="h-8 text-xs" disabled={!title.trim()}>
+            Add
+          </Button>
+        </div>
+      </div>
+    </form>
   )
 }
