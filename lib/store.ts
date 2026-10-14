@@ -29,7 +29,7 @@ import type {
 } from "./types"
 import { generateId } from "./game-utils"
 import { normalizeSystemConfig } from "./execution-os"
-import { buildExecutionLogFromBlocks, calculateTimeBlockHours, emptyWeeklyPlan, getCurrentWeekStartISO } from "@/lib/weekly-plan"
+import { buildExecutionLogFromBlocks, calculateTimeBlockHours, emptyWeeklyPlan, getCurrentWeekStartISO, localDateISO } from "@/lib/weekly-plan"
 import { getOrCreateDeviceId } from "@/lib/sync/deviceId"
 import { applyTaskCompletionXP, calculateTaskXP, normalizeProfileForToday, rollbackTaskXP } from "@/lib/xp-engine"
 import { levelFromXP } from "@/lib/game-utils"
@@ -2417,7 +2417,7 @@ export const useAppStore = create<AppState>()(
       dismissInsight: (id) => set((s) => ({ insights: s.insights.filter((i) => i.id !== id) })),
       setCoaching: (coaching) => set({ coaching }),
       setCoachingLoading: (loading) => set({ coachingLoading: loading }),
-      dismissCoaching: () => set({ coachingDismissedDate: new Date().toISOString().slice(0, 10) }),
+      dismissCoaching: () => set({ coachingDismissedDate: localDateISO() }),
 
       setSyncStatus: (status, error = null) =>
         set((s) => ({

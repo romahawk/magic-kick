@@ -12,8 +12,10 @@ import {
   getCurrentWeekStartISO,
   getWeekDates,
   getWeeklyReviewForPlan,
+  localDateISO,
+  selectDayAgenda,
   selectProjectHours,
-  selectTimeBlocksForDay,
+  selectTaskTimeSlots,
   selectWeekAwaitingReview,
   validateWeeklyPlan,
 } from "@/lib/weekly-plan"
@@ -53,6 +55,8 @@ export function CommandCenter() {
   const allProjects = useAppStore((s) => s.projects)
   const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const timeBlocks = useAppStore((s) => s.timeBlocks)
+  const tasks = useAppStore((s) => s.tasks)
+  const scheduleItems = useAppStore((s) => s.schedule)
   const executionLogs = useAppStore((s) => s.executionLogs)
   const weeklyReviews = useAppStore((s) => s.weeklyReviews)
   const saveWeeklyPlan = useAppStore((s) => s.saveWeeklyPlan)
@@ -78,8 +82,14 @@ export function CommandCenter() {
   const activePlan = getActiveWeeklyPlan(weeklyPlans, weekStartISO)
   const existingReview = getWeeklyReviewForPlan(weeklyReviews, activePlan?.id)
   const weekDays = getWeekDates(weekStartISO)
-  const todayISO = new Date().toISOString().slice(0, 10)
-  const todayBlocks = selectTimeBlocksForDay(timeBlocks, todayISO, activePlan?.id)
+  const todayISO = localDateISO()
+  // Same list as the Schedule calendar for today (time blocks of any week plan, recurring tasks).
+  const todayBlocks = selectDayAgenda({
+    timeBlocks,
+    tasks,
+    taskTimeSlots: selectTaskTimeSlots(scheduleItems, timeBlocks),
+    dateISO: todayISO,
+  })
   const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
   const activePlanValidation = activePlan
     ? validateWeeklyPlan(activePlan, activeProjects)
@@ -103,7 +113,7 @@ export function CommandCenter() {
     description: "",
   })
 
-  const todayDateISO = new Date().toISOString().slice(0, 10)
+  const todayDateISO = todayISO
   const coachingDismissedToday = coachingDismissedDate === todayDateISO
   const coachingMessage = coachingDismissedToday ? null : coaching
 
@@ -225,6 +235,14 @@ export function CommandCenter() {
                 <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Committed this week
                 </p>
+                {projectHours.length === 0 ? (
+                  <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                    No projects committed this week.{" "}
+                    <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab("plan")}>
+                      Open Plan
+                    </button>.
+                  </div>
+                ) : null}
                 {projectHours.map((item) => {
                   const project = projects.find((p) => p.id === item.projectId)
                   const deliveredPct =
@@ -263,7 +281,7 @@ export function CommandCenter() {
                   todayBlocks.map((block) => (
                     <div key={block.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2">
                       <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{block.startTime}–{block.endTime}</span>
-                      <span className="flex-1 truncate text-sm">{block.taskDescription}</span>
+                      <span className="flex-1 truncate text-sm">{block.title}</span>
                       <Badge variant={block.status === "done" ? "default" : "outline"} className="text-[10px]">{block.status}</Badge>
                     </div>
                   ))

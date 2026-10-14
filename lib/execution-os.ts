@@ -111,10 +111,10 @@ export function selectDailyFocus(
   const rules = normalizeSystemConfig(config)
   const projectById = new Map(projects.filter((project) => !project.deleted).map((project) => [project.id, project]))
   const weekOutcomes = selectThisWeekOutcomes(options?.weeklyPlans ?? [])
+  // Every task in the lane is listed, even past the limit, so this matches ToDo's Daily Focus column.
   const explicitFocus = tasks
     .filter((task) => !task.deleted && !task.completed && task.lane === "daily-focus")
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .slice(0, rules.dailyFocusLimit)
 
   // `chosen`: the task is in the Daily Focus lane. Derived tasks only fill empty slots; they are
   // suggestions, not choices, and the block must not count them as "today".
