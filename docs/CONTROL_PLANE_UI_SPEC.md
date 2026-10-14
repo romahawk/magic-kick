@@ -473,7 +473,11 @@ category, project and estimate, and completing from the sheet only.
 
 ### P18 — Daily Focus as the day plan · S
 
-**Status:** open
+**Status:** done
+
+**Note:** merged on 2026-10-14. #159 merged into the already-merged #158 branch, so it reached
+`main` through #160 (`847355a`). The carry-over prompt's single-button follow-up
+(`fix/p18-carryover-button`) missed #159's squash and goes in separately.
 
 **Why:** after the Execution sync fix (#158), Daily Focus means one thing everywhere, but it is
 still a flat list: the tasks with a time today are not in time order, a focus task cannot be put
