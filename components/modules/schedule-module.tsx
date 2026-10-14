@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
-import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, selectTaskTimeSlots, selectTimeBlocksForDates } from "@/lib/weekly-plan"
+import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, externalBlockDateParts, selectTaskTimeSlots, selectTimeBlocksForDates, taskDurationMin } from "@/lib/weekly-plan"
+import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, X, CheckCircle2, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, Focus, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
 import { toast } from "sonner"
 import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -37,10 +38,6 @@ const TOTAL_HOURS = DAY_END - DAY_START
 const GRID_HEIGHT = TOTAL_HOURS * HOUR_PX
 const AUTO_CALENDAR_SYNC_INTERVAL_MS = 60_000
 const TASKS_PANEL_COLLAPSED_KEY = "magic-kick-schedule-tasks-collapsed"
-// "Next free slot" looks inside these hours, not the whole grid, so a task never lands at 05:00.
-const NEXT_SLOT_START_HOUR = 8
-const NEXT_SLOT_END_HOUR = 20
-const NEXT_SLOT_SEARCH_DAYS = 14
 
 function toMin(time: string) {
   const [h, m] = time.split(":").map(Number)
@@ -81,11 +78,6 @@ function clampMin(m: number) {
   return Math.max(DAY_START * 60, Math.min(DAY_END * 60, m))
 }
 
-/** Length of the block a task gets when it is placed on the calendar. */
-function taskDurationMin(task: Task) {
-  return Math.max(SNAP_MIN, task.estimateMin ?? 60)
-}
-
 function todayISO() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -123,28 +115,6 @@ function externalBlockStyle(blocksTime: boolean) {
         borderColor: "rgba(148, 163, 184, 0.7)",
         color: "rgb(100, 116, 139)",
       }
-}
-
-function externalBlockDateParts(block: ExternalCalendarBlock, dateISO: string) {
-  if (block.allDay) {
-    const startDay = block.startISO?.slice(0, 10)
-    if (startDay !== dateISO) return null
-    return { dateISO, startTime: toTime(DAY_START * 60), endTime: toTime(DAY_END * 60) }
-  }
-  if (!block.startISO || !block.endISO) return null
-  try {
-    const start = parseISO(block.startISO)
-    const end = parseISO(block.endISO)
-    const blockDateISO = format(start, "yyyy-MM-dd")
-    if (blockDateISO !== dateISO) return null
-    return {
-      dateISO: blockDateISO,
-      startTime: format(start, "HH:mm"),
-      endTime: format(end, "HH:mm"),
-    }
-  } catch {
-    return null
-  }
 }
 
 function externalBlockToBusyBlock(block: ExternalCalendarBlock, weekDays: Array<{ iso: string }>): TimeBlock[] {
@@ -231,6 +201,7 @@ export function ScheduleModule() {
   const restoreTask = useAppStore((s) => s.restoreTask)
   const toggleTaskOccurrence = useAppStore((s) => s.toggleTaskOccurrence)
   const deleteTimeBlock = useAppStore((s) => s.deleteTimeBlock)
+  const planInNextSlot = usePlanInNextSlot()
   const saveExternalCalendarBlock = useAppStore((s) => s.saveExternalCalendarBlock)
   const deleteExternalCalendarBlock = useAppStore((s) => s.deleteExternalCalendarBlock)
   const setGoogleCalendarMetadata = useAppStore((s) => s.setGoogleCalendarMetadata)
@@ -535,61 +506,9 @@ export function ScheduleModule() {
     updateTask(taskId, { dueDate: dayISO }, { startHHmm: slot.startTime, endHHmm: slot.endTime })
   }
 
-  /** Minutes taken on a date by blocks, recurring tasks and busy calendar events, sorted by start. */
-  function busyIntervalsOn(dateISO: string) {
-    const intervals: Array<[number, number]> = []
-    for (const block of timeBlocks) {
-      if (!block.deleted && block.dateISO === dateISO) intervals.push([toMin(block.startTime), toMin(block.endTime)])
-    }
-    for (const task of tasks) {
-      const slot = taskTimeSlots[task.id]
-      if (slot && !task.completed && isRecurringTask(task) && taskRepeatsOnDate(task, dateISO)) {
-        intervals.push([toMin(slot.startTime), toMin(slot.endTime)])
-      }
-    }
-    for (const block of externalCalendarBlocks) {
-      if (!block.blocksTime) continue
-      const parts = externalBlockDateParts(block, dateISO)
-      if (parts) intervals.push([toMin(parts.startTime), toMin(parts.endTime)])
-    }
-    return intervals.sort((a, b) => a[0] - b[0])
-  }
-
-  function findNextFreeSlot(durationMin: number) {
-    const now = new Date()
-    const nowMin = now.getHours() * 60 + now.getMinutes()
-    for (let offset = 0; offset < NEXT_SLOT_SEARCH_DAYS; offset++) {
-      const dateISO = format(addDays(now, offset), "yyyy-MM-dd")
-      let start = NEXT_SLOT_START_HOUR * 60
-      if (offset === 0) start = Math.max(start, Math.ceil(nowMin / SNAP_MIN) * SNAP_MIN)
-      for (const [busyStart, busyEnd] of busyIntervalsOn(dateISO)) {
-        if (busyStart >= start + durationMin) break
-        if (busyEnd > start) start = Math.ceil(busyEnd / SNAP_MIN) * SNAP_MIN
-      }
-      if (start + durationMin <= NEXT_SLOT_END_HOUR * 60) return { dateISO, startMin: start }
-    }
-    return null
-  }
-
   function scheduleTaskInNextSlot(task: Task) {
-    const durationMin = taskDurationMin(task)
-    const slot = findNextFreeSlot(durationMin)
-    if (!slot) {
-      toast.error(`No free ${durationMin}-minute slot in the next ${NEXT_SLOT_SEARCH_DAYS} days`)
-      return
-    }
-    const previousDueDate = task.dueDate
-    const startTime = toTime(slot.startMin)
-    const endTime = toTime(slot.startMin + durationMin)
-    updateTask(task.id, { dueDate: slot.dateISO }, { startHHmm: startTime, endHHmm: endTime })
-    if (!visibleDays.some((day) => day.iso === slot.dateISO)) setSelectedDateISO(slot.dateISO)
-    toast.success(`Scheduled ${format(parseISO(`${slot.dateISO}T12:00:00`), "EEE, MMM d")} · ${startTime}–${endTime}`, {
-      description: task.title,
-      action: {
-        label: "Undo",
-        onClick: () => updateTask(task.id, { dueDate: previousDueDate }, { clearTimeSlot: true }),
-      },
-    })
+    const dateISO = planInNextSlot(task)
+    if (dateISO && !visibleDays.some((day) => day.iso === dateISO)) setSelectedDateISO(dateISO)
   }
 
   /** Same as "Remove from schedule" in the edit panel, with an undo. */
@@ -1255,6 +1174,24 @@ function EditPanel({
   onClose,
 }: EditPanelProps) {
   const storeUpdateTimeBlock = useAppStore((s) => s.updateTimeBlock)
+  const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
+  const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
+  const focusCount = useAppStore((s) => s.tasks.filter((t) => !t.deleted && !t.completed && t.lane === "daily-focus").length)
+  const inFocus = linkedTask?.lane === "daily-focus"
+
+  // P18: the block shows, and can change, whether its task is in today's Daily Focus.
+  function toggleFocus() {
+    if (!linkedTask) return
+    if (inFocus) {
+      moveTaskToLane(linkedTask.id, "backlog")
+      return
+    }
+    if (focusCount >= dailyFocusLimit) {
+      toast.error(`Daily Focus is full (${dailyFocusLimit} tasks). Move one out in ToDo first.`)
+      return
+    }
+    moveTaskToLane(linkedTask.id, "daily-focus")
+  }
   const isRecurring = Boolean(linkedTask && isRecurringTask(linkedTask))
   const repeatValue = linkedTask?.repeat ?? "none"
   const savedNotes = linkedTask ? linkedTask.notes : block.notes
@@ -1314,8 +1251,22 @@ function EditPanel({
         {linkedTask ? (
           <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-secondary/40 px-2 py-1.5">
             <CategoryBadge category={linkedTask.category} className="text-[10px]" />
-            {linkedTask.lane ? (
+            {linkedTask.lane && !inFocus ? (
               <Badge variant="outline" className="text-[10px] capitalize">{linkedTask.lane.replace("-", " ")}</Badge>
+            ) : null}
+            {!linkedTask.completed ? (
+              <Button
+                type="button"
+                variant={inFocus ? "default" : "outline"}
+                size="sm"
+                className="h-6 gap-1 px-2 text-[10px]"
+                onClick={toggleFocus}
+                aria-pressed={inFocus}
+                title={inFocus ? "In Daily Focus. Click to send back to Backlog." : "Add to Daily Focus"}
+              >
+                <Focus className="h-3 w-3" />
+                {inFocus ? "In Daily Focus" : "Add to focus"}
+              </Button>
             ) : null}
             {linkedTask.dueDate ? (
               <span className="text-[10px] text-muted-foreground">Due {linkedTask.dueDate}</span>
