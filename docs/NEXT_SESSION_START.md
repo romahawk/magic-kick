@@ -1,26 +1,27 @@
 # Next Session Start
 
-**Last updated:** 2026-10-14 (P17 "Schedule: task CRUD in the unscheduled-tasks panel" added, built and merged as #156; no roadmap item open)
-**Resume on:** `main` after this `docs/session-close-2026-10-14` PR merges. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-14 — `npm run build` exit 0 on `8c46eb5` (by the P8 hook; by hand on the same code before a whitespace-only fix); `main` `8554cef` (squash of #156) has the identical code tree
+**Last updated:** 2026-10-14, second session (Execution sync bug fixed as #158; P18 "Daily Focus as the day plan" added, built and merged via #159 → #160; no roadmap item open)
+**Resume on:** `main` after this `docs/session-close-2026-10-14-p18` PR and `fix/p18-carryover-button` merge. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-14 — `npm run build` exit 0 by hand on `main` `847355a`, and by the P8 hook on `f9cf382` (`fix/p18-carryover-button`)
 **Typecheck status:** passing as of 2026-10-14 — `npm run typecheck` exit 0 (same runs)
 **Lint status:** passing as of 2026-10-14 — `npm run lint` exit 0 (same runs)
 **Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** one feature session (P17) plus a store fix (`clearTimeSlot`). No data model, Firestore rules or dependency change; one new store action (`restoreTask`) and one new component (`components/task-detail-sheet.tsx`).
+**Note:** one bug fix and one feature (P18). No data model, store action, Firestore rules or dependency change. New: `components/focus-carryover-dialog.tsx`, `hooks/use-plan-next-slot.ts`, shared selectors in `lib/weekly-plan.ts`.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Open the app on the real account → Schedule** and check P16 and P17 on real data: add a task
-   with a project, open and edit a card, delete and Undo, Mark Complete, next free slot and its Undo,
-   the category chips, and that tasks of paused, parked or completed projects are hidden. So far
-   only demo mode has been checked.
+2. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
+   been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
+   equals Schedule's today column; the carry-over prompt on the first open of the day (after the
+   first sync); Plan + Undo; the focus toggle in a Schedule block. Then P16 and P17 on Schedule
+   (add, edit, delete + Undo, complete, next free slot + Undo, chips, inactive projects hidden).
 3. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
    tasks still use ("Trading", "Job / Career", "Self-performance").
-4. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P8, P6, P9, P4, P5.
+4. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P8, P6, P9, P4, P5.
    **P7, P11:** `queued` but blocked (step 5). **P10, P15:** `gated` on P7. **No roadmap item
    is open and none is unblocked.** A session must name a bug from Open items or a new item Roman
    adds to the spec; otherwise it stops.
@@ -35,6 +36,79 @@
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
    lines and typecheck, lint and build pass. Commits typed in a terminal are not checked, and
    neither is `git cherry-pick`: run the gates by hand after one.
+8. **Stacked PRs:** retarget the stacked PR to `main` before merging it, after its base merges.
+   #159 was merged into the already-merged #158 branch on 2026-10-14 and needed #160 to reach `main`.
+
+---
+
+## Where we left off (2026-10-14, second session) — Execution sync fix and P18
+
+**Why:** Roman reported (screenshot) that tasks did not read the same across the Execution tabs:
+Command Center's Daily Focus showed "0 of 3 chosen" plus three suggestions that ToDo never showed,
+and ticking a suggestion completed the task. The fix went in as #158. Roman then asked for four UX
+ideas from that review; they became P18 (added to the spec straight after P17). He chose: closing
+the carry-over prompt keeps all tasks.
+
+**What changed — #158 (squash `142469b`), the bug fix:**
+- `lib/weekly-plan.ts`: `localDateISO`, `selectTaskTimeSlots` (one "when is this task?" for every
+  tab), `selectDayAgenda` (Schedule's day as a list: blocks of any week plan plus recurring tasks).
+- `lib/execution-os.ts`: `selectDailyFocus` lists every chosen task, not only up to the limit.
+- `components/modules/attention-block.tsx`: chosen and suggested tasks listed separately; a
+  suggestion gets "Add" (moves it to the lane) instead of a complete checkbox; today's time shown.
+- `components/modules/todo-module.tsx`: the same suggestions below the Daily Focus column.
+- `components/modules/command-center.tsx`: Today list from `selectDayAgenda` with the local date
+  (UTC showed yesterday between 00:00 and 02:00); empty state for "Committed this week".
+- `lib/store.ts`: Coaching dismissal uses the local date.
+
+**What changed — P18 (#159 → #160, squash `847355a`):**
+- `lib/weekly-plan.ts`: `orderDailyFocusTasks` (today's timed tasks first); `findNextFreeSlot`,
+  `taskDurationMin`, `externalBlockDateParts` moved here from Schedule.
+- `hooks/use-plan-next-slot.ts` (new): next free slot + Undo toast for Schedule and Command Center.
+- `components/modules/attention-block.tsx`: `DailyFocusCard`: drag to reorder untimed tasks,
+  "Plan" on tasks with no time.
+- `components/focus-carryover-dialog.tsx` (new), `components/app-shell.tsx`: once-a-day prompt
+  per device (`localStorage` key `magic-kick-focus-carryover-date`); waits for the first pull.
+- `components/modules/schedule-module.tsx`: shared next-slot hook; block panel focus toggle.
+- `components/modules/todo-module.tsx`: Daily Focus column uses the shared order under "Manual order".
+- `docs/CONTROL_PLANE_UI_SPEC.md`: P18 (now `done`, 5 criteria), working order. `CHANGELOG.md`: two entries.
+
+**Branch map:**
+- `fix/execution-task-sync` off `main` `45aaa58`: `7a8414c` → **#158 merged** (squash `142469b`).
+  After that, #159 merged into it (`89cfab5`), so origin's copy carries P18 too. Safe to delete.
+- `feat/p18-focus-day-plan` stacked on the above: `d1151cb`, `08f859d` → **#159 merged into
+  `fix/execution-task-sync`, not `main`**. Safe to delete.
+- `fix/land-p18-on-main` off `main` `142469b`: `932de06` (cherry-pick of `89cfab5`, identical tree)
+  → **#160 merged** (`847355a`). Safe to delete.
+- `fix/p18-carryover-button` off `main` `847355a`: `f9cf382`. Same change as `08f859d` (one button
+  in the prompt), which missed #159's squash, plus a CHANGELOG line. **Local only, not pushed.**
+- `docs/session-close-2026-10-14-p18` off `main` `847355a`: this handoff and P18 → `done`. Not stacked.
+- `docs/session-close-2026-10-14` (#157) merged; local and origin copies can be deleted.
+
+**Verified (confirmed):**
+- Gates exit 0 on `7a8414c`, `d1151cb`, `08f859d` (P8 hook), on `932de06` and `main` `847355a`
+  (by hand), and on `f9cf382` (P8 hook).
+- Headless Edge (playwright-core in this session's scratchpad) against Roman's dev server on :3000,
+  demo mode, 1440×1000, no page errors: Add on 3 suggestions → "3 of 3 chosen"; drag row 3 onto
+  row 1 reorders; Plan on the last row → toast "Scheduled … 14:00–14:30", row moves first, shows
+  "today 14:00–14:30", Plan and drag handle gone; Undo restores; ToDo "Manual order" matches
+  Command Center; carry-over prompt (last date set to yesterday) lists 3 ticked tasks, untick one →
+  "Return 1 to Backlog" → "2 of 3 chosen", no prompt on the next reload, × keeps all; Schedule block
+  panel "In Daily Focus" ↔ "Add to focus" changes Command Center's count; Schedule next free slot
+  → 15:00–16:30 block, Undo removes it.
+
+**Not verified:**
+- Real account (Firestore sync, the prompt waiting for the first pull, a second device).
+- 375 px or other narrow widths; light theme; keyboard drag. No screenshots attached to the PRs.
+- ToDo's default sort ("Date: earliest") groups by date, so its Daily Focus order can differ from
+  Command Center's (by design, P18 criterion 1). Roman to confirm.
+
+**Process notes:**
+- `node -e "…"` through the Bash tool exits silently without running (noted on 2026-10-14 for P17
+  too). A CHANGELOG edit made that way never happened, and its commit message claimed it had
+  (caught before push, amended into `f9cf382`). Use the Edit tool, or a script file in the
+  scratchpad.
+- A follow-up commit pushed while a PR is being merged can miss the squash: check
+  `gh pr view <n> --json headRefOid` against the branch before merging.
 
 ---
 
@@ -100,69 +174,25 @@ toast, a quick add form (title, project, category, estimate), complete from the 
 
 ---
 
-## Where we left off (2026-10-13) — P16 unscheduled-tasks panel
-
-**Why:** Roman asked (with a screenshot) for a category filter on Schedule's "Unscheduled tasks", a
-close option like the left sidebar, no tasks from inactive projects, and other UX polish. Nothing was
-open or unblocked, so Roman added it as P16, ranked straight after P14, and chose four extras:
-search and sort, project accent and overdue, one-click next free slot, drag preview and drop-back.
-
-**What changed (squash `ae78927`, #154; two commits `cea24be`, `148c983`):**
-- `components/modules/unscheduled-tasks-panel.tsx` (new): category chips with counts, search, sort
-  (due / project / shortest), project color bar and name, "Overdue", next-free-slot button, drop
-  zone, hidden-task count, hide button.
-- `components/modules/schedule-module.tsx`: lists only tasks with no project or an active one; side
-  column collapses to a count rail (`localStorage`); next free slot 08:00–20:00, from now, 14 days,
-  task length = estimate or 60 min (same as a drop), Undo toast (first use of `sonner` in a module);
-  ghost block while dragging a task; dragging a task block onto the panel or rail unschedules it
-  (same as "Remove from schedule", which also clears `repeat`), with Undo.
-- **Bug fix (P16 criterion 9):** `lib/project-colors.ts` (new) holds the legacy `bg-chart-1…5` → hex
-  map and `normalizeProjectColor`. Schedule parsed class-name colors as hex (NaN), so those projects'
-  blocks were nearly invisible. Now used by Schedule, the panel, Projects, the timeline chart,
-  `lib/roadmap.ts` (Resources backlinks) and `PredictionDashboard`; the two local copies are gone.
-  Stored colors are not rewritten.
-- `docs/CONTROL_PLANE_UI_SPEC.md`: P16 (now `done`, 9 criteria), working order. `CHANGELOG.md`: P16 entry
-  dated 2026-10-13 (Added, Changed, Fixed).
-
-**Branch map:**
-- `feat/schedule-unscheduled-panel` off `main` `a80a14d`, head `148c983` (2 commits) → **#154 merged**
-  (squash `ae78927`). Remote and local branches still exist; safe to delete.
-- `docs/session-close-2026-10-13` off `main` `ae78927`: this handoff and P16 → `done`. Not stacked.
-- `docs/session-close-2026-10-09` (local and origin, head `811df50`): #153 merged; its tree equals
-  `a80a14d`. Safe to delete.
-
-**Verified (confirmed):**
-- Gates exit 0 on `cea24be` and `148c983` (by hand and by the P8 hook); `main` tree identical.
-- Headless Edge (playwright-core in the session scratchpad) against Roman's dev server on :3000,
-  demo mode, 1600×900, no page or console errors: search "stripe" 8 → 1; one category chip 8 → 2;
-  sort "Shortest first"; next free slot placed a task today 13:00–13:25 with an Undo toast; drag
-  ghost shown and the drop scheduled the task; a block dragged onto the panel showed "Drop here to
-  unschedule" and was unscheduled; hide → rail (7) → expand, `localStorage` set; project p1 paused in
-  stored state: 7 → 3 cards, "4 tasks … hidden"; "SaaS MVP Launch" (`bg-chart-1`) blocks render blue.
-
-**Not verified:**
-- Real account data; clicking either Undo button.
-- Light theme; 375 px or other narrow widths; keyboard-only use. No screenshots in #154.
-- Resources backlink dots and the AI prediction list in a browser (code changed, screens not opened).
-- A production build (`next start`) or Vercel preview in a browser.
-
-**Process notes:**
-- Roman's dev server already held `.next/dev/lock`, so a second `next dev` on :3001 refused to start;
-  the check ran against :3000 (reach it as `127.0.0.1`, not `localhost`, from curl).
-- `python` on this machine is the Windows Store stub; use Node for scripts.
-
----
-
 ## Open items
 
-- **Real-data check of P16 and P17** (Start here, step 2): add, edit, delete + Undo, complete, next
-  free slot + Undo, chips, inactive-project tasks hidden, collapse rail; also light theme and a
-  narrow window.
+- **Push and merge `fix/p18-carryover-button`** (`f9cf382`, local only): `main` still shows two
+  buttons ("Keep all", "Keep these") in the carry-over prompt.
+- **Real-data check of #158 and P18** (Start here, step 2), then **P16 and P17**: add, edit,
+  delete + Undo, complete, next free slot + Undo, chips, inactive-project tasks hidden, collapse
+  rail; also light theme and a narrow window.
 - **Real-data check of P14** (Start here, step 3): orphaned categories listed, merged or mapped;
   then confirm the new fields round-trip through Firestore on a second device.
-- **Pick the next piece of work (Roman).** After P17 the roadmap has nothing open or unblocked. Candidates:
-  the dev/preview login failure (worth re-testing after the auth-button fix), the overdue ranking in
-  derived focus, or a new spec item.
+- **Pick the next piece of work (Roman).** After P18 the roadmap has nothing open or unblocked. Candidates:
+  the two bugs below, the dev/preview login failure, the overdue ranking in derived focus, or a new
+  spec item.
+- **Bug (found 2026-10-14):** Command Center with no weekly plan shows "Set weekly plan", which
+  calls `setActiveModule("command-center")`, the module already open, so it does nothing. It
+  should open the Plan tab.
+- **Bug (found 2026-10-14):** in demo mode a loading skeleton stays under the Week tab
+  (probably `coachingLoading` never cleared when AI is off or there is no auth token). Not investigated.
+- **P18 follow-ups (Roman to decide):** ToDo's default "Date: earliest" sort orders Daily Focus
+  differently from Command Center; the carry-over prompt is per device, so it can show on each device.
 - **P17 leftovers (out of scope on purpose):** the task sheet has no project field (a task's project
   can only be set when it is created from the panel or a roadmap); ToDo's Delete still has no Undo.
 - **ADR-029 in the OS:** Magic Kick categories may map to OS domains, and P15 will read the domain
@@ -196,8 +226,10 @@ search and sort, project accent and overdue, one-click next free slot, drag prev
 - **Positioning docs** `docs/PUBLIC_PRESENTATION.md` and `docs/WORKFLOW_AUTOMATION_PLAYBOOK.md` still use
   the sandbox wording (left on purpose by ADR-024).
 - **The `roadmap` label** in `.github/ISSUE_TEMPLATE/feature.md` may not exist on GitHub.
-- **Merged branch safe to delete:** `feat/p17-unscheduled-task-crud` (#156), local and origin. Its
-  extra commit `6aa2c89` is this handoff's earlier draft; nothing else is lost.
+- **Merged branches safe to delete**, local and origin: `feat/p17-unscheduled-task-crud` (#156; its
+  extra commit `6aa2c89` is an earlier handoff draft), `docs/session-close-2026-10-14` (#157),
+  `fix/execution-task-sync` (#158), `feat/p18-focus-day-plan` (#159), `fix/land-p18-on-main` (#160).
+  Their work is on `main`; the only commit not on `main` is `08f859d`, carried by `fix/p18-carryover-button`.
 - **Older branches.** Local `dev` is merged into `origin/main` (confirmed 2026-10-14) and can be
   deleted. Not confirmed merged: local `ai-control-tower` (origin gone),
   `feat/projects-tab-density-redesign`, `feat/schedule-block-editor-improvements`,
