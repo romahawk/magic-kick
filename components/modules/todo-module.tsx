@@ -1,10 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { ElementType } from "react"
+import type { ElementType, ReactNode } from "react"
 import { differenceInCalendarDays, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
-import { TASK_LANE_LABELS } from "@/lib/execution-os"
+import { TASK_LANE_LABELS, selectDailyFocus } from "@/lib/execution-os"
+import { selectTaskTimeSlots } from "@/lib/weekly-plan"
 import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
+import { SuggestedFocusList } from "@/components/modules/attention-block"
 import { Archive, CheckCheck, ChevronDown, Clock, Focus, LayoutList, Search, X, Zap } from "lucide-react"
 import type { Task, TaskLane } from "@/lib/types"
 
@@ -76,7 +78,10 @@ export function TodoModule() {
   const allTasks = useAppStore((s) => s.tasks)
   const allTimeBlocks = useAppStore((s) => s.timeBlocks)
   const allScheduleItems = useAppStore((s) => s.schedule)
-  const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
+  const systemConfig = useAppStore((s) => s.profile.systemConfig)
+  const dailyFocusLimit = systemConfig?.dailyFocusLimit ?? 3
+  const allProjects = useAppStore((s) => s.projects)
+  const weeklyPlans = useAppStore((s) => s.weeklyPlans)
   const toggleTask = useAppStore((s) => s.toggleTask)
   const reorderTasks = useAppStore((s) => s.reorderTasks)
   const moveTaskToLane = useAppStore((s) => s.moveTaskToLane)
@@ -84,25 +89,7 @@ export function TodoModule() {
   const categories = useCategories()
   const tasks = useMemo(() => allTasks.filter((t) => !t.deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [allTasks])
 
-  const taskTimeSlots = useMemo(() => {
-    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }> = {}
-    for (const item of allScheduleItems) {
-      if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
-        map[item.linkedTaskId] = {
-          startTime: item.startISO.slice(11, 16),
-          endTime: item.endISO.slice(11, 16),
-          plannedHours: 0,
-          status: "planned",
-        }
-      }
-    }
-    for (const block of allTimeBlocks) {
-      if (!block.deleted && block.linkedTaskId) {
-        map[block.linkedTaskId] = { startTime: block.startTime, endTime: block.endTime, plannedHours: block.plannedHours, actualHours: block.actualHours, status: block.status }
-      }
-    }
-    return map
-  }, [allScheduleItems, allTimeBlocks])
+  const taskTimeSlots = useMemo(() => selectTaskTimeSlots(allScheduleItems, allTimeBlocks), [allScheduleItems, allTimeBlocks])
 
   const [search, setSearch] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
@@ -152,6 +139,12 @@ export function TodoModule() {
   const hasAnyDone = useMemo(() => tasks.some((task) => task.completed), [tasks])
   const backlogTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "backlog"), [openTasks])
   const dailyFocusTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "daily-focus"), [openTasks])
+  // The same suggestions the Command Center shows, from all open tasks (not the search or filter).
+  const suggestedFocus = useMemo(
+    () =>
+      selectDailyFocus(tasks, allProjects.filter((p) => !p.deleted), systemConfig, { weeklyPlans }).filter((entry) => !entry.chosen),
+    [tasks, allProjects, systemConfig, weeklyPlans]
+  )
   const parkingLotTasks = useMemo(() => openTasks.filter((task) => (task.lane ?? "backlog") === "parking-lot"), [openTasks])
 
   function openTask(task: Task) {
@@ -271,6 +264,16 @@ export function TodoModule() {
                   onToggle={toggleTask}
                   onSelect={openTask}
                   onQuickEdit={updateTask}
+                  footer={
+                    laneConfig.id === "daily-focus" ? (
+                      <SuggestedFocusList
+                        entries={suggestedFocus}
+                        taskTimeSlots={taskTimeSlots}
+                        onAdd={(taskId) => handleMoveTask(taskId, "daily-focus")}
+                        className="rounded-xl border border-border/60 bg-card p-3"
+                      />
+                    ) : null
+                  }
                   {...handlers}
                 />
               )
@@ -352,8 +355,8 @@ function LaneSummaryCard({ title, count, badge, description, icon: Icon, tone }:
 
 // ── Kanban column (row 2) ────────────────────────────────────────────────────
 
-function KanbanColumn({ lane, tasks, limit, grouped = false, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit }: {
-  lane: TaskLane; tasks: Task[]; limit?: number; grouped?: boolean
+function KanbanColumn({ lane, tasks, limit, grouped = false, taskTimeSlots, onToggle, onSelect, onDragStart, onDropOnTask, onDropOnLane, onDragEnd, onQuickEdit, footer }: {
+  lane: TaskLane; tasks: Task[]; limit?: number; grouped?: boolean; footer?: ReactNode
   taskTimeSlots: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: string }>
   onToggle: (id: string) => void; onSelect: (task: Task) => void
   onDragStart: (taskId: string) => void; onDropOnTask: (task: Task) => void
@@ -420,6 +423,7 @@ function KanbanColumn({ lane, tasks, limit, grouped = false, taskTimeSlots, onTo
             })
           : tasks.map(renderCard)}
       </div>
+      {footer}
     </div>
   )
 }

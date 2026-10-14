@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-14 - Tasks read the same across Execution tabs
+
+### Fixed
+- Daily Focus is now the same list in Command Center and ToDo: the tasks in ToDo's Daily Focus column. Before, Command Center filled empty slots with suggested tasks that ToDo did not show, and ticking a suggested task completed it.
+- Command Center lists every task in the Daily Focus column, even past the limit, and the count turns red when it is over.
+- Command Center's "Today" list now matches Schedule's calendar for today. It includes recurring tasks, blocks from any week plan and the task's current title. Between midnight and 02:00 it used to show yesterday.
+
+### Changed
+- Suggested tasks now sit under their own "Suggested" heading, in Command Center and below ToDo's Daily Focus column. Each has an "Add" button that moves it into Daily Focus.
+- A focus task due today shows its scheduled time (for example "today 11:15–12:15"), the same time Schedule and ToDo show.
+- Command Center's "Committed this week" says when no project is committed and links to Plan.
+
+---
+
 ## [Unreleased] - 2026-10-14 - Add, edit and delete tasks from Schedule (P17)
 
 ### Added

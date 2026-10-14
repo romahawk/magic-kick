@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
-import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, selectTimeBlocksForDates } from "@/lib/weekly-plan"
+import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, selectTaskTimeSlots, selectTimeBlocksForDates } from "@/lib/weekly-plan"
 import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -353,31 +353,7 @@ export function ScheduleModule() {
 
   const weekBlocks = selectTimeBlocksForDates(timeBlocks, weekDays.map((d) => d.iso))
 
-  const taskTimeSlots = useMemo(() => {
-    const map: Record<string, { startTime: string; endTime: string; plannedHours: number; actualHours?: number; status: TimeBlockStatus }> = {}
-    for (const item of scheduleItems) {
-      if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
-        map[item.linkedTaskId] = {
-          startTime: item.startISO.slice(11, 16),
-          endTime: item.endISO.slice(11, 16),
-          plannedHours: 0,
-          status: "planned",
-        }
-      }
-    }
-    for (const block of timeBlocks) {
-      if (!block.deleted && block.linkedTaskId) {
-        map[block.linkedTaskId] = {
-          startTime: block.startTime,
-          endTime: block.endTime,
-          plannedHours: block.plannedHours,
-          actualHours: block.actualHours,
-          status: block.status,
-        }
-      }
-    }
-    return map
-  }, [scheduleItems, timeBlocks])
+  const taskTimeSlots = useMemo(() => selectTaskTimeSlots(scheduleItems, timeBlocks), [scheduleItems, timeBlocks])
 
   const displayBlocks: DisplayBlock[] = (() => {
     const persistedBlocks: DisplayBlock[] = weekBlocks

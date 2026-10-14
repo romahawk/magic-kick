@@ -1,9 +1,13 @@
 import { addDays, format, parseISO, startOfWeek } from "date-fns"
+import { isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import type {
   ExecutionLog,
   Project,
   ProjectPriority,
+  ScheduleItem,
+  Task,
   TimeBlock,
+  TimeBlockStatus,
   WeeklyAllocation,
   WeeklyPlan,
   WeeklyReview,
@@ -127,6 +131,106 @@ export function selectTimeBlocksForDay(timeBlocks: TimeBlock[], dateISO: string,
   return selectTimeBlocksForWeek(timeBlocks, weekPlanId)
     .filter((block) => block.dateISO === dateISO)
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
+}
+
+/** Today in local time. `toISOString()` is UTC and gives yesterday's date after midnight in Europe. */
+export function localDateISO(date = new Date()) {
+  return format(date, "yyyy-MM-dd")
+}
+
+export type TaskTimeSlot = {
+  startTime: string
+  endTime: string
+  plannedHours: number
+  actualHours?: number
+  status: TimeBlockStatus
+}
+
+/**
+ * The one answer to "when is this task?" for every Execution tab. A task's time block wins over
+ * its schedule item, since the calendar draws the block.
+ */
+export function selectTaskTimeSlots(scheduleItems: ScheduleItem[], timeBlocks: TimeBlock[]) {
+  const map: Record<string, TaskTimeSlot> = {}
+  for (const item of scheduleItems) {
+    if (!item.deleted && item.linkedTaskId && item.hasExplicitTime) {
+      map[item.linkedTaskId] = {
+        startTime: item.startISO.slice(11, 16),
+        endTime: item.endISO.slice(11, 16),
+        plannedHours: 0,
+        status: "planned",
+      }
+    }
+  }
+  for (const block of timeBlocks) {
+    if (!block.deleted && block.linkedTaskId) {
+      map[block.linkedTaskId] = {
+        startTime: block.startTime,
+        endTime: block.endTime,
+        plannedHours: block.plannedHours,
+        actualHours: block.actualHours,
+        status: block.status,
+      }
+    }
+  }
+  return map
+}
+
+export type DayAgendaEntry = {
+  id: string
+  linkedTaskId?: string
+  projectId?: string
+  startTime: string
+  endTime: string
+  title: string
+  status: TimeBlockStatus
+}
+
+/**
+ * What the Schedule calendar shows on one day, as a list: the day's time blocks (by date, whatever
+ * week plan they belong to) and the occurrences of recurring tasks. A block of a recurring task is
+ * skipped, because the occurrence stands for it, so a task is never listed twice.
+ */
+export function selectDayAgenda(input: {
+  timeBlocks: TimeBlock[]
+  tasks: Task[]
+  taskTimeSlots: Record<string, TaskTimeSlot>
+  dateISO: string
+}): DayAgendaEntry[] {
+  const taskById = new Map(input.tasks.filter((task) => !task.deleted).map((task) => [task.id, task]))
+  const entries: DayAgendaEntry[] = []
+
+  for (const block of input.timeBlocks) {
+    if (block.deleted || block.dateISO !== input.dateISO) continue
+    const task = block.linkedTaskId ? taskById.get(block.linkedTaskId) : undefined
+    if (task && isRecurringTask(task)) continue
+    entries.push({
+      id: block.id,
+      linkedTaskId: block.linkedTaskId,
+      projectId: block.projectId,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      title: task?.title ?? block.taskDescription,
+      status: block.status,
+    })
+  }
+
+  for (const task of taskById.values()) {
+    if (task.completed || !isRecurringTask(task) || !taskRepeatsOnDate(task, input.dateISO)) continue
+    const slot = input.taskTimeSlots[task.id]
+    if (!slot) continue
+    entries.push({
+      id: `recurring-${task.id}-${input.dateISO}`,
+      linkedTaskId: task.id,
+      projectId: task.linkedProjectId,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      title: task.title,
+      status: isTaskOccurrenceComplete(task, input.dateISO) ? "done" : "planned",
+    })
+  }
+
+  return entries.sort((a, b) => a.startTime.localeCompare(b.startTime))
 }
 
 export function selectProjectHours(plan: WeeklyPlan | undefined, timeBlocks: TimeBlock[], executionLogs: ExecutionLog[]) {
