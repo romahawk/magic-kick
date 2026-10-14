@@ -438,7 +438,9 @@ the left sidebar, no tasks from inactive projects, and a more polished planning 
 
 ### P17 — Schedule: task CRUD in the unscheduled-tasks panel · S
 
-**Status:** open
+**Status:** done
+
+**Note:** merged on 2026-10-14 (#156, `8554cef`). Criterion 6 (clearing a time slot) was added during the build.
 
 **Why:** the unscheduled-tasks panel (P16) only lists and places tasks. Adding, editing, completing
 or deleting one means leaving Schedule for ToDo. Roman asked for CRUD in the panel (2026-10-14) and
