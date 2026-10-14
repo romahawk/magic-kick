@@ -1,7 +1,8 @@
 import { addDays, format, parseISO } from "date-fns"
 import type { ExecutionBlockTemplate, ModuleId, Project, ProjectStatus, SystemConfig, Task, TaskLane, WeeklyPlan } from "@/lib/types"
 import { isDueToday, isDueThisWeek, isOverdue } from "@/lib/game-utils"
-import { findWeeklyPlanForWeek, getCurrentWeekStartISO, selectWeekAwaitingReview } from "@/lib/weekly-plan"
+import { findWeeklyPlanForWeek, getCurrentWeekStartISO, orderDailyFocusTasks, selectWeekAwaitingReview } from "@/lib/weekly-plan"
+import type { TaskTimeSlot } from "@/lib/weekly-plan"
 
 const DEFAULT_EXECUTION_BLOCKS: ExecutionBlockTemplate[] = [
   {
@@ -106,15 +107,17 @@ export function selectDailyFocus(
   tasks: Task[],
   projects: Project[],
   config?: Partial<SystemConfig>,
-  options?: { focusedProjectId?: string; weeklyPlans?: WeeklyPlan[] }
+  options?: { focusedProjectId?: string; weeklyPlans?: WeeklyPlan[]; taskTimeSlots?: Record<string, TaskTimeSlot> }
 ) {
   const rules = normalizeSystemConfig(config)
   const projectById = new Map(projects.filter((project) => !project.deleted).map((project) => [project.id, project]))
   const weekOutcomes = selectThisWeekOutcomes(options?.weeklyPlans ?? [])
   // Every task in the lane is listed, even past the limit, so this matches ToDo's Daily Focus column.
-  const explicitFocus = tasks
-    .filter((task) => !task.deleted && !task.completed && task.lane === "daily-focus")
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  // Tasks with a time today come first, in time order (P18).
+  const explicitFocus = orderDailyFocusTasks(
+    tasks.filter((task) => !task.deleted && !task.completed && task.lane === "daily-focus"),
+    options?.taskTimeSlots ?? {}
+  )
 
   // `chosen`: the task is in the Daily Focus lane. Derived tasks only fill empty slots; they are
   // suggestions, not choices, and the block must not count them as "today".

@@ -2,6 +2,7 @@ import { addDays, format, parseISO, startOfWeek } from "date-fns"
 import { isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import type {
   ExecutionLog,
+  ExternalCalendarBlock,
   Project,
   ProjectPriority,
   ScheduleItem,
@@ -231,6 +232,116 @@ export function selectDayAgenda(input: {
   }
 
   return entries.sort((a, b) => a.startTime.localeCompare(b.startTime))
+}
+
+/**
+ * P18: Daily Focus as the day plan. Tasks with a time today come first, earliest start first; the
+ * rest keep their manual order. The Command Center and ToDo's "Manual order" both use this.
+ */
+export function orderDailyFocusTasks<T extends Pick<Task, "id" | "order" | "dueDate">>(
+  tasks: T[],
+  taskTimeSlots: Record<string, TaskTimeSlot>,
+  todayISO = localDateISO()
+) {
+  const startToday = (task: T) => (task.dueDate === todayISO ? taskTimeSlots[task.id]?.startTime : undefined)
+  return [...tasks].sort((a, b) => {
+    const aStart = startToday(a)
+    const bStart = startToday(b)
+    if (aStart && bStart) return aStart.localeCompare(bStart)
+    if (aStart) return -1
+    if (bStart) return 1
+    return (a.order ?? 0) - (b.order ?? 0)
+  })
+}
+
+// "Next free slot" (P16) looks inside these hours, not the whole calendar, so a task never lands at 05:00.
+const SLOT_SNAP_MIN = 15
+const NEXT_SLOT_START_HOUR = 8
+const NEXT_SLOT_END_HOUR = 20
+export const NEXT_SLOT_SEARCH_DAYS = 14
+// An all-day calendar event fills the calendar's whole visible day.
+const CALENDAR_DAY_START_MIN = 5 * 60
+const CALENDAR_DAY_END_MIN = 23 * 60
+
+function minutesOf(time: string) {
+  const [h, m] = time.split(":").map(Number)
+  return h * 60 + m
+}
+
+export function timeOfMinutes(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+}
+
+/** Length of the block a task gets when it is placed on the calendar. */
+export function taskDurationMin(task: Pick<Task, "estimateMin">) {
+  return Math.max(SLOT_SNAP_MIN, task.estimateMin ?? 60)
+}
+
+/** Start and end of an external calendar event on one day, or null when it is not on that day. */
+export function externalBlockDateParts(block: ExternalCalendarBlock, dateISO: string) {
+  if (block.allDay) {
+    if (block.startISO?.slice(0, 10) !== dateISO) return null
+    return { dateISO, startTime: timeOfMinutes(CALENDAR_DAY_START_MIN), endTime: timeOfMinutes(CALENDAR_DAY_END_MIN) }
+  }
+  if (!block.startISO || !block.endISO) return null
+  try {
+    const start = parseISO(block.startISO)
+    const end = parseISO(block.endISO)
+    const blockDateISO = format(start, "yyyy-MM-dd")
+    if (blockDateISO !== dateISO) return null
+    return { dateISO: blockDateISO, startTime: format(start, "HH:mm"), endTime: format(end, "HH:mm") }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The first gap of `durationMin` between 08:00 and 20:00, from now, over the next 14 days. Time
+ * blocks, recurring tasks and busy calendar events count as taken.
+ */
+export function findNextFreeSlot(input: {
+  durationMin: number
+  timeBlocks: TimeBlock[]
+  tasks: Task[]
+  taskTimeSlots: Record<string, TaskTimeSlot>
+  externalCalendarBlocks: ExternalCalendarBlock[]
+  now?: Date
+}) {
+  const now = input.now ?? new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+
+  function busyIntervalsOn(dateISO: string) {
+    const intervals: Array<[number, number]> = []
+    for (const block of input.timeBlocks) {
+      if (!block.deleted && block.dateISO === dateISO) intervals.push([minutesOf(block.startTime), minutesOf(block.endTime)])
+    }
+    for (const task of input.tasks) {
+      const slot = input.taskTimeSlots[task.id]
+      if (slot && !task.deleted && !task.completed && isRecurringTask(task) && taskRepeatsOnDate(task, dateISO)) {
+        intervals.push([minutesOf(slot.startTime), minutesOf(slot.endTime)])
+      }
+    }
+    for (const block of input.externalCalendarBlocks) {
+      if (block.deleted || block.status === "cancelled" || !block.blocksTime) continue
+      const parts = externalBlockDateParts(block, dateISO)
+      if (parts) intervals.push([minutesOf(parts.startTime), minutesOf(parts.endTime)])
+    }
+    return intervals.sort((a, b) => a[0] - b[0])
+  }
+
+  for (let offset = 0; offset < NEXT_SLOT_SEARCH_DAYS; offset++) {
+    const dateISO = format(addDays(now, offset), "yyyy-MM-dd")
+    let start = NEXT_SLOT_START_HOUR * 60
+    if (offset === 0) start = Math.max(start, Math.ceil(nowMin / SLOT_SNAP_MIN) * SLOT_SNAP_MIN)
+    for (const [busyStart, busyEnd] of busyIntervalsOn(dateISO)) {
+      if (busyStart >= start + input.durationMin) break
+      if (busyEnd > start) start = Math.ceil(busyEnd / SLOT_SNAP_MIN) * SLOT_SNAP_MIN
+    }
+    if (start + input.durationMin <= NEXT_SLOT_END_HOUR * 60) {
+      return { dateISO, startTime: timeOfMinutes(start), endTime: timeOfMinutes(start + input.durationMin) }
+    }
+  }
+  return null
 }
 
 export function selectProjectHours(plan: WeeklyPlan | undefined, timeBlocks: TimeBlock[], executionLogs: ExecutionLog[]) {

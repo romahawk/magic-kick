@@ -14,6 +14,7 @@ import { ResourcesModule } from "./modules/resources-module"
 import { JournalModule } from "./modules/journal-module"
 import { DemoBanner } from "./demo-banner"
 import { ErrorBoundary } from "./error-boundary"
+import { FocusCarryoverDialog } from "./focus-carryover-dialog"
 
 const MODULE_MAP = {
   "command-center": CommandCenter,
@@ -43,6 +44,7 @@ export function AppShell() {
         </main>
       </div>
       <BottomNav />
+      <FocusCarryoverDialog />
     </div>
   )
 }
