@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-14 - Add, edit and delete tasks from Schedule (P17)
+
+### Added
+- The "+" button on Schedule's "Unscheduled tasks" adds a task without leaving Schedule: title, project, category and estimate. The task lands in the list, ready to drag or place with the clock.
+- Click a task in the list (or press Enter on its title) to open it: edit any field, mark it complete, or delete it.
+- Deleting a task from Schedule shows an Undo button.
+
+### Changed
+- ToDo and Schedule now open the same task panel, so it looks and works the same in both. After saving, the panel shows the new values straight away.
+
+### Fixed
+- Undo after "next free slot" now puts the task back in the unscheduled list. Before, it stayed on the calendar at the same time on its old due date.
+- Clearing a task's start and end time in ToDo now removes it from the calendar and keeps the due date.
+
+---
+
 ## [Unreleased] - 2026-10-13 - Schedule unscheduled-tasks panel (P16)
 
 ### Changed

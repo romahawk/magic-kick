@@ -374,6 +374,8 @@ export interface AppState {
   unscheduleTask: (id: string) => void
   moveTaskToTodo: (id: string) => void
   deleteTask: (id: string) => void
+  /** Undo for deleteTask: brings back the task and the schedule items deleted with it (P17). */
+  restoreTask: (id: string) => void
   addGoal: (goal: Omit<Goal, "id">) => void
   updateGoal: (id: string, updates: Partial<Omit<Goal, "id" | "deleted" | "clientUpdatedAt">>) => void
   updateGoalProgress: (id: string, progress: number) => void
@@ -1172,7 +1174,8 @@ export const useAppStore = create<AppState>()(
 
           if (merged.dueDate) {
             const existing = scheduleIndex >= 0 ? schedule[scheduleIndex] : null
-            const existingHasExplicitTime = existing?.hasExplicitTime ?? true
+            // clearTimeSlot keeps the due date but drops the time, so the old time must not carry over.
+            const existingHasExplicitTime = !clearTimeSlot && (existing?.hasExplicitTime ?? true)
             const existingStart = existingHasExplicitTime && existing ? format(parseISO(existing.startISO), "HH:mm") : undefined
             const existingEnd = existingHasExplicitTime && existing ? format(parseISO(existing.endISO), "HH:mm") : undefined
             const hasExplicitTime = Boolean(requestedStart || requestedEnd || existingStart || existingEnd)
@@ -1359,6 +1362,34 @@ export const useAppStore = create<AppState>()(
                 }
                 return acc
               }, { ...s.sync.pending.schedule }),
+            },
+          },
+        }))
+      },
+
+      restoreTask: (id) => {
+        const deletedTask = get().tasks.find((t) => t.id === id && t.deleted)
+        if (!deletedTask) return
+        // deleteTask stamps the task and its schedule items with one timestamp; restore only those.
+        const deletedAt = deletedTask.clientUpdatedAt
+        const restoredItemIds = get().schedule
+          .filter((item) => item.linkedTaskId === id && item.deleted && item.clientUpdatedAt === deletedAt)
+          .map((item) => item.id)
+        const ts = now()
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, deleted: false, clientUpdatedAt: ts } : t)),
+          schedule: s.schedule.map((item) =>
+            restoredItemIds.includes(item.id) ? { ...item, deleted: false, clientUpdatedAt: ts } : item
+          ),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              tasks: { ...s.sync.pending.tasks, [id]: ts },
+              schedule: restoredItemIds.reduce<Record<string, number>>(
+                (acc, itemId) => ({ ...acc, [itemId]: ts }),
+                { ...s.sync.pending.schedule }
+              ),
             },
           },
         }))

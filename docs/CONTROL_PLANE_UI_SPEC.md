@@ -39,13 +39,14 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
 P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028). P14 and P15 were added on
 2026-10-09 by Roman (ADR-029): P14 straight after P3, P15 after P11 because it reads through P7.
 P16 was added on 2026-10-13 by Roman, ranked straight after P14 (nothing else was unblocked).
+P17 was added on 2026-10-14 by Roman, ranked straight after P16 (nothing else was unblocked).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -432,6 +433,38 @@ the left sidebar, no tasks from inactive projects, and a more polished planning 
    rewritten; saving the project in Projects already stores hex.
 
 **Out of scope:** the AI Suggest request (still sends every task).
+
+---
+
+### P17 — Schedule: task CRUD in the unscheduled-tasks panel · S
+
+**Status:** open
+
+**Why:** the unscheduled-tasks panel (P16) only lists and places tasks. Adding, editing, completing
+or deleting one means leaving Schedule for ToDo. Roman asked for CRUD in the panel (2026-10-14) and
+chose: the ToDo task sheet shared by both modules, delete with Undo, a quick add form with title,
+category, project and estimate, and completing from the sheet only.
+
+**Acceptance criteria**
+
+1. A "+" button in the panel header opens an inline form: title (required), project (optional,
+   active projects only), category, estimate in minutes. Choosing a project sets its task category
+   (P14). The task is created with no date or time, so it appears in the list. The form stays open
+   for the next task; Escape or Cancel closes it.
+2. Clicking a card, or Enter on its title, opens the task sheet. The clock button and dragging do
+   not open it.
+3. ToDo's task sheet is one shared component used by ToDo and Schedule, with the same fields and
+   rules as before (Daily Focus limit, start before end). It reads the task live, so a save shows
+   at once.
+4. Mark Complete in the sheet removes the task from the panel.
+5. Delete in the sheet removes the task and shows a toast with Undo, which brings the task back
+   with the schedule items deleted with it.
+6. Clearing a task's time slot keeps its due date and drops the time (added 2026-10-14: the store
+   kept the old time, so Undo after "next free slot" left the task scheduled on its old due date,
+   and clearing the start and end time in the ToDo sheet did nothing).
+7. No new module, store collection, data field or Firestore rules change.
+
+**Out of scope:** a project field in the task sheet; Undo for delete in ToDo; AI Suggest.
 
 ---
 
