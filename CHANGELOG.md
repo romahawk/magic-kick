@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-15 - Category when adding a Schedule block
+
+### Added
+- Schedule's "New block" form has a Category select next to Project. Choosing a project switches it to that project's category; you can still pick another.
+
+### Fixed
+- A new Schedule block without a project no longer always files its task under the first category ("Learning"). It uses the category you pick.
+
+---
+
 ## [Unreleased] - 2026-10-14 - Current focus from AI-Business-OS canon (P7, rescoped)
 
 ### Added

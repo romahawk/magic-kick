@@ -24,6 +24,7 @@ import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel
 import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
 import { useCategories } from "@/hooks/use-categories"
+import { defaultTaskCategory } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
@@ -213,6 +214,7 @@ export function ScheduleModule() {
   const [creating, setCreating] = useState<{ dayISO: string; startTime: string; endTime: string } | null>(null)
   const [newDesc, setNewDesc] = useState("")
   const [newProjectId, setNewProjectId] = useState("")
+  const [newCategory, setNewCategory] = useState("")
   const [editId, setEditId] = useState<string | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [hoverSlot, setHoverSlot] = useState<HoverSlot | null>(null)
@@ -472,7 +474,14 @@ export function ScheduleModule() {
     setCreating({ dayISO, startTime: toTime(startMin), endTime: toTime(endMin) })
     setNewDesc("")
     setNewProjectId("")
+    setNewCategory(defaultTaskCategory(categories))
     setEditId(null)
+  }
+
+  function chooseNewProject(id: string) {
+    setNewProjectId(id)
+    // A project's tasks take its category (P14), unless it has none.
+    setNewCategory(defaultTaskCategory(categories, projects.find((p) => p.id === id)))
   }
 
   function handleCreate() {
@@ -480,6 +489,7 @@ export function ScheduleModule() {
     saveTimeBlock({
       weekPlanId: activePlan?.id ?? ensureWeeklyPlan(getCurrentWeekStartISO(parseISO(`${creating.dayISO}T00:00:00`))),
       projectId: newProjectId || undefined,
+      category: newCategory || undefined,
       dateISO: creating.dayISO,
       startTime: creating.startTime,
       endTime: creating.endTime,
@@ -992,23 +1002,40 @@ export function ScheduleModule() {
                       onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">
-                      Project <span className="text-muted-foreground">(optional)</span>
-                    </Label>
-                    <Select value={newProjectId || "none"} onValueChange={(v) => setNewProjectId(v === "none" ? "" : v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="No project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No project</SelectItem>
-                        {activeProjects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <Label className="text-xs">
+                        Project <span className="text-muted-foreground">(optional)</span>
+                      </Label>
+                      <Select value={newProjectId || "none"} onValueChange={(v) => chooseNewProject(v === "none" ? "" : v)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="No project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No project</SelectItem>
+                          {activeProjects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-0 space-y-1.5">
+                      <Label className="text-xs">Category</Label>
+                      <Select value={newCategory} onValueChange={setNewCategory}>
+                        <SelectTrigger className="w-full" aria-label="New block category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1.5">
