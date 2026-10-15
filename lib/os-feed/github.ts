@@ -6,8 +6,8 @@ import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
  * P7: reads current focus from AI-Business-OS canon through the GitHub API (ADR-024 §5, ADR-031).
  * Read-only. The token stays on the server: never returned, never logged.
  */
-const OS_REPO_OWNER = "romahawk"
-const OS_REPO_NAME = "AI-Business-OS"
+export const OS_REPO_OWNER = "romahawk"
+export const OS_REPO_NAME = "AI-Business-OS"
 const CURRENT_FOCUS_PATH = "01_CONTEXT/current-focus.md"
 const CONTEXT_PACK_PATH = "00_HOME/context-pack.md"
 

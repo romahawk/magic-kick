@@ -214,6 +214,24 @@ files on `main` through the GitHub API, cached for 5 minutes:
   GitHub down or refusing shows the last good result as "Last known, fetched <time>", or one muted
   line if nothing was fetched yet; an unreadable context pack only drops the date stamp.
 
+### Close day: write-back to the OS (P11)
+
+"Close day" on the Command Center writes today's daily review to AI-Business-OS (ADR-032), the
+Magic Kick side of the OS `daily-close` workflow. The dialog has the sections of the OS
+`09_TEMPLATES/daily-review-template.md`. Completed starts with today's completed tasks and Carry
+Forward with the open Daily Focus tasks. Decisions go under "Decisions Made". The whole file is shown
+before anything is written.
+
+- **Route:** `GET /api/os/daily-review` (does today's file exist?) and `POST` (create it), signed in
+  as the writer only.
+- **Writes** one file, `06_REVIEWS/daily/YYYY-MM-DD.md` (Europe/Berlin date), directly to OS `main`
+  with the message `daily-close: YYYY-MM-DD (Magic Kick)`. The server refuses every other path.
+  An existing file is never overwritten.
+- **Env vars:** `AIOS_GITHUB_WRITE_TOKEN` (a separate fine-grained PAT, `romahawk/AI-Business-OS`
+  only, `Contents: read and write`) and `AIOS_WRITER_UID` (Roman's Firebase uid). Server-side only.
+  Without either, the dialog says Close day is not set up.
+- Nothing from the dialog is kept in Firestore or the local store.
+
 ### Local Development
 
 ```bash

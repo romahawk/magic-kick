@@ -13,10 +13,11 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Next by rank: P11, then P19.** P11's first slice needs a ruling from Roman before any code: the
-   written slice ("check off items in today's plan") depends on plan files that stay local in the
-   OS. Roman named it "Close day"; a candidate is the OS `daily-close` workflow (writes
-   `06_REVIEWS/daily/YYYY-MM-DD.md`). Not confirmed.
+2. **P11 Close day (ADR-032), `feat/p11-close-day`:** Roman adds `AIOS_GITHUB_WRITE_TOKEN`
+   (fine-grained, `romahawk/AI-Business-OS` only, Contents read and write, with an expiry) and
+   `AIOS_WRITER_UID` (his Firebase uid) in Vercel, Production and Preview, sensitive; redeploys; then
+   closes a day on the preview, signed in. Field wording may change when Roman's canon text for the
+   workflow arrives. Next by rank after P11: P19.
 3. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
    been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
    equals Schedule's today column; the carry-over prompt on the first open of the day (after the
@@ -26,18 +27,16 @@
    tasks still use ("Trading", "Job / Career", "Self-performance").
 5. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
    Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5.
-   **P7:** `done` (2026-10-15), checked by Roman on production. **P11:** `queued`, next by rank; needs
-   a write token (step 6) and a rescoped first slice (step 2). **P19:** `queued` (2026-10-15), gated
+   **P7:** `done` (2026-10-15), checked by Roman on production. **P11:** `open` (2026-10-15), first
+   slice Close day (step 2). **P19:** `queued` (2026-10-15), gated
    on its own ADR (the AI route freeze, ADR-017). **P10, P15:** still `gated` on P7 in the spec; P7
    is now done, so their gates need re-checking when they come up.
 6. **P7 needs no OS feed script (ADR-031):** it reads `01_CONTEXT/current-focus.md` and the
    `00_HOME/context-pack.md` front matter with a read-only `AIOS_GITHUB_TOKEN`. Vercel now has it and
-  the three `FIREBASE_ADMIN_*` variables (added 2026-10-15; without them every signed-in route
-  answered 401). `ANTHROPIC_API_KEY` is still not set, so the AI routes cannot work in production.
-  P11 still needs:
-   - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
-     read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
-     `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
+   the three `FIREBASE_ADMIN_*` variables (added 2026-10-15; without them every signed-in route
+   answered 401). `ANTHROPIC_API_KEY` is still not set, so the AI routes cannot work in production.
+   P11 uses its own write token and writer uid (step 2), never P7's read token. Strategy-file PRs
+   (P11 criterion 2) are a later slice; that token then also needs `Pull requests`.
 7. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
 8. **Commit gate (P8):** every `git commit` from Claude Code goes through
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
@@ -139,8 +138,9 @@ canon.
 
 - **Push and merge `fix/p18-carryover-button`** (`f9cf382`, local only): `main` still shows two
   buttons ("Keep all", "Keep these") in the carry-over prompt.
-- **P11 first slice (Roman):** confirm what "Close day" means (Start here, step 2), then a spec
-  change and an ADR rescoping P11's first slice, and a separate read/write token.
+- **P11 Close day (ADR-032, 2026-10-15):** built on `feat/p11-close-day`; needs the write token and
+  writer uid in Vercel and a signed-in test (Start here, step 2). Roman's canon text for the
+  daily-close workflow is still to come; the dialog's field labels follow it when it arrives.
 - **`ANTHROPIC_API_KEY` is not set in Vercel** (checked 2026-10-15), so AI Suggest and the other AI
   routes fail in production. Needed before P19 can be checked there.
 - **Unused OS PAT "AI-Business-OS agent jobs"** (never used, expires 2026-10-22): Roman may delete
