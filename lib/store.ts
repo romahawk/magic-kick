@@ -55,6 +55,7 @@ import {
   colorFromCategoryName,
   defaultTaskCategory,
   findCategoryConflict,
+  resolveCategories,
   withUsedCategories,
 } from "@/lib/categories"
 
@@ -408,7 +409,8 @@ export interface AppState {
   ensureWeeklyPlan: (weekStartISO?: string) => string
   saveWeeklyPlan: (plan: Omit<WeeklyPlan, "id"> & { id?: string }) => void
   deleteWeeklyPlan: (id: string) => void
-  saveTimeBlock: (block: Omit<TimeBlock, "id" | "plannedHours"> & { id?: string; plannedHours?: number }) => void
+  /** `category` applies only to the task a new block creates; it is not stored on the block. */
+  saveTimeBlock: (block: Omit<TimeBlock, "id" | "plannedHours"> & { id?: string; plannedHours?: number; category?: string }) => void
   updateTimeBlock: (id: string, updates: Partial<Omit<TimeBlock, "id" | "deleted" | "clientUpdatedAt">>) => void
   deleteTimeBlock: (id: string) => void
   saveExternalCalendarBlock: (block: ExternalCalendarBlock) => void
@@ -2153,7 +2155,7 @@ export const useAppStore = create<AppState>()(
         }))
       },
 
-      saveTimeBlock: (block) => {
+      saveTimeBlock: ({ category: chosenCategory, ...block }) => {
         const ts = now()
         const id = block.id ?? generateId()
         const plannedHours = block.plannedHours ?? calculateTimeBlockHours(block.startTime, block.endTime)
@@ -2185,7 +2187,11 @@ export const useAppStore = create<AppState>()(
 
           if (isNew) {
             const project = block.projectId ? s.projects.find((entry) => entry.id === block.projectId) : undefined
-            const category = defaultTaskCategory(currentCategories(s), project)
+            const categories = currentCategories(s)
+            const category =
+              chosenCategory && resolveCategories(categories).includes(chosenCategory)
+                ? chosenCategory
+                : defaultTaskCategory(categories, project)
             const maxOrder = s.tasks.reduce((max, entry) => Math.max(max, entry.order ?? 0), 0)
             const newTask = touchEntity({
               id: `block-${id}`,
