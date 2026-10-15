@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -48,6 +48,7 @@ P7, P11, P8, P6 and P10 (ADR-027), and P3 the same way after P2 (ADR-028). P14 a
 P16 was added on 2026-10-13 by Roman, ranked straight after P14 (nothing else was unblocked).
 P17 was added on 2026-10-14 by Roman, ranked straight after P16 (nothing else was unblocked).
 P18 was added on 2026-10-14 by Roman, ranked straight after P17 (nothing else was unblocked).
+P19 was added on 2026-10-15 by Roman, ranked after P11: it starts only after P7 is `done`, and P11 goes first.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -512,7 +513,13 @@ suggestions; changing ToDo's kanban cards.
 
 ### P7 — Read the OS context feed · M
 
-**Status:** open (until the canon block is checked on the deployed app with the token set)
+**Status:** done
+
+**Closed 2026-10-15:** checked by Roman on production (`main` `d81feda`), signed in, with
+`AIOS_GITHUB_TOKEN` and the `FIREBASE_ADMIN_*` variables set in Vercel: "From canon" shows the three
+primary outcomes, the `primary` and `protected` lanes, and "Canon as of 2026-10-15 08:21
+Europe/Berlin, reconciled 2026-10-02". The "missing" state was also seen on the way (token without
+repository access → GitHub 404 → "Current focus not found in canon").
 
 **First slice, rescoped 2026-10-14 (ADR-031, supersedes ADR-030; OS `DEC-2026-10-14-003`):** current
 focus from tracked canon on OS `main`: the primary outcomes and the `primary` and `protected` lanes
@@ -582,6 +589,52 @@ the feed-shape document P7 depends on.
 **Out of scope:** writing to any other repository, background jobs, webhooks, AI-generated edits.
 
 **Depends on:** P7 (read path and feed shape).
+
+---
+
+### P19 — AI Suggest proposes Daily Focus from canon · M
+
+**Status:** queued
+
+**Why:** Schedule's "AI Suggest" ranks tasks without knowing what the OS says matters, and it sends
+every task, including tasks of paused, parked or completed projects (open item since 2026-10-06).
+With P7, canon's primary outcomes and lanes are readable on the server, so suggestions can say
+which outcome or lane they serve.
+
+**Shape.** `POST /api/ai/schedule-suggest` calls `fetchCanonFocus()` on the server (not through
+the client, not through `/api/os/canon`) and adds the primary outcomes, the `primary` and
+`protected` lanes, `packGenerated`, `reconciledWithGit` and `stale` to the model input. It
+proposes at most 3 Daily Focus candidates, each with a time block today (Europe/Berlin).
+
+**Acceptance criteria**
+
+1. **Gate: its own ADR first.** The route is frozen by ADR-017 and ADR-024 §6; an ADR unfreezes
+   it for this change only, records that tasks still come from the client (ADR-017 point 5) and
+   that writes happen client-side on accept only, and states which default of the AI flag holds
+   (`isAiEnabled()` is on unless `AI_FEATURES_ENABLED=false`; ADR-017 says default off).
+2. **Canon as context.** With canon `ok` (or stale), the input carries it and the response says
+   `canonUsed: true`. Not configured, missing or error: the route runs as today without canon and
+   returns `canonUsed: false`.
+3. **Inactive projects filtered.** Tasks of projects that are not active (paused, parked,
+   completed) are not sent, the same filter Schedule's unscheduled panel uses (P16).
+4. **At most 3 suggestions,** each a Daily Focus candidate with a time block today that does not
+   overlap `existingBlocks`, a reason of one short line naming the outcome or lane it serves, and
+   no more than `dailyFocusLimit` minus the tasks already in the lane. Existing task ids are
+   preferred; a suggestion for a new task (no `taskId`, a `newTaskTitle`) is allowed and shown as
+   "new task". The shape stays compatible with `ScheduleSuggestion`, adding optional `outcomeRef`
+   and `newTaskTitle`.
+5. **Validated output.** The model's JSON is checked with zod; invalid items (bad times, overlaps,
+   over 3, over the focus limit) are dropped, not repaired.
+6. **Per-item accept and reject, nothing on fetch.** The panel shows "Using canon as of
+   <packGenerated>" or "Canon unavailable". Accept puts the task (created first if new) in the
+   Daily Focus lane and creates the time block through the existing store actions. No accept-all.
+7. **Tests (vitest):** the prompt-input builder with and without canon; the zod filter (bad times,
+   overlaps, more than 3 items, focus limit).
+
+**Out of scope:** other AI routes; server-side loading of tasks from Firestore (ADR-017 point 5
+stays open); writing to the OS (P11).
+
+**Depends on:** P7 `done` (canon read path checked on the deployed app); the ADR in criterion 1.
 
 ---
 
