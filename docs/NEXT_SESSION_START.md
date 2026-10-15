@@ -1,6 +1,6 @@
 # Next Session Start
 
-**Last updated:** 2026-10-15 (P7 rescope merged as #163; Schedule block category fix merged as #164; P19 "AI Suggest proposes Daily Focus from canon" added to the spec as `queued`)
+**Last updated:** 2026-10-15 (P7 rescope merged as #163 and checked on production, P7 `done`; Schedule block category fix merged as #164; P19 "AI Suggest proposes Daily Focus from canon" added to the spec as `queued`)
 **Resume on:** `main`. Start a new branch from `main` for any work.
 **Build status:** passing as of 2026-10-15 — `npm run build` exit 0 by hand on `main` `d81feda`
 **Typecheck status:** passing as of 2026-10-15 — `npm run typecheck` exit 0 (same run)
@@ -13,10 +13,10 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Close P7:** with `AIOS_GITHUB_TOKEN` in Vercel (fine-grained, `romahawk/AI-Business-OS` only,
-   Contents read-only, with an expiry; Production and Preview, sensitive), Roman opens the deployed
-   app signed in and checks the "From canon" block and its date line. Then P7 → `done` in the spec.
-   Next by rank: P11, then P19.
+2. **Next by rank: P11, then P19.** P11's first slice needs a ruling from Roman before any code: the
+   written slice ("check off items in today's plan") depends on plan files that stay local in the
+   OS. Roman named it "Close day"; a candidate is the OS `daily-close` workflow (writes
+   `06_REVIEWS/daily/YYYY-MM-DD.md`). Not confirmed.
 3. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
    been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
    equals Schedule's today column; the carry-over prompt on the first open of the day (after the
@@ -25,14 +25,16 @@
 4. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
    tasks still use ("Trading", "Job / Career", "Self-performance").
 5. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P8, P6, P9, P4, P5.
-   **P7:** `open` (2026-10-14). Rescoped by ADR-031 (supersedes ADR-030, OS `DEC-2026-10-14-003`),
-   merged as #163; only the deployed check is left (step 2). **P11:** `queued`, needs a write token
-   (step 6), and its first slice ("check off items in today's plan") needs rescoping, because the plan
-   files stay local in the OS. **P19:** `queued` (2026-10-15), gated on its own ADR (the AI route
-   freeze, ADR-017). **P10, P15:** `gated` on P7.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5.
+   **P7:** `done` (2026-10-15), checked by Roman on production. **P11:** `queued`, next by rank; needs
+   a write token (step 6) and a rescoped first slice (step 2). **P19:** `queued` (2026-10-15), gated
+   on its own ADR (the AI route freeze, ADR-017). **P10, P15:** still `gated` on P7 in the spec; P7
+   is now done, so their gates need re-checking when they come up.
 6. **P7 needs no OS feed script (ADR-031):** it reads `01_CONTEXT/current-focus.md` and the
-   `00_HOME/context-pack.md` front matter with a read-only `AIOS_GITHUB_TOKEN`. P11 still needs:
+   `00_HOME/context-pack.md` front matter with a read-only `AIOS_GITHUB_TOKEN`. Vercel now has it and
+  the three `FIREBASE_ADMIN_*` variables (added 2026-10-15; without them every signed-in route
+  answered 401). `ANTHROPIC_API_KEY` is still not set, so the AI routes cannot work in production.
+  P11 still needs:
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
@@ -59,7 +61,11 @@ request extends a frozen AI route (ADR-017, ADR-024 §6), so Roman chose to add 
   for the new task only, not stored on the block. CHANGELOG entry 2026-10-15.
 - This PR (`docs/session-close-2026-10-15`): this note (restored from `6781a37` and updated), and
   P19 in `docs/CONTROL_PLANE_UI_SPEC.md`: `queued`, ranked after P11, with the inactive-project
-  filter and an ADR gate as criteria.
+  filter and an ADR gate as criteria. Second commit: P7 → `done` after Roman's check on production.
+- Vercel (Roman, 2026-10-15): `AIOS_GITHUB_TOKEN` and `FIREBASE_ADMIN_PROJECT_ID`, `_CLIENT_EMAIL`,
+  `_PRIVATE_KEY` added for Production and Preview (sensitive). The first redeploy ran before the
+  Firebase variables existed; a second one picked them up. The token first lacked repository
+  access (GitHub 404 → "Current focus not found in canon"); fixed in its settings.
 
 **Branch map:**
 - `feat/p7-canon-feed`: #163 merged as `4981d89`. Its extra commit `6781a37` (handoff) is carried
@@ -71,10 +77,15 @@ request extends a frozen AI route (ADR-017, ADR-024 §6), so Roman chose to add 
 - Gates on `main` `d81feda`: build, lint, `npm test` (typecheck + 9 tests) exit 0.
 - #164: headless Edge on a production build, demo mode: picking "Sport" saved the task with
   category "Sport"; the stored time block has no `category`; no page errors.
+- Vercel variable names and targets read through the Vercel connector (values not read).
+- P7 on production, by Roman (screenshot): "From canon" lists the three outcomes (the second now
+  "Ship the Rolevoice Capstone MVP", from OS commit `9060cb9`), lanes career, deutschon ai,
+  alpharhythm, masters · protected, magic kick, and "Canon as of 2026-10-15 08:21 Europe/Berlin,
+  reconciled 2026-10-02".
 
 **Not verified:**
 - #164 on the real account; picking a project that has a category (no demo project has one).
-- P7 on the deployed app (step 2).
+- P7's stale ("Last known") and error states on production; light theme; narrow widths.
 
 ---
 
@@ -128,9 +139,12 @@ canon.
 
 - **Push and merge `fix/p18-carryover-button`** (`f9cf382`, local only): `main` still shows two
   buttons ("Keep all", "Keep these") in the carry-over prompt.
-- **Close P7** (#163 merged 2026-10-14): token in Vercel (Roman), check of the "From canon" block on
-  the deployed app signed in; then P7 → `done` in the spec (Start here, step 2). After that P11 is
-  next and needs its own write token and a rescoped first slice.
+- **P11 first slice (Roman):** confirm what "Close day" means (Start here, step 2), then a spec
+  change and an ADR rescoping P11's first slice, and a separate read/write token.
+- **`ANTHROPIC_API_KEY` is not set in Vercel** (checked 2026-10-15), so AI Suggest and the other AI
+  routes fail in production. Needed before P19 can be checked there.
+- **Unused OS PAT "AI-Business-OS agent jobs"** (never used, expires 2026-10-22): Roman may delete
+  it. The OS `current-focus.md` "Waiting #1" PAT entry is then stale (OS session).
 - **Real-data check of #158 and P18** (Start here, step 3), then **P16 and P17**: add, edit,
   delete + Undo, complete, next free slot + Undo, chips, inactive-project tasks hidden, collapse
   rail; also light theme and a narrow window.

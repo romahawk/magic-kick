@@ -513,7 +513,13 @@ suggestions; changing ToDo's kanban cards.
 
 ### P7 — Read the OS context feed · M
 
-**Status:** open (until the canon block is checked on the deployed app with the token set)
+**Status:** done
+
+**Closed 2026-10-15:** checked by Roman on production (`main` `d81feda`), signed in, with
+`AIOS_GITHUB_TOKEN` and the `FIREBASE_ADMIN_*` variables set in Vercel: "From canon" shows the three
+primary outcomes, the `primary` and `protected` lanes, and "Canon as of 2026-10-15 08:21
+Europe/Berlin, reconciled 2026-10-02". The "missing" state was also seen on the way (token without
+repository access → GitHub 404 → "Current focus not found in canon").
 
 **First slice, rescoped 2026-10-14 (ADR-031, supersedes ADR-030; OS `DEC-2026-10-14-003`):** current
 focus from tracked canon on OS `main`: the primary outcomes and the `primary` and `protected` lanes
