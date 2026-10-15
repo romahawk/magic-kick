@@ -1,175 +1,126 @@
 # Next Session Start
 
-**Last updated:** 2026-10-14, second session (Execution sync bug fixed as #158; P18 "Daily Focus as the day plan" added, built and merged via #159 → #160; no roadmap item open)
-**Resume on:** `main` after this `docs/session-close-2026-10-14-p18` PR and `fix/p18-carryover-button` merge. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-14 — `npm run build` exit 0 by hand on `main` `847355a`, and by the P8 hook on `f9cf382` (`fix/p18-carryover-button`)
-**Typecheck status:** passing as of 2026-10-14 — `npm run typecheck` exit 0 (same runs)
-**Lint status:** passing as of 2026-10-14 — `npm run lint` exit 0 (same runs)
-**Test status:** `npm test` is an alias for `typecheck`; there is no separate test suite
-**Note:** one bug fix and one feature (P18). No data model, store action, Firestore rules or dependency change. New: `components/focus-carryover-dialog.tsx`, `hooks/use-plan-next-slot.ts`, shared selectors in `lib/weekly-plan.ts`.
+**Last updated:** 2026-10-15 (P7 rescope merged as #163; Schedule block category fix merged as #164; P19 "AI Suggest proposes Daily Focus from canon" added to the spec as `queued`)
+**Resume on:** `main`. Start a new branch from `main` for any work.
+**Build status:** passing as of 2026-10-15 — `npm run build` exit 0 by hand on `main` `d81feda`
+**Typecheck status:** passing as of 2026-10-15 — `npm run typecheck` exit 0 (same run)
+**Lint status:** passing as of 2026-10-15 — `npm run lint` exit 0 (same run)
+**Test status:** passing as of 2026-10-15 — `npm test` (typecheck + `vitest run`) exit 0, 9 tests in `lib/os-feed/canon-parser.test.ts`
+**Note:** P7 code (#163) and one bug fix (#164) on `main`; this handoff and the P19 spec item are docs only.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
+2. **Close P7:** with `AIOS_GITHUB_TOKEN` in Vercel (fine-grained, `romahawk/AI-Business-OS` only,
+   Contents read-only, with an expiry; Production and Preview, sensitive), Roman opens the deployed
+   app signed in and checks the "From canon" block and its date line. Then P7 → `done` in the spec.
+   Next by rank: P11, then P19.
+3. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
    been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
    equals Schedule's today column; the carry-over prompt on the first open of the day (after the
    first sync); Plan + Undo; the focus toggle in a Schedule block. Then P16 and P17 on Schedule
    (add, edit, delete + Undo, complete, next free slot + Undo, chips, inactive projects hidden).
-3. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
+4. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
    tasks still use ("Trading", "Job / Career", "Self-performance").
-4. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+5. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
    Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P8, P6, P9, P4, P5.
-   **P7:** `open` (2026-10-14). Rescoped by ADR-031 (supersedes ADR-030, OS `DEC-2026-10-14-003`):
-   reads current focus from tracked canon on `feat/p7-canon-feed`; the plan-file slice is paused and
-   its code removed. **P11:** `queued`, needs a write token (step 5). **P10, P15:** `gated` on P7.
-5. **P7 needs no OS feed script (ADR-031):** it reads `01_CONTEXT/current-focus.md` and the
+   **P7:** `open` (2026-10-14). Rescoped by ADR-031 (supersedes ADR-030, OS `DEC-2026-10-14-003`),
+   merged as #163; only the deployed check is left (step 2). **P11:** `queued`, needs a write token
+   (step 6), and its first slice ("check off items in today's plan") needs rescoping, because the plan
+   files stay local in the OS. **P19:** `queued` (2026-10-15), gated on its own ADR (the AI route
+   freeze, ADR-017). **P10, P15:** `gated` on P7.
+6. **P7 needs no OS feed script (ADR-031):** it reads `01_CONTEXT/current-focus.md` and the
    `00_HOME/context-pack.md` front matter with a read-only `AIOS_GITHUB_TOKEN`. P11 still needs:
    - A GitHub fine-grained PAT, `romahawk/AI-Business-OS` only, `Contents` + `Pull requests`
      read/write, stored in Vercel as a server-only variable (suggested name `OS_GITHUB_TOKEN`, never
      `NEXT_PUBLIC_…`). On 2026-10-05 the Vercel project had only the seven Firebase variables.
-6. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
-7. **Commit gate (P8):** every `git commit` from Claude Code goes through
+7. Read ADR-024, ADR-027, ADR-028 and ADR-029 before any control-plane, category or scope decision.
+8. **Commit gate (P8):** every `git commit` from Claude Code goes through
    `.claude/hooks/commit-gate.mjs`. It blocks unless the message has `Verified:` and `Not verified:`
    lines and typecheck, lint and build pass. Commits typed in a terminal are not checked, and
    neither is `git cherry-pick`: run the gates by hand after one.
-8. **Stacked PRs:** retarget the stacked PR to `main` before merging it, after its base merges.
+9. **Stacked PRs:** retarget the stacked PR to `main` before merging it, after its base merges.
    #159 was merged into the already-merged #158 branch on 2026-10-14 and needed #160 to reach `main`.
 
 ---
 
-## Where we left off (2026-10-14, second session) — Execution sync fix and P18
+## Where we left off (2026-10-15) — #163 and #164 merged, P19 specified
 
-**Why:** Roman reported (screenshot) that tasks did not read the same across the Execution tabs:
-Command Center's Daily Focus showed "0 of 3 chosen" plus three suggestions that ToDo never showed,
-and ticking a suggestion completed the task. The fix went in as #158. Roman then asked for four UX
-ideas from that review; they became P18 (added to the spec straight after P17). He chose: closing
-the carry-over prompt keeps all tasks.
+**Why:** #163 (P7 canon) merged on 2026-10-14 without its handoff commit (`6781a37` was pushed
+after the merge), so `main`'s note still described the session before P7. Roman then reported that
+new Schedule blocks always got "Learning" (#164), and asked for AI Suggest to read canon. That
+request extends a frozen AI route (ADR-017, ADR-024 §6), so Roman chose to add it to the spec first.
 
-**What changed — #158 (squash `142469b`), the bug fix:**
-- `lib/weekly-plan.ts`: `localDateISO`, `selectTaskTimeSlots` (one "when is this task?" for every
-  tab), `selectDayAgenda` (Schedule's day as a list: blocks of any week plan plus recurring tasks).
-- `lib/execution-os.ts`: `selectDailyFocus` lists every chosen task, not only up to the limit.
-- `components/modules/attention-block.tsx`: chosen and suggested tasks listed separately; a
-  suggestion gets "Add" (moves it to the lane) instead of a complete checkbox; today's time shown.
-- `components/modules/todo-module.tsx`: the same suggestions below the Daily Focus column.
-- `components/modules/command-center.tsx`: Today list from `selectDayAgenda` with the local date
-  (UTC showed yesterday between 00:00 and 02:00); empty state for "Committed this week".
-- `lib/store.ts`: Coaching dismissal uses the local date.
-
-**What changed — P18 (#159 → #160, squash `847355a`):**
-- `lib/weekly-plan.ts`: `orderDailyFocusTasks` (today's timed tasks first); `findNextFreeSlot`,
-  `taskDurationMin`, `externalBlockDateParts` moved here from Schedule.
-- `hooks/use-plan-next-slot.ts` (new): next free slot + Undo toast for Schedule and Command Center.
-- `components/modules/attention-block.tsx`: `DailyFocusCard`: drag to reorder untimed tasks,
-  "Plan" on tasks with no time.
-- `components/focus-carryover-dialog.tsx` (new), `components/app-shell.tsx`: once-a-day prompt
-  per device (`localStorage` key `magic-kick-focus-carryover-date`); waits for the first pull.
-- `components/modules/schedule-module.tsx`: shared next-slot hook; block panel focus toggle.
-- `components/modules/todo-module.tsx`: Daily Focus column uses the shared order under "Manual order".
-- `docs/CONTROL_PLANE_UI_SPEC.md`: P18 (now `done`, 5 criteria), working order. `CHANGELOG.md`: two entries.
+**What changed:**
+- #164 (`d81feda`), `fix/schedule-block-category`: the "New block" form has a Category select next
+  to Project (follows the project's category, P14); `saveTimeBlock` takes an optional `category`
+  for the new task only, not stored on the block. CHANGELOG entry 2026-10-15.
+- This PR (`docs/session-close-2026-10-15`): this note (restored from `6781a37` and updated), and
+  P19 in `docs/CONTROL_PLANE_UI_SPEC.md`: `queued`, ranked after P11, with the inactive-project
+  filter and an ADR gate as criteria.
 
 **Branch map:**
-- `fix/execution-task-sync` off `main` `45aaa58`: `7a8414c` → **#158 merged** (squash `142469b`).
-  After that, #159 merged into it (`89cfab5`), so origin's copy carries P18 too. Safe to delete.
-- `feat/p18-focus-day-plan` stacked on the above: `d1151cb`, `08f859d` → **#159 merged into
-  `fix/execution-task-sync`, not `main`**. Safe to delete.
-- `fix/land-p18-on-main` off `main` `142469b`: `932de06` (cherry-pick of `89cfab5`, identical tree)
-  → **#160 merged** (`847355a`). Safe to delete.
-- `fix/p18-carryover-button` off `main` `847355a`: `f9cf382`. Same change as `08f859d` (one button
-  in the prompt), which missed #159's squash, plus a CHANGELOG line. **Local only, not pushed.**
-- `docs/session-close-2026-10-14-p18` off `main` `847355a`: this handoff and P18 → `done`. Not stacked.
-- `docs/session-close-2026-10-14` (#157) merged; local and origin copies can be deleted.
+- `feat/p7-canon-feed`: #163 merged as `4981d89`. Its extra commit `6781a37` (handoff) is carried
+  here instead. Safe to delete, local and origin.
+- `fix/schedule-block-category`: #164 merged as `d81feda`. Safe to delete, local and origin.
+- `docs/session-close-2026-10-15` off `main` `d81feda`: this PR. Not stacked.
 
 **Verified (confirmed):**
-- Gates exit 0 on `7a8414c`, `d1151cb`, `08f859d` (P8 hook), on `932de06` and `main` `847355a`
-  (by hand), and on `f9cf382` (P8 hook).
-- Headless Edge (playwright-core in this session's scratchpad) against Roman's dev server on :3000,
-  demo mode, 1440×1000, no page errors: Add on 3 suggestions → "3 of 3 chosen"; drag row 3 onto
-  row 1 reorders; Plan on the last row → toast "Scheduled … 14:00–14:30", row moves first, shows
-  "today 14:00–14:30", Plan and drag handle gone; Undo restores; ToDo "Manual order" matches
-  Command Center; carry-over prompt (last date set to yesterday) lists 3 ticked tasks, untick one →
-  "Return 1 to Backlog" → "2 of 3 chosen", no prompt on the next reload, × keeps all; Schedule block
-  panel "In Daily Focus" ↔ "Add to focus" changes Command Center's count; Schedule next free slot
-  → 15:00–16:30 block, Undo removes it.
+- Gates on `main` `d81feda`: build, lint, `npm test` (typecheck + 9 tests) exit 0.
+- #164: headless Edge on a production build, demo mode: picking "Sport" saved the task with
+  category "Sport"; the stored time block has no `category`; no page errors.
 
 **Not verified:**
-- Real account (Firestore sync, the prompt waiting for the first pull, a second device).
-- 375 px or other narrow widths; light theme; keyboard drag. No screenshots attached to the PRs.
-- ToDo's default sort ("Date: earliest") groups by date, so its Daily Focus order can differ from
-  Command Center's (by design, P18 criterion 1). Roman to confirm.
-
-**Process notes:**
-- `node -e "…"` through the Bash tool exits silently without running (noted on 2026-10-14 for P17
-  too). A CHANGELOG edit made that way never happened, and its commit message claimed it had
-  (caught before push, amended into `f9cf382`). Use the Edit tool, or a script file in the
-  scratchpad.
-- A follow-up commit pushed while a PR is being merged can miss the squash: check
-  `gh pr view <n> --json headRefOid` against the branch before merging.
+- #164 on the real account; picking a project that has a category (no demo project has one).
+- P7 on the deployed app (step 2).
 
 ---
 
-## Where we left off (2026-10-14) — P17 task CRUD in the unscheduled panel
+## Where we left off (2026-10-14, third session) — P7 rescope: current focus from canon
 
-**Why:** the unscheduled-tasks panel (P16) could only list and place tasks; adding, editing,
-completing or deleting one meant going to ToDo. Roman asked for CRUD there (screenshot), added it as
-P17 straight after P16, and chose: ToDo's task sheet shared by both modules, delete with an Undo
-toast, a quick add form (title, project, category, estimate), complete from the sheet only.
+**Why:** OS `DEC-2026-10-14-003` (OS `a5d9cfa`): Daily Focus (P18) is the day plan, and
+`07_INBOX/agent/plans/` stays gitignored and local, so the file #162 (ADR-030) read never reaches OS
+`main` and "From plan" always showed nothing. Roman's prompt for this session repointed P7 at tracked
+canon.
 
-**What changed (squash `8554cef`, #156; commit `8c46eb5`):**
-- `components/task-detail-sheet.tsx` (new): ToDo's task sheet as one component; reads the task live
-  from the store (a save shows at once); `onDeleted` hook for Undo.
-- `components/modules/todo-module.tsx`: uses the shared sheet; inline sheet and edit state removed.
-- `components/modules/unscheduled-tasks-panel.tsx`: "+" opens an inline add form (project sets the
-  category, P14; no date or time, so the task lands in the list); card click or Enter on the title
-  opens the sheet; the clock button no longer bubbles to the card.
-- `components/modules/schedule-module.tsx`: renders the sheet; delete → "Task deleted" toast with Undo.
-- `lib/store.ts`: `restoreTask` (restores the task and the schedule items deleted with it, matched
-  by the delete timestamp). **Fix (P17 criterion 6):** `updateTask` with `clearTimeSlot` kept the old
-  explicit time, so P16's Undo after "next free slot" left the task on the calendar on its old due
-  date, and clearing both times in the ToDo sheet did nothing.
-- `docs/CONTROL_PLANE_UI_SPEC.md`: P17 (now `done`, 7 criteria), working order. `CHANGELOG.md`: P17
-  entry dated 2026-10-14 (Added, Changed, Fixed).
+**What changed (`233ec61`, PR #163, merged 2026-10-14 as `4981d89`):**
+- `lib/os-feed/canon-parser.ts` (new): `parseCurrentFocus` (outcomes from `## Primary Outcomes`,
+  bold title only; lanes from the `execution_allocation:` yaml block, comments stripped;
+  `reconciled_with_git`; warnings, never throws) and `parseFrontMatterGenerated`.
+- Removed: `lib/os-feed/plan-parser.ts` and its test, `app/api/os/plan`, `hooks/use-os-plan.ts`,
+  `OsPlanList`/`OsPlanRow`. `berlinDateISO` went too (nothing else used it).
+- `lib/os-feed/github.ts`: `fetchCanonFocus()`, two parallel GETs (current focus required, context
+  pack optional), statuses `ok` / `not-configured` / `missing` / `error` (stale last good).
+- `app/api/os/canon/route.ts`, `hooks/use-os-canon.ts`: same guard, caching and refetch as before.
+- `components/modules/attention-block.tsx`: `CanonFocus`, "From canon", at the bottom of the Daily
+  Focus card: outcomes, `primary`/`protected` lane badges, "Canon as of …, reconciled …".
+- `lib/os-feed/canon-parser.test.ts`: 9 tests. Docs: ADR-031 (ADR-030 marked superseded), spec P7
+  note (status stays `open`), README, CHANGELOG (Added + Removed), `.env.example` comment.
 
 **Branch map:**
-- `feat/p17-unscheduled-task-crud` off `main` `fe587fb`: `8c46eb5` (P17) → **#156 merged** (squash
-  `8554cef`). A handoff commit `6aa2c89` was pushed to the branch but GitHub had not registered it
-  when #156 was merged, so it is not on `main`; `docs/session-close-2026-10-14` carries it. Remote and local
-  branch still exist; safe to delete (its P17 code equals `8554cef`).
-- `docs/session-close-2026-10-14` off `main` `8554cef`: this handoff and P17 → `done`. Not stacked.
-- Deleted on 2026-10-14, local and origin, after checking each tree equals its squash commit:
-  `feat/schedule-unscheduled-panel` (#154), `docs/session-close-2026-10-13` (#155),
-  `docs/session-close-2026-10-09` (#153).
+- `feat/p7-canon-feed` off `main` `984eb74`: `233ec61` → **#163 merged** (`4981d89`). The handoff
+  commit `6781a37` missed the merge; the 2026-10-15 docs PR carries it.
+- `feat/p7-plan-feed` (#162 merged as `984eb74`): local and origin copies can be deleted.
+- `fix/p18-carryover-button` (`f9cf382`): **still local only, not pushed** (see Open items).
 
 **Verified (confirmed):**
-- Gates exit 0 on `8c46eb5` (P8 hook) and by hand on the same code before a whitespace-only fix.
-- Headless Edge (playwright-core from an earlier session's scratchpad) against Roman's dev server on
-  :3000, demo mode, 1600×900, no page or console errors: add with project and 40 min (8 → 9 cards,
-  project name and 40m on the card), form stays open, Escape closes; clock click does not open the
-  sheet and **its Undo now returns the task to the list** (schedule item `hasExplicitTime: false`,
-  due date kept); card click opens the sheet, title and estimate edit shows in sheet and panel;
-  delete → toast → Undo restores; Enter on the title opens; Mark Complete removes the card; ToDo
-  sheet opens and loads the edit form; clearing both times in ToDo keeps the due date and drops the
-  time block.
-- Found during the check: the add form's estimate field had `min=1 step=5`, so 40 failed browser
-  validation and the form silently did not submit. Removed `step`.
+- Gates exit 0 on `233ec61` by hand (lint, typecheck, `npm test` with 9 tests, build listing
+  `/api/os/canon`) and by the P8 hook.
+- `.next/static` contains neither `AIOS_GITHUB_TOKEN` nor `api.github.com`.
+- The parser run (Node 22 strip-types, scratchpad) on the real OS `main` files: 3 outcomes, 9 lanes,
+  `reconciledWithGit` 2026-10-02, pack `generated` "2026-10-14 19:37 Europe/Berlin", no warnings.
+- `package.json` unchanged, so `pnpm-lock.yaml` needs no update.
 
 **Not verified:**
-- Real account data; Firestore round-trip of a restored task, including Undo after the delete has
-  already synced to another device.
-- Light theme; 375 px or other narrow widths; keyboard use of the add form's selects. No
-  screenshots in #156.
-- Undo of a drag-to-unschedule (P16) — not clicked in either session.
+- The route against GitHub with a real token (no `AIOS_GITHUB_TOKEN` in `.env.local`): `ok`,
+  `missing`, `error`/stale and pack-failure paths were not exercised.
+- The block in a browser in any state; Vercel preview; light theme; 375 px. No screenshots in #163.
 
 **Process notes:**
-- Gates ran with Roman's `next dev` on :3000 still up (Next 16 keeps dev output in `.next/dev`);
-  build passed without stopping it.
-- `node -e '…'` and heredocs with nested quotes failed silently through the Bash tool here; scripts
-  written to the scratchpad with the Write tool worked.
-- After a push, check the PR shows the new head (`gh api repos/romahawk/magic-kick/pulls/<n> -q .head.sha`)
-  before merging. #156 was merged while GitHub still showed the old head.
+- After renaming a route, `tsc` failed on stale `.next/types` until `next build` regenerated them.
+- `sed` replacement with `\\uFEFF` through the Bash tool dropped the backslash; fixed with Edit.
 
 ---
 
@@ -177,14 +128,14 @@ toast, a quick add form (title, project, category, estimate), complete from the 
 
 - **Push and merge `fix/p18-carryover-button`** (`f9cf382`, local only): `main` still shows two
   buttons ("Keep all", "Keep these") in the carry-over prompt.
-- **Real-data check of #158 and P18** (Start here, step 2), then **P16 and P17**: add, edit,
+- **Close P7** (#163 merged 2026-10-14): token in Vercel (Roman), check of the "From canon" block on
+  the deployed app signed in; then P7 → `done` in the spec (Start here, step 2). After that P11 is
+  next and needs its own write token and a rescoped first slice.
+- **Real-data check of #158 and P18** (Start here, step 3), then **P16 and P17**: add, edit,
   delete + Undo, complete, next free slot + Undo, chips, inactive-project tasks hidden, collapse
   rail; also light theme and a narrow window.
-- **Real-data check of P14** (Start here, step 3): orphaned categories listed, merged or mapped;
+- **Real-data check of P14** (Start here, step 4): orphaned categories listed, merged or mapped;
   then confirm the new fields round-trip through Firestore on a second device.
-- **Pick the next piece of work (Roman).** After P18 the roadmap has nothing open or unblocked. Candidates:
-  the two bugs below, the dev/preview login failure, the overdue ranking in derived focus, or a new
-  spec item.
 - **Bug (found 2026-10-14):** Command Center with no weekly plan shows "Set weekly plan", which
   calls `setActiveModule("command-center")`, the module already open, so it does nothing. It
   should open the Plan tab.
@@ -204,15 +155,17 @@ toast, a quick add form (title, project, category, estimate), complete from the 
 - **Derived Daily Focus ranks overdue tasks below anything due this week:** once past due a task gets
   no due-date score (`selectDailyFocus`). Found 2026-10-06; Roman to decide whether overdue tasks
   should be suggested first.
-- **AI Suggest in Schedule still sends every task**, including tasks of paused, parked or completed
-  projects (left out of P16 and P17 on purpose). Roman to decide whether it should use the same filter.
-- **P7 / P11 blockers:** the OS context feed (OS session) and the GitHub PAT in Vercel (Roman).
-  See Start here, step 5.
+- **AI Suggest:** now P19 in the spec (2026-10-15), including the inactive-project filter (Roman's
+  ruling). Also open there: `isAiEnabled()` defaults on, while ADR-017 says default off; P19's ADR
+  states which holds.
+- **P11 blocker:** a read/write GitHub PAT in Vercel (Roman). See Start here, step 6. P7 no longer
+  waits on an OS feed script (OS `DEC-2026-10-14-003`, ADR-031).
 - **OS session** (prompt drafted 2026-10-04; Roman holds it). Deliverables: decision-template field
   "Repo decisions affected"; one generic `repo-sync` skill with the old sync skills as aliases; an
   amendment line on `DEC-2026-10-03-001` (MK ADR-023 superseded); an OS decision removing the
   2026-10-21 revert (ADR-024 §8); `source-of-truth-map.md` and `02_PROJECTS/magic-kick/context.md`
-  recording that MK writes to the OS repo (ADR-024 §5); the context feed (P7 path step 2).
+  recording that MK writes to the OS repo (ADR-024 §5). (The context feed, P7 path step 2, was
+  dropped by OS `DEC-2026-10-14-003`.)
   The OS `current-focus.md` (reconciled 2026-10-02) still says "P7 next, then P8" and the OS MK
   `context.md` still says P1 is open (both stale; MK sessions do not edit them).
 - **Allocation reverts to `limited` on 2026-10-21** until that OS decision lands (7 days from 2026-10-14).
@@ -227,8 +180,11 @@ toast, a quick add form (title, project, category, estimate), complete from the 
 - **The `roadmap` label** in `.github/ISSUE_TEMPLATE/feature.md` may not exist on GitHub.
 - **Merged branches safe to delete**, local and origin: `feat/p17-unscheduled-task-crud` (#156; its
   extra commit `6aa2c89` is an earlier handoff draft), `docs/session-close-2026-10-14` (#157),
-  `fix/execution-task-sync` (#158), `feat/p18-focus-day-plan` (#159), `fix/land-p18-on-main` (#160).
-  Their work is on `main`; the only commit not on `main` is `08f859d`, carried by `fix/p18-carryover-button`.
+  `fix/execution-task-sync` (#158), `feat/p18-focus-day-plan` (#159), `fix/land-p18-on-main` (#160),
+  `docs/session-close-2026-10-14-p18` (#161), `feat/p7-plan-feed` (#162), `feat/p7-canon-feed`
+  (#163), `fix/schedule-block-category` (#164).
+  Their work is on `main`. Commits not on `main`: `08f859d`, carried by `fix/p18-carryover-button`;
+  `6781a37` (#163's handoff), carried by `docs/session-close-2026-10-15`.
 - **Older branches.** Local `dev` is merged into `origin/main` (confirmed 2026-10-14) and can be
   deleted. Not confirmed merged: local `ai-control-tower` (origin gone),
   `feat/projects-tab-density-redesign`, `feat/schedule-block-editor-improvements`,
