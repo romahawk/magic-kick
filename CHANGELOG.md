@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-15 - Close day writes the daily review to AI-Business-OS (P11, first slice)
+
+### Added
+- "Close day" on the Command Center. Fill in today's review: completed tasks and open Daily Focus tasks are filled in for you, plus blockers, decisions and learning. Then check the whole file and commit it to AI-Business-OS as `06_REVIEWS/daily/<today>.md`. It never overwrites a day that is already closed, and nothing is written until you click "Commit to OS".
+
+---
+
 ## [Unreleased] - 2026-10-15 - Category when adding a Schedule block
 
 ### Added

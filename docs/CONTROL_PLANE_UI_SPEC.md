@@ -556,13 +556,14 @@ route unfreeze is ADR-024 §6.
 
 ### P11 — Write back to the OS · M
 
-**Status:** queued
+**Status:** open (2026-10-15, first slice: Close day)
 
 **Why:** ADR-024. Reading the OS (P7) makes Magic Kick a window onto it; a usable UI also has to change
 it. Without write-back, every update still needs a laptop session with the repo checked out.
 
-**Shape.** Server-side routes write to the AI-Business-OS repo through the GitHub API, with the same
-PAT as P7 (`Contents` and `Pull requests` read/write, that repo only). The OS repo stays the source of
+**Shape.** Server-side routes write to the AI-Business-OS repo through the GitHub API, with a write
+PAT separate from P7's read-only one (`Contents` read/write, plus `Pull requests` when the strategy
+slice needs it; that repo only; ADR-032). The OS repo stays the source of
 truth; nothing written through these routes is kept in Firestore.
 
 - **Tasks and day-to-day context:** committed directly to the OS `main`. The commit message names
@@ -572,13 +573,44 @@ truth; nothing written through these routes is kept in Firestore.
 - **Writable paths** are an explicit list, kept in one place in code and documented here before the
   first route ships. Anything not on the list is refused. When in doubt, a path goes through a PR.
 
-**First slice:** check off and re-date items in today's plan. The exact file and line format comes from
-the feed-shape document P7 depends on.
+**First slice, rescoped 2026-10-15 (ADR-032): Close day.** The old first slice ("check off and
+re-date items in today's plan") is dropped: the plan files stay local in the OS (OS
+`DEC-2026-10-14-003`), and Daily Focus (P18) is the day plan. Close day is the Magic Kick side of
+the OS `daily-close` workflow (`03_WORKFLOWS/planning/daily-close.md`, job contract
+`10_AUTOMATION/jobs/daily-close.yaml`): it writes today's daily review to the OS.
 
-**Acceptance criteria**
+- **Where:** a "Close day" action on the Command Center (no new module). It opens a dialog.
+- **Fields:** the sections of the OS `09_TEMPLATES/daily-review-template.md`, in its order: Primary
+  Outcome, Completed, Meaningful Progress, Blockers, **Decisions** (written as "Decisions Made"),
+  Captured Learning, Carry Forward, Stop / Avoid. Completed is prefilled with today's completed
+  tasks and Carry Forward with the open Daily Focus tasks; both stay editable. Exact wording follows
+  the OS canon text for the workflow (Roman, pending).
+- **Write:** one file, `06_REVIEWS/daily/YYYY-MM-DD.md` (today, Europe/Berlin), committed directly
+  to the OS `main` with the message `daily-close: YYYY-MM-DD (Magic Kick)`. The server allows writes
+  only under `06_REVIEWS/daily/`.
+- **Token:** a separate `AIOS_GITHUB_WRITE_TOKEN`, `Contents` read/write on `romahawk/AI-Business-OS`
+  only, with an expiry. The P7 read token stays read-only.
 
-1. Checking off an item in Magic Kick produces a commit in the OS repo, and the change shows in the
-   next feed read.
+**Acceptance criteria (first slice)**
+
+1. **Close day** shows the full file before anything is written; the commit happens only on an
+   explicit "Commit to OS" click (the job contract's "ok on the shown diff"). Nothing is written on
+   open, on typing, or on cancel.
+2. The commit lands on OS `main` as `06_REVIEWS/daily/<today>.md` with the message
+   `daily-close: <today> (Magic Kick)`, and the dialog shows the commit link.
+3. **Decisions** typed in the dialog appear under "## Decisions Made" in the same file, the same day.
+4. If today's file already exists on OS `main` (written from the laptop, or an earlier Close day),
+   the dialog says so, shows a link to it, and does not overwrite it. A file created between opening
+   the dialog and committing is refused by GitHub (create without `sha`) and reported, not
+   overwritten.
+5. The server refuses any path outside `06_REVIEWS/daily/YYYY-MM-DD.md` (one check, one place in
+   code), any request not signed in as Roman (`AIOS_WRITER_UID`), and runs as "not configured" when
+   the write token or the writer uid is missing. The token never reaches the browser.
+6. Nothing from the dialog is kept in Firestore or the persisted store.
+
+**Acceptance criteria (P11 as a whole)**
+
+1. Close day (first slice, above).
 2. Editing a strategy file opens a PR in the OS repo; the OS `main` is unchanged until it is merged.
 3. A write against a file that changed since it was read is refused and the view reloads; nothing is
    overwritten.
@@ -588,7 +620,7 @@ the feed-shape document P7 depends on.
 
 **Out of scope:** writing to any other repository, background jobs, webhooks, AI-generated edits.
 
-**Depends on:** P7 (read path and feed shape).
+**Depends on:** P7 (done 2026-10-15); `AIOS_GITHUB_WRITE_TOKEN` and `AIOS_WRITER_UID` in Vercel (Roman).
 
 ---
 

@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { format, isToday, parseISO } from "date-fns"
-import { CalendarPlus, GripVertical, Plus } from "lucide-react"
+import { CalendarPlus, GripVertical, MoonStar, Plus } from "lucide-react"
+import { CloseDayDialog } from "@/components/close-day-dialog"
 import { useAppStore } from "@/lib/store"
 import { isOverdue } from "@/lib/game-utils"
 import {
@@ -39,6 +40,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   const scheduleItems = useAppStore((s) => s.schedule)
   const updateProject = useAppStore((s) => s.updateProject)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
+  const [closingDay, setClosingDay] = useState(false)
 
   const config = normalizeSystemConfig(profile.systemConfig)
   const liveTasks = tasks.filter((task) => !task.deleted)
@@ -60,7 +62,12 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="font-serif text-xl font-bold tracking-tight">Now</h2>
         <span className="text-sm text-muted-foreground">{format(new Date(), "EEEE, d MMMM")}</span>
+        <Button variant="outline" size="sm" className="ml-auto h-7 gap-1.5 px-2.5 text-xs" onClick={() => setClosingDay(true)}>
+          <MoonStar className="h-3.5 w-3.5" />
+          Close day
+        </Button>
       </div>
+      <CloseDayDialog open={closingDay} onOpenChange={setClosingDay} />
 
       <div className="grid gap-3 md:grid-cols-2">
         {/* Focus — what next */}

@@ -1067,3 +1067,69 @@ plan, pauses P7's plan-file slice, and points P7 at files already tracked on OS 
 
 **Revisit trigger:** the OS changes the structure of `current-focus.md`, or P7's next slice (another
 canon file) is picked up.
+
+---
+
+## ADR-032: P11's first slice is Close day, writing only `06_REVIEWS/daily/`
+
+**Date:** 2026-10-15
+**Status:** Accepted (Roman, 2026-10-15).
+**Amends:** P11's first slice and token line in `docs/CONTROL_PLANE_UI_SPEC.md`.
+**Relates to:** ADR-024 §5–6 (OS write routes permitted), ADR-031, OS `DEC-2026-10-14-003`, OS
+`03_WORKFLOWS/planning/daily-close.md`, `08_SKILLS/daily-close/SKILL.md`,
+`10_AUTOMATION/jobs/daily-close.yaml`.
+
+### Context
+
+P11's written first slice was "check off and re-date items in today's plan". The plan files stay
+local in the OS (`DEC-2026-10-14-003`), so that slice cannot work. The OS already has a daily-close
+workflow that writes `06_REVIEWS/daily/YYYY-MM-DD.md` from the template
+`09_TEMPLATES/daily-review-template.md`. Its job contract lets it write only `06_REVIEWS/daily/*.md`
+without approval, and commit only after Roman's "ok" on the shown diff. Today that needs a laptop
+session. Roman asked for it in Magic Kick as "Close day" (2026-10-15).
+
+### Decision
+
+1. **First slice: Close day.** A "Close day" action on the Command Center opens a dialog with the
+   template's sections. Completed is prefilled with the tasks completed today and Carry Forward with
+   the open Daily Focus tasks; both are editable. A **Decisions** field is written under
+   "## Decisions Made", so decisions taken on a call land in the repo that day (Roman). Exact field
+   wording follows the OS canon text for the workflow, which Roman sends separately.
+2. **One writable prefix, enforced on the server.** The write route accepts only paths matching
+   `06_REVIEWS/daily/YYYY-MM-DD.md`, checked in one place in code. Anything else is refused.
+3. **Direct commit, with Roman's ok in the UI.** The dialog shows the whole file; the commit happens
+   only on an explicit "Commit to OS" click, which stands for the job contract's "ok". It goes to OS
+   `main` with the message `daily-close: YYYY-MM-DD (Magic Kick)` (prefix set by Roman; the date is
+   Europe/Berlin).
+4. **Never overwrite.** If today's file exists, the dialog shows its link and does not write. The
+   write creates the file without a `sha`, so GitHub refuses it if the file appeared in the meantime;
+   that refusal is reported.
+5. **Separate write token and a writer check.** `AIOS_GITHUB_WRITE_TOKEN` (fine-grained, `Contents`
+   read/write, `romahawk/AI-Business-OS` only, with an expiry) is used only by the write route; the P7
+   token stays read-only. The route accepts only the Firebase uid in `AIOS_WRITER_UID`. Without either
+   variable, the route answers "not configured" and writes nothing.
+6. **Render and write only.** Dialog text lives in component state. Nothing goes to Firestore, the
+   persisted store or sync.
+
+### Rationale
+
+- It reuses an OS workflow that already exists, with its own path rule and template, instead of
+  inventing a file format.
+- Decisions captured in the daily file are evidence, as the job contract says; moving one into
+  `04_DECISIONS/decision-log.md` stays an OS session's job, with approval.
+- `00_HOME/context-pack.md` is rebuilt by the OS pre-commit hook, which an API commit does not run.
+  The pack's sources (`build-context-pack.js`, `CORE`) do not include daily reviews, so it stays
+  correct.
+
+### Consequences
+
+- New server route and module under `app/api/os/` and `lib/os-feed/`; a dialog on the Command
+  Center. No Firestore, rules or store change.
+- Two new Vercel variables for Roman: `AIOS_GITHUB_WRITE_TOKEN` and `AIOS_WRITER_UID`.
+- Strategy-file edits through a PR (P11 criterion 2) stay a later slice; that is when the token needs
+  `Pull requests`.
+- **Rollback:** revert the P11 PR and remove the two variables. Files already committed to the OS
+  stay, as any daily review would.
+
+**Revisit trigger:** the OS changes the daily-review template or the daily-close job contract, or a
+second writable path is needed.
