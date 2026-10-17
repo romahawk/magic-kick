@@ -556,7 +556,8 @@ route unfreeze is ADR-024 §6.
 
 ### P11 — Write back to the OS · M
 
-**Status:** open (2026-10-15, first slice: Close day)
+**Status:** open (2026-10-15). First slice (Close day) **done** 2026-10-17; second slice (Close day
+UX, ADR-034) in review 2026-10-17.
 
 **First slice done 2026-10-17:** Close day shipped as #166 (ADR-032) and #167 (missed days,
 ADR-033). Checked on production by Roman: the form opened (2026-10-16), and closing 16 Oct produced
@@ -612,13 +613,40 @@ the OS `daily-close` workflow (`03_WORKFLOWS/planning/daily-close.md`, job contr
 5. The server refuses any path outside `06_REVIEWS/daily/YYYY-MM-DD.md` (one check, one place in
    code), any request not signed in as Roman (`AIOS_WRITER_UID`), and runs as "not configured" when
    the write token or the writer uid is missing. The token never reaches the browser.
-6. Nothing from the dialog is kept in Firestore or the persisted store.
+6. Nothing from the dialog is kept in Firestore or the persisted store. (Amended by ADR-034: the
+   review text still is not; the Daily Focus snapshots and saved chips are, on the profile.)
 7. **Missed days (ADR-033, added 2026-10-17).** A day picker offers today and the 6 days before it
    (Europe/Berlin), each marked closed when its file exists. A missed day is written to its own
    `06_REVIEWS/daily/<date>.md` with the message `daily-close: <date> (Magic Kick)` and a line
    `_Written on <today> for <date>._` under the title. Completed is prefilled with that day's
    completed tasks; Carry Forward starts empty. The server refuses any other date. Criteria 1, 4, 5
    and 6 apply unchanged.
+
+**Second slice, 2026-10-17 (ADR-034): Close day UX.** Roman's first real close was eight empty
+fields, six of them ending "None.". The dialog now starts from the plan.
+
+**Acceptance criteria (second slice)**
+
+1. Today's dialog lists the Daily Focus tasks, the scheduled blocks and the tasks completed today as
+   ticks; completed items are pre-ticked.
+2. Ticking or unticking moves a line between Completed and Carry Forward in the preview; a note
+   appears as `- <title>: <note>`. Every section keeps a free-text area after the prefill.
+3. Chips insert text into the right section (Blockers; Carry Forward reasons, the blocker set plus
+   "Moved on purpose"; Decisions and Learning starters). Saved custom chips persist across reload and
+   devices (profile, existing sync).
+4. Only the checklist, Blockers, Decisions and Carry forward show by default; "More" reveals Primary
+   outcome, Meaningful progress, Captured learning and Stop / avoid. The file always has all 8
+   headings in template order, "None." when empty.
+5. Each day's Daily Focus list is saved by Berlin date (last write of the day wins, 7 days kept). A
+   missed day with a snapshot gets the checklist and Carry Forward; one without behaves as in
+   criterion 7 above and says so.
+6. Ticking never changes a task in the store.
+7. Path rule, date window, writer gate and no-overwrite behave exactly as before; existing tests stay
+   green.
+8. No AI route is called (ADR-017), and `.next/static` contains no `AIOS_GITHUB_TOKEN`,
+   `AIOS_GITHUB_WRITE_TOKEN`, `AIOS_WRITER_UID` or `api.github.com`.
+
+**Later slice (needs its own ADR):** feed unticked items into tomorrow's P18 carry-over.
 
 **Acceptance criteria (P11 as a whole)**
 

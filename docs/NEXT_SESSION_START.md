@@ -1,26 +1,28 @@
 # Next Session Start
 
-**Last updated:** 2026-10-17 (P11 first slice "Close day" shipped as #166 and #167 and proven on production: Roman closed 16 Oct, OS commit `7634893`; P11 stays `open` for its next slice)
-**Resume on:** `main`. Start a new branch from `main` for any work.
-**Build status:** passing as of 2026-10-17 — `npm run build` exit 0 by hand on `main` `aac6065`
+**Last updated:** 2026-10-17 (P11 second slice "Close day UX", ADR-034, open as a PR on `feat/p11-close-day-ux`, not merged. First slice proven on production: #167 merged, Roman closed 16 Oct, OS commit `7634893`)
+**Resume on:** `feat/p11-close-day-ux` until its PR is merged, then `main`. Start new work from `main`.
+**Build status:** passing as of 2026-10-17 — `npm run build` exit 0 by hand on `feat/p11-close-day-ux`
 **Typecheck status:** passing as of 2026-10-17 — `npm run typecheck` exit 0 (same run, inside `npm test`)
 **Lint status:** passing as of 2026-10-17 — `npm run lint` exit 0 (same run)
-**Test status:** passing as of 2026-10-17 — `npm test` (typecheck + `vitest run`) exit 0, 30 tests in 3 files under `lib/os-feed/`
-**Note:** two features on `main` (#166 Close day, #167 missed days); this handoff is docs only.
+**Test status:** passing as of 2026-10-17 — `npm test` (typecheck + `vitest run`) exit 0, 54 tests in 5 files (`lib/os-feed/` and `lib/close-day*.test.ts`)
+**Note:** `main` is `aac6065` (#166, #167). The branch adds the session-close docs (`2aaac21`, cherry-picked from the unpushed `docs/session-close-2026-10-17`) and the Close day UX slice.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P11 is `open`; its first slice (Close day, ADR-032 and ADR-033) is done and proven.** The next
-   slice is criterion 2: editing a strategy file opens a PR in the OS repo. It needs a scope ruling
-   from Roman (which files, which edits) and the write token to also get **Pull requests: read and
-   write**. Until Roman names it, nothing is unblocked inside P11. Next by rank after P11: P19 (its
-   own ADR first; `ANTHROPIC_API_KEY` must be set in Vercel to check it on production).
-3. **Close day follow-ups (small, Roman to choose):** field labels follow Roman's canon text for the
-   daily-close workflow (still to come); optionally turn typed lines into `- ` bullets, as the
-   prefill already does.
+2. **P11 is `open`.** First slice (Close day, ADR-032 and ADR-033) done and proven. Second slice
+   (Close day UX, ADR-034) is a PR on `feat/p11-close-day-ux`, **not merged**: Roman checks the
+   signed-in close and a real commit on the Vercel preview (sign-in there needs the preview domain in
+   Firebase, step 8) or on production after merge. Then the next slice is criterion 2 (a strategy
+   file edit opens an OS PR), which needs a scope ruling from Roman and **Pull requests: read and
+   write** on the write token. Next by rank after P11: P19 (its own ADR first; `ANTHROPIC_API_KEY`
+   must be set in Vercel to check it on production).
+3. **Close day follow-ups (Roman to choose):** field labels follow Roman's canon text for the
+   daily-close workflow (still to come). Feeding unticked items into tomorrow's P18 carry-over is a
+   later slice with its own ADR (ADR-034, Consequences).
 4. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
    been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
    equals Schedule's today column; the carry-over prompt on the first open of the day (after the
@@ -30,7 +32,7 @@
    tasks still use ("Trading", "Job / Career", "Self-performance").
 6. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
    Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5.
-   **P11:** `open` (2026-10-15), first slice done 2026-10-17. **P19:** `queued` (2026-10-15), gated
+   **P11:** `open` (2026-10-15), first slice done 2026-10-17, second slice in review. **P19:** `queued` (2026-10-15), gated
    on its own ADR (the AI route freeze, ADR-017). **P10, P15:** still `gated` on P7 in the spec; P7
    is done, so their gates need re-checking when they come up.
 7. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN` (P7,
@@ -47,6 +49,47 @@
    neither is `git cherry-pick`: run the gates by hand after one.
 11. **Stacked PRs:** retarget the stacked PR to `main` before merging it, after its base merges.
    #159 was merged into the already-merged #158 branch on 2026-10-14 and needed #160 to reach `main`.
+
+---
+
+## Where we left off (2026-10-17, later) — P11 second slice, Close day UX (ADR-034)
+
+**Why:** Roman's first real close (16 Oct) was eight empty fields; he retyped his plan and six of
+eight sections were "None.". A missed day's Carry Forward started empty because Magic Kick kept no
+Daily Focus history. Roman's slice brief (2026-10-17) asked for a checklist from the plan, chips,
+four essentials with "More", and a 7-day snapshot, on the same write path.
+
+**What changed (on `feat/p11-close-day-ux`, PR open, not merged):**
+- `lib/close-day.ts` (new, pure): checklist (Daily Focus, then `selectDayAgenda` blocks, then other
+  completed tasks, once each), `composeCloseDayFields` (ticked → Completed, unticked → Carry
+  Forward as `- <title>: <note>`, own text after), chips (presets, save, remove, insert), snapshots
+  (keyed by Berlin date, last write wins, pruned to the 7-day window, per-date merge).
+- `lib/types.ts`: `Profile.dailyFocusSnapshots` and `Profile.closeDayChips` (arrays: the profile is
+  written with merge, so a removed map key would stay in Firestore).
+- `lib/store.ts`: `saveDailyFocusSnapshot` (no-op when unchanged), `addCloseDayChip`,
+  `removeCloseDayChip`; all mark only the profile for sync. `lib/sync/applyRemote.ts` merges
+  snapshots per date whichever profile wins.
+- `hooks/use-daily-focus-snapshot.ts` (mounted in `AuthProvider`): saves on task changes, signed in
+  only after this session's first sync; in demo mode at once.
+- `components/close-day-dialog.tsx`: checklist with per-item reason and reason chips; Blockers,
+  Decisions, Carry forward shown; the other four behind "More"; ticks and notes kept per day;
+  Ctrl/Cmd+Enter; demo mode shows the form and preview with "Commit to OS" disabled; preview in mono.
+- `lib/os-feed/daily-review.ts`: `selectCompletedOn` extracted; route, `github-write.ts`, path rule,
+  window and writer gate untouched. No Firestore rules change.
+- Docs: ADR-034, spec P11 (first slice done, second-slice criteria), README, CHANGELOG.
+
+**Verified (confirmed):** lint, build, `npm test` (typecheck + 54 tests) exit 0 on the branch;
+`.next/static` has none of `AIOS_GITHUB_TOKEN`, `AIOS_GITHUB_WRITE_TOKEN`, `AIOS_WRITER_UID`,
+`api.github.com`. Headless Edge, demo mode, 375 and 1280 px: two tasks added to Daily Focus and one
+completed through the UI; the dialog listed both (the completed one ticked); a reason chip, a
+blocker chip and a decision starter landed in the right places; "More" revealed the four; a missed
+day without a snapshot showed the fallback text; the preview had all eight headings and
+`- <title>: Ran out of time` under Carry Forward; tasks in the persisted store were identical before
+and after the dialog; today's snapshot was saved; no `/api/` request; no horizontal overflow.
+
+**Not verified:** the signed-in close and a real commit (Roman, on the preview or production);
+custom chips across two devices; a missed day *with* a snapshot in the browser (unit-tested only:
+snapshots start on the day this ships); light theme.
 
 ---
 
@@ -83,7 +126,8 @@ to close a missed day too (6 days back, marked "Written on …").
 - `feat/p11-close-missed-day` off `main` `d6b0424`: `eb7aa5e` → **#167 merged** (`aac6065`, same
   tree). Safe to delete.
 - `docs/session-close-2026-10-15` → **#165 merged** (`fa30f83`). Safe to delete.
-- `docs/session-close-2026-10-17` off `main` `aac6065`: this handoff. Not stacked.
+- `docs/session-close-2026-10-17` off `main` `aac6065`: never pushed; its commit is on
+  `feat/p11-close-day-ux` as `2aaac21`. Safe to delete locally.
 
 **Verified (confirmed):**
 - Gates on `main` `aac6065` (tree identical to `eb7aa5e`): lint, build, `npm test` (typecheck + 30
@@ -100,10 +144,9 @@ to close a missed day too (6 days back, marked "Written on …").
   `origin/main`.
 
 **Not verified:**
-- The day picker seen by Claude in a browser (only Roman's use on production).
 - Closing *today* (only a missed day has been committed); "already closed" after a commit, and
   "Close another day".
-- Light theme and 375 px of the signed-in form and picker.
+- Light theme of the signed-in form and picker (375 px seen in demo mode on the second slice).
 
 **Process notes:**
 - PowerShell mangles `rev^{tree}` (`-encodedCommand` noise); use the Bash tool for git revision syntax.
@@ -113,43 +156,12 @@ to close a missed day too (6 days back, marked "Written on …").
 
 ---
 
-## Where we left off (2026-10-15) — #163 and #164 merged, P19 specified
-
-**Why:** #163 (P7 canon) merged on 2026-10-14 without its handoff commit (`6781a37` was pushed
-after the merge), so `main`'s note still described the session before P7. Roman then reported that
-new Schedule blocks always got "Learning" (#164), and asked for AI Suggest to read canon. That
-request extends a frozen AI route (ADR-017, ADR-024 §6), so Roman chose to add it to the spec first.
-
-**What changed:**
-- #164 (`d81feda`), `fix/schedule-block-category`: the "New block" form has a Category select next
-  to Project (follows the project's category, P14); `saveTimeBlock` takes an optional `category`
-  for the new task only, not stored on the block. CHANGELOG entry 2026-10-15.
-- #165 (`docs/session-close-2026-10-15`): this note restored from `6781a37` and updated; P19 in
-  `docs/CONTROL_PLANE_UI_SPEC.md` (`queued`, ranked after P11, inactive-project filter and an ADR
-  gate as criteria); P7 → `done` after Roman's check on production.
-- Vercel (Roman, 2026-10-15): `AIOS_GITHUB_TOKEN` and the three `FIREBASE_ADMIN_*` variables. The
-  first redeploy ran before the Firebase variables existed; a second one picked them up. The token
-  first lacked repository access (GitHub 404 → "Current focus not found in canon").
-
-**Verified (confirmed):**
-- Gates on `main` `d81feda`: build, lint, `npm test` (typecheck + 9 tests) exit 0.
-- #164: headless Edge, demo mode: picking "Sport" saved the task with category "Sport"; the stored
-  time block has no `category`.
-- P7 on production, by Roman (screenshot): "From canon" with three outcomes, five lanes and
-  "Canon as of 2026-10-15 08:21 Europe/Berlin, reconciled 2026-10-02".
-
-**Not verified:**
-- #164 on the real account; picking a project that has a category (no demo project has one).
-- P7's stale ("Last known") and error states on production; light theme; narrow widths.
-
----
-
 ## Open items
 
 - **P11 next slice (Roman):** scope of strategy-file edits through an OS PR (criterion 2); the
   write token then needs `Pull requests: read and write`.
-- **Close day:** field labels to follow Roman's canon text for the daily-close workflow (pending);
-  optional: typed lines become `- ` bullets. The 16 Oct file has "Decisions Made: None." and plain
+- **Close day:** field labels to follow Roman's canon text for the daily-close workflow (pending).
+  Later slice (own ADR): unticked items feed tomorrow's P18 carry-over. The 16 Oct file has "Decisions Made: None." and plain
   lines under Completed (as typed); editing it is done on GitHub or in an OS session, not from
   Magic Kick (no overwrite, by design).
 - **OS guardrail vs ADR-033:** the OS daily-close skill says "don't backfill a guess"; Magic Kick

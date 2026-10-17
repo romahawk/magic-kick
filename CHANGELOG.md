@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-17 - Close day starts from your plan (P11)
+
+### Added
+- Close day lists the day's Daily Focus tasks, scheduled blocks and anything you completed, as ticks. Completed items start ticked. Ticked lines go to Completed, the rest to Carry forward, each with an optional one-line reason. Ticking only writes the review; it never changes a task.
+- Quick-pick chips for Blockers, Carry forward reasons, Decisions and Learning, plus "Save chip" for your own. Saved chips sync to your other devices.
+- Magic Kick now keeps each day's Daily Focus list for 7 days, so a missed day gets the same checklist. A missed day from before this release, or with no saved list, works as before and the dialog says so.
+- Demo mode shows the Close day form and the file preview; committing still needs a signed-in account.
+- Ctrl+Enter (Cmd+Enter on a Mac) goes from the form to the file, and from the file to the commit.
+
+### Changed
+- The form shows the checklist, Blockers, Decisions and Carry forward. Primary outcome, Meaningful progress, Captured learning and Stop / avoid are under "More". The file still has all eight sections.
+
+---
+
 ## [Unreleased] - 2026-10-17 - Close a missed day (P11)
 
 ### Added

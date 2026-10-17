@@ -276,6 +276,25 @@ export interface Profile extends SyncFields {
   streakDays: number
   lastActiveDateISO?: string
   xpWeekKey?: string
+  /** P11 Close day (ADR-034): the Daily Focus list per Berlin date, last 7 days. An array, not a map,
+   *  so a pruned day leaves Firestore (the profile is written with merge). */
+  dailyFocusSnapshots?: DailyFocusSnapshot[]
+  /** P11 Close day: quick-pick chips Roman saved, on top of the built-in ones. */
+  closeDayChips?: CloseDayChip[]
+}
+
+export interface DailyFocusSnapshot {
+  /** Berlin date, YYYY-MM-DD. */
+  date: string
+  tasks: Array<{ id: string; title: string }>
+  savedAt: number
+}
+
+export type CloseDayChipSection = "blockers" | "reasons" | "decisions" | "learning"
+
+export interface CloseDayChip {
+  section: CloseDayChipSection
+  text: string
 }
 
 export type SyncCollection =

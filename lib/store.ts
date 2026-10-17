@@ -3,6 +3,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type {
   Achievement,
+  CloseDayChipSection,
   CoachingMessage,
   ExecutionLog,
   ExternalCalendarBlock,
@@ -37,6 +38,8 @@ import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achie
 import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence"
 import { findBySource } from "@/lib/provenance"
 import { moveMilestoneInList, nextMilestoneOrder, renumberMilestones, sortMilestones } from "./roadmap"
+import { addCloseDayChip, dailyFocusSnapshotTasks, nextDailyFocusSnapshots, removeCloseDayChip } from "@/lib/close-day"
+import { berlinDateISO } from "@/lib/os-feed/daily-review"
 import {
   seedAchievements,
   seedGoals,
@@ -176,6 +179,17 @@ function createEmptyPending(): PendingRecord {
     resources: {},
     journal: {},
   }
+}
+
+/** A profile change, marked for sync like the category actions below. */
+function setProfilePatch(set: (fn: (s: AppState) => Partial<AppState>) => void, patch: Partial<Profile>, ts: number) {
+  set((s) => ({
+    profile: { ...s.profile, ...patch, clientUpdatedAt: ts, deleted: false },
+    sync: {
+      ...s.sync,
+      pending: { ...s.sync.pending, profile: { ...s.sync.pending.profile, profile: ts } },
+    },
+  }))
 }
 
 function touchEntity<T extends LocalEntity>(entity: T): T {
@@ -362,6 +376,10 @@ export interface AppState {
   deleteCategory: (name: string) => void
   setCategoryColor: (name: string, color: string) => void
   setCategoryDomain: (name: string, domain: OsDomain | "") => void
+  /** P11 Close day (ADR-034): saves today's Daily Focus list when it changed; never changes a task. */
+  saveDailyFocusSnapshot: () => void
+  addCloseDayChip: (section: CloseDayChipSection, text: string) => void
+  removeCloseDayChip: (section: CloseDayChipSection, text: string) => void
   toggleTask: (id: string) => void
   toggleTaskOccurrence: (id: string, dateISO: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
@@ -782,6 +800,31 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+      },
+
+      saveDailyFocusSnapshot: () => {
+        const ts = now()
+        const s = get()
+        const today = berlinDateISO(new Date(ts))
+        const next = nextDailyFocusSnapshots(
+          s.profile.dailyFocusSnapshots,
+          dailyFocusSnapshotTasks(s.tasks, today, localDateISO),
+          today,
+          ts,
+        )
+        if (!next) return
+        setProfilePatch(set, { dailyFocusSnapshots: next }, ts)
+      },
+
+      addCloseDayChip: (section, text) => {
+        const current = get().profile.closeDayChips ?? []
+        const next = addCloseDayChip(current, section, text)
+        if (next !== current) setProfilePatch(set, { closeDayChips: next }, now())
+      },
+
+      removeCloseDayChip: (section, text) => {
+        const current = get().profile.closeDayChips ?? []
+        setProfilePatch(set, { closeDayChips: removeCloseDayChip(current, section, text) }, now())
       },
 
       toggleTask: (id) => {

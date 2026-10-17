@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from "firebase/auth"
 import { auth } from "@/lib/firebase/client"
 import { useAppStore } from "@/lib/store"
 import { useSync } from "@/hooks/use-sync"
+import { useDailyFocusSnapshot } from "@/hooks/use-daily-focus-snapshot"
 
 interface AuthContextValue {
   user: User | null
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setCurrentUid])
 
   useSync(user?.uid ?? null)
+  useDailyFocusSnapshot(user?.uid ?? null)
 
   const value = useMemo<AuthContextValue>(
     () => ({

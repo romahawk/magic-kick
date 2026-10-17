@@ -123,6 +123,16 @@ export function toBulletList(items: string[]): string {
   return items.map((item) => `- ${item.replace(/\s+/g, " ").trim()}`).join("\n")
 }
 
+/** Tasks completed on `dateISO`; a recurring task counts when that day's occurrence is done. */
+export function selectCompletedOn(tasks: Task[], dateISO: string, toLocalDateISO: (date: Date) => string): Task[] {
+  return tasks.filter(
+    (task) =>
+      !task.deleted &&
+      ((task.completed && task.completedAt && toLocalDateISO(new Date(task.completedAt)) === dateISO) ||
+        task.recurrenceCompletedDates?.includes(dateISO)),
+  )
+}
+
 /**
  * Close day's starting text for `dateISO`: tasks completed that day (a recurring task counts when that
  * day's occurrence is done) and, for today only, the Daily Focus tasks still open. Magic Kick keeps no
@@ -136,11 +146,7 @@ export function selectCloseDayPrefill(
   toLocalDateISO: (date: Date) => string,
 ) {
   const live = tasks.filter((task) => !task.deleted)
-  const completed = live.filter(
-    (task) =>
-      (task.completed && task.completedAt && toLocalDateISO(new Date(task.completedAt)) === dateISO) ||
-      task.recurrenceCompletedDates?.includes(dateISO),
-  )
+  const completed = selectCompletedOn(live, dateISO, toLocalDateISO)
   const carryForward =
     dateISO === todayISO
       ? live.filter((task) => task.lane === "daily-focus" && !task.completed && !completed.includes(task))
