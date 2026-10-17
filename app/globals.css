@@ -130,3 +130,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* P20: tab switches use a view transition; none under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
