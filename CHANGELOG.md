@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-17 - One attention row for an unplanned week (P20)
+
+### Changed
+- When two or more active projects have no outcome in this week's plan, Needs attention shows one row ("Week not planned — 4 projects have no outcome"), naming up to three of them, with one "Open Plan" button. One project without an outcome keeps its own row, now with "Set outcome".
+
+---
+
 ## [Unreleased] - 2026-10-17 - Close day starts from your plan (P11)
 
 ### Added
