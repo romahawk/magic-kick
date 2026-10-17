@@ -1,6 +1,8 @@
 import { useAppStore } from "@/lib/store"
 import type { RemoteSnapshot } from "@/lib/db/types"
 import type { Profile } from "@/lib/types"
+import { mergeDailyFocusSnapshots } from "@/lib/close-day"
+import { berlinDateISO } from "@/lib/os-feed/daily-review"
 
 function compareRemoteVsLocal(
   localClientUpdatedAt: number | undefined,
@@ -57,8 +59,11 @@ function mergeProfile(local: Profile, remote: Profile | null) {
     return { profile: remote, remoteWon: true }
   }
   const winner = compareRemoteVsLocal(local.clientUpdatedAt, remote.clientUpdatedAt, local.updatedAt, remote.updatedAt)
+  // Daily Focus snapshots (ADR-034) merge per date, so one device's newer day survives the other
+  // device's newer profile.
+  const dailyFocusSnapshots = mergeDailyFocusSnapshots(local.dailyFocusSnapshots, remote.dailyFocusSnapshots, berlinDateISO())
   return {
-    profile: winner === "remote" ? remote : local,
+    profile: { ...(winner === "remote" ? remote : local), dailyFocusSnapshots },
     remoteWon: winner === "remote",
   }
 }

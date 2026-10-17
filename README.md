@@ -218,9 +218,23 @@ files on `main` through the GitHub API, cached for 5 minutes:
 
 "Close day" on the Command Center writes a daily review to AI-Business-OS (ADR-032), the Magic
 Kick side of the OS `daily-close` workflow. The dialog has the sections of the OS
-`09_TEMPLATES/daily-review-template.md`. Completed starts with the day's completed tasks and, for
-today, Carry Forward with the open Daily Focus tasks. Decisions go under "Decisions Made". The whole
-file is shown before anything is written.
+`09_TEMPLATES/daily-review-template.md`. Decisions go under "Decisions Made". The whole file is
+shown before anything is written.
+
+- **Checklist (ADR-034):** the day's Daily Focus tasks, its time blocks and any task completed that
+  day, as ticks; completed items start ticked. Ticked lines go to Completed, unticked ones to Carry
+  Forward as `- <title>: <note>`. Ticking never changes a task. Every section keeps a text area for
+  your own lines, written after the generated ones.
+- **Four essentials:** the checklist, Blockers, Decisions and Carry forward are shown; Primary
+  outcome, Meaningful progress, Captured learning and Stop / avoid sit behind "More". The file always
+  has all eight headings, "None." when empty.
+- **Chips:** quick picks for Blockers, Carry Forward reasons, Decisions and Learning. "Save chip"
+  adds your own; saved chips are kept on the profile and sync across devices.
+- **Daily Focus snapshot:** the profile keeps each day's Daily Focus list for 7 days (Berlin date,
+  last write of the day wins), so a missed day gets the same checklist. A day with no snapshot lists
+  only that day's completed tasks and starts Carry Forward empty, and the dialog says so.
+- **Keyboard:** Ctrl+Enter (Cmd+Enter) goes from the form to the file, and from the file to the
+  commit. Demo mode shows the form and the file; committing needs the writer account.
 
 - **Missed days (ADR-033):** a day picker offers today and the 6 days before it, each marked closed
   when its file exists. A missed day's file says `_Written on <today> for <date>._` under the title.
@@ -232,7 +246,8 @@ file is shown before anything is written.
 - **Env vars:** `AIOS_GITHUB_WRITE_TOKEN` (a separate fine-grained PAT, `romahawk/AI-Business-OS`
   only, `Contents: read and write`) and `AIOS_WRITER_UID` (Roman's Firebase uid). Server-side only.
   Without either, the dialog says Close day is not set up.
-- Nothing from the dialog is kept in Firestore or the local store.
+- The review text is not kept in Firestore or the local store; only the snapshots and saved chips
+  are, on the profile.
 
 ### Local Development
 

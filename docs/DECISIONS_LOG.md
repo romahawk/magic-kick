@@ -1181,3 +1181,66 @@ backfill a guess. Leave it uncaptured and move on."
 - **Rollback:** revert the PR; ADR-032's today-only behaviour returns.
 
 **Revisit trigger:** a missed day older than six days needs closing, or the OS rewords its guardrail.
+
+---
+
+## ADR-034: Close day prefills from the plan and keeps a 7-day Daily Focus snapshot
+
+**Date:** 2026-10-17
+**Status:** Accepted (Roman, 2026-10-17, slice brief "Close day UX").
+**Amends:** ADR-033 point 4 (a missed day's Carry Forward starts empty). ADR-032 and ADR-033 otherwise
+stand: same route, path rule, commit prefix, create-only write, Berlin date, window and writer gate.
+**Relates to:** P11 in `docs/CONTROL_PLANE_UI_SPEC.md`, ADR-017 (AI-route freeze), P18 (carry-over).
+
+### Context
+
+Roman's first real close (16 Oct, OS commit `7634893`) was eight empty text fields: he retyped what
+he had planned, and six of eight sections ended up "None.". A missed day's Carry Forward could only
+start empty because Magic Kick kept no record of what the Daily Focus lane held on a past day.
+
+### Decision
+
+1. **Checklist from the plan:** the dialog lists the day's Daily Focus tasks, its time blocks (the
+   list Schedule draws, `selectDayAgenda`) and any task completed that day, once each. Completed
+   items start ticked. Ticked lines go to Completed; unticked lines go to Carry Forward as
+   `- <title>: <note>` with an optional one-line reason. Every section keeps a free-text area, and
+   that text follows the generated lines.
+2. **Ticks only shape the text.** Ticking never completes, moves or edits a task.
+3. **Daily Focus snapshot:** the profile keeps `dailyFocusSnapshots`, one entry per Berlin date with
+   the lane's tasks (`id`, `title`; open ones and those completed that day). The app rewrites today's
+   entry whenever the lane changes (the last write of the day wins) and drops days outside the
+   7-day missed-day window. Signed in, it waits for the session's first sync, so a stale device
+   never stamps its profile newer before pulling. When two profiles meet in sync, the snapshots
+   merge per date (newer `savedAt` wins) whichever profile wins.
+4. **Missed days:** a day with a snapshot gets the same checklist and Carry Forward. A day without
+   one behaves as ADR-033 did (completed tasks only, Carry Forward empty) and the dialog says so.
+5. **Quick picks:** chips for Blockers, Carry Forward reasons (the blocker set plus "Moved on
+   purpose"), Decisions and Learning starters. Roman's own chips are saved on the profile
+   (`closeDayChips`, up to 12 per section).
+6. **Four essentials:** the checklist, Blockers, Decisions and Carry forward show by default; Primary
+   outcome, Meaningful progress, Captured learning and Stop / avoid sit behind "More". The file
+   always has all eight headings in template order, "None." when empty.
+7. **Demo mode** shows the form and the file preview so it can be checked without an account;
+   "Commit to OS" stays disabled there.
+
+### Rationale
+
+- The profile is already synced through the existing store and sync path, and Firestore rules
+  accept extra profile fields, so no rules deploy and no new collection are needed. A new sync
+  collection would need a rules deploy first; until then every sync batch would be refused.
+- Both fields are arrays, not maps: the profile is written with `merge`, and a key removed from a
+  map would never leave Firestore, so pruned days would come back.
+- No AI call (ADR-017): the chips and the checklist are fixed rules over local data.
+
+### Consequences
+
+- `Profile` gains `dailyFocusSnapshots` and `closeDayChips`; the profile write grows by at most seven
+  short lists.
+- Chips follow the winning profile in sync like every other profile field; only snapshots merge per
+  date.
+- Snapshots exist only from the day this ships. Older missed days fall back as in point 4.
+- **Later slice (own ADR):** feeding unticked items into tomorrow's P18 carry-over. Out of scope here.
+- **Rollback:** revert the PR. The two profile fields are then ignored; the ADR-033 form returns.
+
+**Revisit trigger:** the profile document grows near Firestore's limit, the missed-day window
+changes, or P18 starts reading Carry Forward.
