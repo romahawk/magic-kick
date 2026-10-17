@@ -1133,3 +1133,51 @@ session. Roman asked for it in Magic Kick as "Close day" (2026-10-15).
 
 **Revisit trigger:** the OS changes the daily-review template or the daily-close job contract, or a
 second writable path is needed.
+
+---
+
+## ADR-033: Close day can close a missed day, up to six days back
+
+**Date:** 2026-10-17
+**Status:** Accepted (Roman, 2026-10-17).
+**Amends:** ADR-032 points 1 and 3 (today only). Its other points stand.
+**Relates to:** OS `08_SKILLS/daily-close/SKILL.md` guardrails, P11 criterion 7 in
+`docs/CONTROL_PLANE_UI_SPEC.md`.
+
+### Context
+
+ADR-032 lets Close day write only today's review. A day that was not closed, such as 16 October
+2026, can then never be written from Magic Kick. Roman asked to pick a missed day and close it with
+the same write rules (2026-10-17). The OS daily-close skill says: "If Roman skips a day, don't
+backfill a guess. Leave it uncaptured and move on."
+
+### Decision
+
+1. **Window:** today and the 6 days before it, in Europe/Berlin, newest first. Never a future day.
+   The server checks the date (`isClosableDate`) before anything else; the path rule
+   (`06_REVIEWS/daily/YYYY-MM-DD.md`) is unchanged.
+2. **Same write rules:** one file per day, created on OS `main` without a `sha` (never overwritten),
+   message `daily-close: <date> (Magic Kick)` with the day's own date, the whole file shown before
+   "Commit to OS".
+3. **Marked as written later:** a missed day's file carries `_Written on <today> for <date>._` under
+   the title, so it is never mistaken for a record written that evening.
+4. **Prefill:** Completed lists the tasks completed on that day. Carry Forward starts empty, because
+   Magic Kick keeps no history of the Daily Focus lane.
+5. **Closed days are shown:** the dialog lists the folder `06_REVIEWS/daily/` once and marks each day
+   in the window closed or open; a closed day links to its file.
+
+### Rationale
+
+- The skill's guardrail is against an agent inventing a record. A day Roman writes himself, marked
+  as written later, is his own account, not a guess. Six days keeps Close day a recent record, not a
+  history editor.
+- Rewording the guardrail is an OS session's job; Magic Kick sessions do not edit the OS.
+
+### Consequences
+
+- `GET /api/os/daily-review` returns the window with closed flags instead of one "exists" answer;
+  `POST` takes a `date`.
+- The OS skill text and this ADR differ until an OS session rewords the guardrail (open item).
+- **Rollback:** revert the PR; ADR-032's today-only behaviour returns.
+
+**Revisit trigger:** a missed day older than six days needs closing, or the OS rewords its guardrail.

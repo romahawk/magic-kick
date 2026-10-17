@@ -13,11 +13,11 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P11 Close day (ADR-032), `feat/p11-close-day`:** Roman adds `AIOS_GITHUB_WRITE_TOKEN`
-   (fine-grained, `romahawk/AI-Business-OS` only, Contents read and write, with an expiry) and
-   `AIOS_WRITER_UID` (his Firebase uid) in Vercel, Production and Preview, sensitive; redeploys; then
-   closes a day on the preview, signed in. Field wording may change when Roman's canon text for the
-   workflow arrives. Next by rank after P11: P19.
+2. **P11 Close day (ADR-032, #166 merged 2026-10-16; missed days ADR-033 on
+   `feat/p11-close-missed-day`):** the Vercel variables are set and the form opened on production
+   (Roman, 2026-10-16), but no Close day has been committed yet: the write path is still unproven.
+   First real test: close 16 Oct from the day picker. Field wording may change when Roman's canon
+   text for the workflow arrives. Next by rank after P11: P19.
 3. **Open the app on the real account** and check #158 and P18 on real data (only demo mode has
    been checked): Command Center's Daily Focus equals ToDo's Daily Focus column; the Today list
    equals Schedule's today column; the carry-over prompt on the first open of the day (after the
@@ -138,9 +138,11 @@ canon.
 
 - **Push and merge `fix/p18-carryover-button`** (`f9cf382`, local only): `main` still shows two
   buttons ("Keep all", "Keep these") in the carry-over prompt.
-- **P11 Close day (ADR-032, 2026-10-15):** built on `feat/p11-close-day`; needs the write token and
-  writer uid in Vercel and a signed-in test (Start here, step 2). Roman's canon text for the
-  daily-close workflow is still to come; the dialog's field labels follow it when it arrives.
+- **P11 Close day:** first real commit to the OS still to happen (Start here, step 2). Roman's canon
+  text for the daily-close workflow is still to come; the dialog's field labels follow it.
+- **OS guardrail vs ADR-033:** the OS daily-close skill says "don't backfill a guess"; Magic Kick
+  now lets Roman close a missed day (up to 6 days back, marked "Written on …"). An OS session should
+  reword the guardrail (agents must not invent a record; Roman may write his own missed day).
 - **`ANTHROPIC_API_KEY` is not set in Vercel** (checked 2026-10-15), so AI Suggest and the other AI
   routes fail in production. Needed before P19 can be checked there.
 - **Unused OS PAT "AI-Business-OS agent jobs"** (never used, expires 2026-10-22): Roman may delete

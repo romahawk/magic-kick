@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-17 - Close a missed day (P11)
+
+### Added
+- Close day has a day picker: today and the six days before it, with closed days ticked. Pick a missed day to write its review under its own date. The file notes the day it was actually written, Completed lists what you finished that day, and the same rules apply: nothing is written until "Commit to OS", and a closed day is never overwritten.
+
+### Fixed
+- The file path in the Close day dialog showed in a serif font.
+
+---
+
 ## [Unreleased] - 2026-10-15 - Close day writes the daily review to AI-Business-OS (P11, first slice)
 
 ### Added

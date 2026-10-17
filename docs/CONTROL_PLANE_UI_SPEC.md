@@ -607,6 +607,12 @@ the OS `daily-close` workflow (`03_WORKFLOWS/planning/daily-close.md`, job contr
    code), any request not signed in as Roman (`AIOS_WRITER_UID`), and runs as "not configured" when
    the write token or the writer uid is missing. The token never reaches the browser.
 6. Nothing from the dialog is kept in Firestore or the persisted store.
+7. **Missed days (ADR-033, added 2026-10-17).** A day picker offers today and the 6 days before it
+   (Europe/Berlin), each marked closed when its file exists. A missed day is written to its own
+   `06_REVIEWS/daily/<date>.md` with the message `daily-close: <date> (Magic Kick)` and a line
+   `_Written on <today> for <date>._` under the title. Completed is prefilled with that day's
+   completed tasks; Carry Forward starts empty. The server refuses any other date. Criteria 1, 4, 5
+   and 6 apply unchanged.
 
 **Acceptance criteria (P11 as a whole)**
 
