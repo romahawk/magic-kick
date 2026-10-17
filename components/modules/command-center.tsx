@@ -61,7 +61,6 @@ export function CommandCenter() {
   const weeklyReviews = useAppStore((s) => s.weeklyReviews)
   const saveWeeklyPlan = useAppStore((s) => s.saveWeeklyPlan)
   const saveWeeklyReview = useAppStore((s) => s.saveWeeklyReview)
-  const setActiveModule = useAppStore((s) => s.setActiveModule)
   const insights = useAppStore((s) => s.insights)
   const insightsLoading = useAppStore((s) => s.insightsLoading)
   const insightsFetchedWeek = useAppStore((s) => s.insightsFetchedWeek)
@@ -205,7 +204,8 @@ export function CommandCenter() {
             <div className="ml-auto flex items-center gap-5">
               <StatusPill label="Capacity" value={activePlan ? `${activePlan.totalCapacityHours}h` : "—"} />
               <StatusPill
-                label="Free"
+                label="Unallocated"
+                title="Capacity minus project allocations"
                 value={activePlan ? `${activePlanValidation.remainingHours}h` : "—"}
                 highlight={activePlan ? (activePlanValidation.isOverCapacity ? "warn" : "ok") : undefined}
               />
@@ -226,67 +226,43 @@ export function CommandCenter() {
                     Set capacity, pick up to three projects, assign hours — then go execute.
                   </p>
                 </div>
-                <Button onClick={() => setActiveModule("command-center")}>Set weekly plan</Button>
+                <Button onClick={() => setTab("plan")}>Set weekly plan</Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-              <div className="space-y-1.5">
-                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Committed this week
-                </p>
-                {projectHours.length === 0 ? (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                    No projects committed this week.{" "}
-                    <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab("plan")}>
-                      Open Plan
-                    </button>.
-                  </div>
-                ) : null}
-                {projectHours.map((item) => {
-                  const project = projects.find((p) => p.id === item.projectId)
-                  const deliveredPct =
-                    item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
-                  return (
-                    <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
-                      <PriorityDot priority={item.priority} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium leading-tight">{project?.title ?? "Unknown"}</p>
-                        <p className="truncate text-xs text-muted-foreground">{item.weeklyOutcome}</p>
-                      </div>
-                      <div className="w-36 shrink-0">
-                        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{item.actualHours}h / {item.allocatedHours}h</span>
-                          <span>{Math.round(deliveredPct)}%</span>
-                        </div>
-                        <Progress value={deliveredPct} className="h-1" />
-                      </div>
+            <div className="space-y-1.5">
+              <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Committed this week
+              </p>
+              {projectHours.length === 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                  No projects committed this week.
+                  <Button size="sm" onClick={() => setTab("plan")}>
+                    Plan week
+                  </Button>
+                </div>
+              ) : null}
+              {projectHours.map((item) => {
+                const project = projects.find((p) => p.id === item.projectId)
+                const deliveredPct =
+                  item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
+                return (
+                  <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
+                    <PriorityDot priority={item.priority} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium leading-tight">{project?.title ?? "Unknown"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{item.weeklyOutcome}</p>
                     </div>
-                  )
-                })}
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Today — {format(new Date(`${todayISO}T12:00:00`), "EEE d")}
-                </p>
-                {todayBlocks.length === 0 ? (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                    No blocks yet. Open{" "}
-                    <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setActiveModule("schedule")}>
-                      Schedule
-                    </button>.
-                  </div>
-                ) : (
-                  todayBlocks.map((block) => (
-                    <div key={block.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2">
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{block.startTime}–{block.endTime}</span>
-                      <span className="flex-1 truncate text-sm">{block.title}</span>
-                      <Badge variant={block.status === "done" ? "default" : "outline"} className="text-[10px]">{block.status}</Badge>
+                    <div className="w-36 shrink-0">
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{item.actualHours}h / {item.allocatedHours}h</span>
+                        <span>{Math.round(deliveredPct)}%</span>
+                      </div>
+                      <Progress value={deliveredPct} className="h-1" />
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -534,9 +510,9 @@ function PriorityDot({ priority }: { priority: string }) {
   )
 }
 
-function StatusPill({ label, value, highlight }: { label: string; value: string; highlight?: "ok" | "warn" }) {
+function StatusPill({ label, value, highlight, title }: { label: string; value: string; highlight?: "ok" | "warn"; title?: string }) {
   return (
-    <span className="text-sm">
+    <span className="text-sm" title={title}>
       <span className="text-muted-foreground">{label} </span>
       <span className={cn("font-medium", highlight === "ok" && "text-emerald-400", highlight === "warn" && "text-amber-400")}>
         {value}

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { format, isToday, parseISO } from "date-fns"
-import { CalendarPlus, GripVertical, MoonStar, Plus } from "lucide-react"
+import { CalendarPlus, ChevronRight, GripVertical, MoonStar, Plus } from "lucide-react"
 import { CloseDayDialog } from "@/components/close-day-dialog"
 import { useAppStore } from "@/lib/store"
 import { isOverdue } from "@/lib/game-utils"
@@ -13,8 +13,9 @@ import {
   normalizeSystemConfig,
 } from "@/lib/execution-os"
 import type { AttentionEffect, AttentionItem } from "@/lib/execution-os"
-import { localDateISO, selectTaskTimeSlots } from "@/lib/weekly-plan"
-import type { TaskTimeSlot } from "@/lib/weekly-plan"
+import { localDateISO, selectDayAgenda, selectTaskTimeSlots } from "@/lib/weekly-plan"
+import type { DayAgendaEntry, TaskTimeSlot } from "@/lib/weekly-plan"
+import { isPast } from "@/lib/time-blocks"
 import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { useOsCanon } from "@/hooks/use-os-canon"
@@ -47,6 +48,8 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   const liveProjects = projects.filter((project) => !project.deleted)
 
   const taskTimeSlots = selectTaskTimeSlots(scheduleItems, timeBlocks)
+  // Same list as the Schedule calendar for today (#158); Daily Focus is the one place it shows (P20).
+  const todayBlocks = selectDayAgenda({ timeBlocks, tasks: liveTasks, taskTimeSlots, dateISO: localDateISO() })
   const attention = selectAttentionItems({ projects: liveProjects, tasks: liveTasks, weeklyPlans, config })
 
   // Actions carry their effect as data (P3), so this runs any item without knowing its kind.
@@ -76,6 +79,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
           projects={liveProjects}
           weeklyPlans={weeklyPlans}
           taskTimeSlots={taskTimeSlots}
+          todayBlocks={todayBlocks}
           dailyFocusLimit={config.dailyFocusLimit}
           systemConfig={config}
         />
@@ -154,6 +158,7 @@ function DailyFocusCard({
   projects,
   weeklyPlans,
   taskTimeSlots,
+  todayBlocks,
   dailyFocusLimit,
   systemConfig,
 }: {
@@ -161,6 +166,7 @@ function DailyFocusCard({
   projects: Project[]
   weeklyPlans: WeeklyPlan[]
   taskTimeSlots: Record<string, TaskTimeSlot>
+  todayBlocks: DayAgendaEntry[]
   dailyFocusLimit: number
   systemConfig: SystemConfig
 }) {
@@ -171,12 +177,17 @@ function DailyFocusCard({
   const planInNextSlot = usePlanInNextSlot()
   const canon = useOsCanon()
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const now = useMinuteClock()
 
   const focus = selectDailyFocus(tasks, projects, systemConfig, { weeklyPlans, taskTimeSlots })
   const chosen = focus.filter((entry) => entry.chosen)
   const suggested = focus.filter((entry) => !entry.chosen)
   const todayISO = localDateISO()
   const isTimedToday = (task: Task) => task.dueDate === todayISO && Boolean(taskTimeSlots[task.id])
+  const isTaskPast = (task: Task) => isTimedToday(task) && isPast(taskTimeSlots[task.id].endTime, todayISO, now)
+  // Blocks whose task this card already lists are not listed again (P20: no block in two places).
+  const listedTaskIds = new Set(focus.map((entry) => entry.task.id))
+  const otherBlocks = todayBlocks.filter((block) => !block.linkedTaskId || !listedTaskIds.has(block.linkedTaskId))
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -248,10 +259,13 @@ function DailyFocusCard({
                   aria-label={`Complete ${task.title}`}
                 />
                 <div className="min-w-0 flex-1">
-                  <label htmlFor={`focus-${task.id}`} className="block cursor-pointer text-sm font-medium leading-snug">
+                  <label
+                    htmlFor={`focus-${task.id}`}
+                    className={cn("block cursor-pointer text-sm font-medium leading-snug", isTaskPast(task) && "text-muted-foreground")}
+                  >
                     {task.title}
                   </label>
-                  <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} />
+                  <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} past={isTaskPast(task)} />
                 </div>
                 {taskTimeSlots[task.id] ? null : (
                   <Button
@@ -277,8 +291,11 @@ function DailyFocusCard({
         entries={suggested}
         taskTimeSlots={taskTimeSlots}
         onAdd={(taskId) => moveTaskToLane(taskId, "daily-focus")}
+        isTaskPast={isTaskPast}
         className={chosen.length > 0 ? "mt-4" : undefined}
       />
+
+      <ScheduledToday blocks={otherBlocks} todayISO={todayISO} now={now} className={focus.length > 0 ? "mt-4" : undefined} />
 
       <CanonFocus canon={canon} className="mt-4 border-t border-border pt-3" />
     </div>
@@ -286,7 +303,17 @@ function DailyFocusCard({
 }
 
 /** Due date and, when it is today, the task's time, so a task reads the same here as in ToDo and Schedule. */
-function FocusTaskMeta({ task, linkedProject, timeSlot }: { task: Task; linkedProject?: Project; timeSlot?: TaskTimeSlot }) {
+function FocusTaskMeta({
+  task,
+  linkedProject,
+  timeSlot,
+  past,
+}: {
+  task: Task
+  linkedProject?: Project
+  timeSlot?: TaskTimeSlot
+  past?: boolean
+}) {
   const dueToday = task.dueDate === localDateISO()
   return (
     <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -298,6 +325,7 @@ function FocusTaskMeta({ task, linkedProject, timeSlot }: { task: Task; linkedPr
       {dueToday && timeSlot ? (
         <span className="text-xs tabular-nums text-muted-foreground">
           today {timeSlot.startTime}–{timeSlot.endTime}
+          {past ? <PastLabel /> : null}
         </span>
       ) : task.dueDate ? (
         <span className={cn("text-xs", isOverdue(task.dueDate) ? "font-medium text-destructive" : "text-muted-foreground")}>
@@ -331,41 +359,105 @@ function CanonFocus({ canon, className }: { canon: CanonFeedResult | null; class
   ].filter(Boolean)
   const asOfLine = asOf.join(", ")
 
+  // Read-only and slow to change, so it is folded away by default (P20); the summary says what is inside.
+  const outcomes = canon.outcomes.length
+  return (
+    <details className={cn("group", className)}>
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-[11px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <ChevronRight aria-hidden className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+        Canon · {outcomes} {outcomes === 1 ? "outcome" : "outcomes"}
+        {canon.stale ? <span className="font-normal normal-case tracking-normal"> · last known</span> : null}
+      </summary>
+      <div className="mt-2">
+        {canon.stale && canon.fetchedAt ? (
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            Last known, fetched {format(new Date(canon.fetchedAt), "d MMM HH:mm")}
+          </p>
+        ) : null}
+        {canon.outcomes.length > 0 ? (
+          <ul className="flex flex-col gap-1">
+            {canon.outcomes.map((outcome) => (
+              <li key={outcome.id} className="text-sm leading-snug">
+                {outcome.title}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {lanes.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {lanes.map((lane) => (
+              <Badge
+                key={lane.id}
+                variant={lane.level === "primary" ? "secondary" : "outline"}
+                className="text-[11px] font-normal"
+                title={lane.level}
+              >
+                {lane.lane.replace(/_/g, " ")}
+                {lane.level === "protected" ? " · protected" : ""}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+        {asOfLine ? (
+          <p className="mt-2 text-xs text-muted-foreground">{asOfLine.charAt(0).toUpperCase() + asOfLine.slice(1)}</p>
+        ) : null}
+      </div>
+    </details>
+  )
+}
+
+/** The current time, updated once a minute, so rows turn "past" without a reload (P20). */
+function useMinuteClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return now
+}
+
+function PastLabel() {
+  return <span className="ml-1.5 rounded-sm bg-muted px-1 py-px text-[10px] font-medium text-muted-foreground">past</span>
+}
+
+/**
+ * Today's time blocks that the card does not already list as a task: blocks without a task, and
+ * blocks of tasks outside Daily Focus. The status shows only when it is not "planned".
+ */
+function ScheduledToday({
+  blocks,
+  todayISO,
+  now,
+  className,
+}: {
+  blocks: DayAgendaEntry[]
+  todayISO: string
+  now: Date
+  className?: string
+}) {
+  if (blocks.length === 0) return null
   return (
     <div className={className}>
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">From canon</p>
-      {canon.stale && canon.fetchedAt ? (
-        <p className="mb-2 text-xs font-medium text-muted-foreground">
-          Last known, fetched {format(new Date(canon.fetchedAt), "d MMM HH:mm")}
-        </p>
-      ) : null}
-      {canon.outcomes.length > 0 ? (
-        <ul className="flex flex-col gap-1">
-          {canon.outcomes.map((outcome) => (
-            <li key={outcome.id} className="text-sm leading-snug">
-              {outcome.title}
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Also scheduled</p>
+      <ul className="flex flex-col gap-1.5">
+        {blocks.map((block) => {
+          const past = isPast(block.endTime, todayISO, now)
+          return (
+            <li key={block.id} className="flex items-baseline gap-3 text-sm">
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {block.startTime}–{block.endTime}
+              </span>
+              <span className={cn("min-w-0 flex-1 truncate leading-snug", past && "text-muted-foreground")}>{block.title}</span>
+              {block.status !== "planned" ? (
+                <Badge variant={block.status === "done" ? "default" : "outline"} className="text-[10px]">
+                  {block.status}
+                </Badge>
+              ) : null}
+              {past && block.status === "planned" ? <PastLabel /> : null}
             </li>
-          ))}
-        </ul>
-      ) : null}
-      {lanes.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {lanes.map((lane) => (
-            <Badge
-              key={lane.id}
-              variant={lane.level === "primary" ? "secondary" : "outline"}
-              className="text-[11px] font-normal"
-              title={lane.level}
-            >
-              {lane.lane.replace(/_/g, " ")}
-              {lane.level === "protected" ? " · protected" : ""}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-      {asOfLine ? (
-        <p className="mt-2 text-xs text-muted-foreground">{asOfLine.charAt(0).toUpperCase() + asOfLine.slice(1)}</p>
-      ) : null}
+          )
+        })}
+      </ul>
     </div>
   )
 }
@@ -378,11 +470,14 @@ export function SuggestedFocusList({
   entries,
   taskTimeSlots,
   onAdd,
+  isTaskPast,
   className,
 }: {
   entries: Array<{ task: Task; linkedProject?: Project }>
   taskTimeSlots: Record<string, TaskTimeSlot>
   onAdd: (taskId: string) => void
+  /** P20: a suggestion whose slot today has ended reads as past; it can still be added. */
+  isTaskPast?: (task: Task) => boolean
   className?: string
 }) {
   if (entries.length === 0) return null
@@ -393,8 +488,8 @@ export function SuggestedFocusList({
         {entries.map(({ task, linkedProject }) => (
           <li key={task.id} className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm leading-snug text-muted-foreground">{task.title}</p>
-              <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} />
+              <p className={cn("text-sm leading-snug text-muted-foreground", isTaskPast?.(task) && "text-muted-foreground/70")}>{task.title}</p>
+              <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} past={isTaskPast?.(task)} />
             </div>
             <Button
               type="button"

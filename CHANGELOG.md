@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-17 - One Today list on the Command Center (P20)
+
+### Changed
+- Daily Focus is now the one place for today. The Week tab's "Today" column is gone; today's blocks that are not already a Daily Focus task or suggestion appear in the Daily Focus card under "Also scheduled", so no block is listed twice.
+- Rows whose time has passed are muted and marked "past", re-checked every minute. A block's status shows only when it is not "planned".
+- "From canon" is folded into "Canon · N outcomes"; open it to see the outcomes and lanes.
+- The Week tab says "Unallocated" instead of "Free" (capacity minus project allocations, same number). "No projects committed this week" has one "Plan week" button.
+
+### Fixed
+- "Set weekly plan" on the empty Week tab now opens the Plan tab; before, it did nothing.
+
+---
+
 ## [Unreleased] - 2026-10-17 - One attention row for an unplanned week (P20)
 
 ### Changed
