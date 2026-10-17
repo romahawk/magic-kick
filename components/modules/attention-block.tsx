@@ -61,9 +61,9 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
   }
 
   return (
-    <section aria-label="Now" className="flex flex-col gap-3">
+    <section aria-labelledby="now-heading" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="font-serif text-xl font-bold tracking-tight">Now</h2>
+        <h2 id="now-heading" className="font-serif text-xl font-bold tracking-tight">Now</h2>
         <span className="text-sm text-muted-foreground">{format(new Date(), "EEEE, d MMMM")}</span>
         <Button variant="outline" size="sm" className="ml-auto h-7 gap-1.5 px-2.5 text-xs" onClick={() => setClosingDay(true)}>
           <MoonStar className="h-3.5 w-3.5" />
@@ -85,8 +85,8 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
         />
 
         {/* Attention — what is wrong */}
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="mb-3 flex items-center gap-2">
+        <div className="@container rounded-xl border border-border bg-card p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Needs attention
             </h3>
@@ -102,7 +102,7 @@ export function AttentionBlock({ onOpenTab }: { onOpenTab: (tab: "plan" | "revie
           {attention.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing needs attention.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
+            <ul role="list" className="flex flex-col divide-y divide-border">
               {attention.items.map((item) => (
                 <AttentionRow key={item.id} item={item} onAction={runEffect} />
               ))}
@@ -129,8 +129,8 @@ function AttentionRow({ item, onAction }: { item: AttentionItem; onAction: (effe
           item.severity === "high" ? "bg-destructive" : "bg-muted-foreground",
         )}
       />
-      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <div className="min-w-0 basis-48 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 @md:flex-row @md:items-start @md:justify-between @md:gap-3">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-snug">{item.subject}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {item.detail}
@@ -141,6 +141,7 @@ function AttentionRow({ item, onAction }: { item: AttentionItem; onAction: (effe
           {item.actions.map((action) => (
             <Button key={action.label} variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => onAction(action.effect)}>
               {action.label}
+              <span className="sr-only"> for {item.subject}</span>
             </Button>
           ))}
         </div>
@@ -190,8 +191,8 @@ function DailyFocusCard({
   const otherBlocks = todayBlocks.filter((block) => !block.linkedTaskId || !listedTaskIds.has(block.linkedTaskId))
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-3 flex items-center gap-2">
+    <div className="@container rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {TASK_LANE_LABELS["daily-focus"]}
         </h3>
@@ -201,7 +202,7 @@ function DailyFocusCard({
         <button
           type="button"
           onClick={() => setActiveModule("todo")}
-          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Open in ToDo
         </button>
@@ -213,7 +214,7 @@ function DailyFocusCard({
           <button
             type="button"
             onClick={() => setActiveModule("todo")}
-            className="underline underline-offset-4 hover:text-foreground"
+            className="underline underline-offset-4 hover:text-foreground rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Pick up to {dailyFocusLimit} tasks
           </button>
@@ -222,7 +223,7 @@ function DailyFocusCard({
       ) : null}
 
       {chosen.length > 0 ? (
-        <ul className="flex flex-col gap-1.5">
+        <ul role="list" className="flex flex-col gap-1.5">
           {chosen.map(({ task, linkedProject }) => {
             // Timed tasks sit in time order, so only untimed ones take a manual position.
             const draggable = !isTimedToday(task)
@@ -375,7 +376,7 @@ function CanonFocus({ canon, className }: { canon: CanonFeedResult | null; class
           </p>
         ) : null}
         {canon.outcomes.length > 0 ? (
-          <ul className="flex flex-col gap-1">
+          <ul role="list" className="flex flex-col gap-1">
             {canon.outcomes.map((outcome) => (
               <li key={outcome.id} className="text-sm leading-snug">
                 {outcome.title}
@@ -439,15 +440,15 @@ function ScheduledToday({
   return (
     <div className={className}>
       <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Also scheduled</p>
-      <ul className="flex flex-col gap-1.5">
+      <ul role="list" className="flex flex-col gap-1.5">
         {blocks.map((block) => {
           const past = isPast(block.endTime, todayISO, now)
           return (
-            <li key={block.id} className="flex items-baseline gap-3 text-sm">
+            <li key={block.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {block.startTime}–{block.endTime}
               </span>
-              <span className={cn("min-w-0 flex-1 truncate leading-snug", past && "text-muted-foreground")}>{block.title}</span>
+              <span className={cn("min-w-0 flex-1 basis-32 leading-snug", past && "text-muted-foreground")}>{block.title}</span>
               {block.status !== "planned" ? (
                 <Badge variant={block.status === "done" ? "default" : "outline"} className="text-[10px]">
                   {block.status}
@@ -481,12 +482,13 @@ export function SuggestedFocusList({
   className?: string
 }) {
   if (entries.length === 0) return null
+  // Its own container, so the rows reflow by the list's width in ToDo as well as here.
   return (
-    <div className={className}>
+    <div className={cn("@container", className)}>
       <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Suggested</p>
-      <ul className="flex flex-col gap-2.5">
+      <ul role="list" className="flex flex-col gap-2.5">
         {entries.map(({ task, linkedProject }) => (
-          <li key={task.id} className="flex items-start gap-3">
+          <li key={task.id} className="flex flex-col gap-2 @md:flex-row @md:items-start @md:gap-3">
             <div className="min-w-0 flex-1">
               <p className={cn("text-sm leading-snug text-muted-foreground", isTaskPast?.(task) && "text-muted-foreground/70")}>{task.title}</p>
               <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} past={isTaskPast?.(task)} />
@@ -495,7 +497,7 @@ export function SuggestedFocusList({
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0 gap-1 px-2 text-xs"
+              className="h-7 shrink-0 gap-1 self-start px-2 text-xs"
               onClick={() => onAdd(task.id)}
               aria-label={`Add ${task.title} to Daily Focus`}
             >
