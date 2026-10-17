@@ -221,6 +221,8 @@ export interface AttentionItem {
 }
 
 const ATTENTION_LIMIT = 6
+/** Project titles named in the grouped "Week not planned" row before "+N more". */
+const OUTCOME_TITLES_SHOWN = 3
 
 function selectOverdueTasks(tasks: Task[]) {
   return tasks
@@ -299,16 +301,30 @@ export function selectAttentionItems(input: {
       actions: [{ label: "Plan", effect: { type: "open-tab", tab: "plan" } }],
     })
   } else {
+    // One cause, one row (P20): several projects without an outcome are one unplanned week.
     const weekOutcomes = selectThisWeekOutcomes(input.weeklyPlans)
-    for (const project of activeProjects.filter((p) => !weekOutcomes.has(p.id))) {
+    const missing = activeProjects.filter((p) => !weekOutcomes.has(p.id))
+    if (missing.length === 1) {
       items.push({
-        id: "outcome-missing:" + project.id,
+        id: "outcome-missing:" + missing[0].id,
         kind: "outcome-missing",
         severity: "medium",
-        subject: "No weekly outcome — " + project.title,
+        subject: "No weekly outcome — " + missing[0].title,
         detail: "Active project with no outcome in this week's plan",
         since: weekStartISO,
-        actions: [{ label: "Set", effect: { type: "open-tab", tab: "plan" } }],
+        actions: [{ label: "Set outcome", effect: { type: "open-tab", tab: "plan" } }],
+      })
+    } else if (missing.length > 1) {
+      const shown = missing.slice(0, OUTCOME_TITLES_SHOWN).map((p) => p.title)
+      const more = missing.length - shown.length
+      items.push({
+        id: "outcome-missing",
+        kind: "outcome-missing",
+        severity: "medium",
+        subject: "Week not planned — " + missing.length + " projects have no outcome",
+        detail: shown.join(" · ") + (more > 0 ? " · +" + more + " more" : ""),
+        since: weekStartISO,
+        actions: [{ label: "Open Plan", effect: { type: "open-tab", tab: "plan" } }],
       })
     }
   }

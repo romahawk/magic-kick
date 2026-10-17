@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -49,6 +49,8 @@ P16 was added on 2026-10-13 by Roman, ranked straight after P14 (nothing else wa
 P17 was added on 2026-10-14 by Roman, ranked straight after P16 (nothing else was unblocked).
 P18 was added on 2026-10-14 by Roman, ranked straight after P17 (nothing else was unblocked).
 P19 was added on 2026-10-15 by Roman, ranked after P11: it starts only after P7 is `done`, and P11 goes first.
+P20 was added on 2026-10-17 by Roman, ranked now, after P11 and before P19: P11's next slice waits on
+his strategy-file ruling (`decision`), and P20 is presentation only.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -556,8 +558,9 @@ route unfreeze is ADR-024 §6.
 
 ### P11 — Write back to the OS · M
 
-**Status:** open (2026-10-15). First slice (Close day) **done** 2026-10-17; second slice (Close day
-UX, ADR-034) in review 2026-10-17.
+**Status:** decision (2026-10-17: criterion 2, strategy-file edits through an OS PR, waits on Roman's
+scope ruling). First slice (Close day) **done** 2026-10-17; second slice (Close day UX, ADR-034)
+merged as #168 2026-10-17.
 
 **First slice done 2026-10-17:** Close day shipped as #166 (ADR-032) and #167 (missed days,
 ADR-033). Checked on production by Roman: the form opened (2026-10-16), and closing 16 Oct produced
@@ -661,6 +664,57 @@ fields, six of them ending "None.". The dialog now starts from the plan.
 **Out of scope:** writing to any other repository, background jobs, webhooks, AI-generated edits.
 
 **Depends on:** P7 (done 2026-10-15); `AIOS_GITHUB_WRITE_TOKEN` and `AIOS_WRITER_UID` in Vercel (Roman).
+
+---
+
+### P20 — Command Center UX v2 · M
+
+**Status:** open (2026-10-17)
+
+**Why:** an audit of the Command Center on real data (17 Oct, 13:44)
+(Roman's local `Claude outputs/command-center-ux-v2.md`, not in the repo)
+found the same blocks listed twice (Daily Focus and the Week tab's Today column), past blocks
+looking live, four "No weekly outcome" rows with one cause and one action, a static canon block in
+prime space, a "planned" badge on every row, "Free 25h" next to "Today 3 blocks" reading as a
+calculation bug, and headings, lists and landmarks that assistive tech cannot follow.
+
+**Shape.** Presentation and pure selectors only: no Firestore schema, rules, store-action or
+write-path change, no new dependency, route or collection. Three PRs, each revertable on its own:
+
+- **CC-1:** one grouped "Week not planned" attention row when 2+ active projects lack a weekly
+  outcome (`lib/execution-os.ts`); one missing outcome keeps its own row ("Set outcome").
+- **CC-2:** Daily Focus is the one Today surface. The day's time blocks move into it as "Also
+  scheduled" (minus blocks whose task the card already lists) and the Week tab's Today column goes,
+  so no block shows twice and blocks without a task stay visible (the #158 list is kept, not
+  dropped). Past rows are flagged "past" (flag only: Close day stays the one place that resolves a
+  day; Roman, 2026-10-17). Status badges only when not "planned". Canon behind a disclosure.
+  "Free" becomes "Unallocated" (same calculation). One "Plan week" button in the empty state.
+- **CC-3:** headings and landmarks, `role="list"`, unique accessible names for attention actions,
+  `aria-current="date"` on today's chip, focus rings, container queries on the Now cards, and a
+  view transition on tab switches (instant under reduced motion or without support).
+
+**Acceptance criteria**
+
+1. With several active projects missing an outcome, Needs attention shows one row for them, naming
+   up to three and "+N more", with one "Open Plan" action. One missing outcome keeps its own row.
+2. No time block appears in two places on the page.
+3. A block whose end time has passed renders "past" (re-checked every minute); no "planned" badge
+   shows anywhere.
+4. Canon is collapsed by default and opens with Enter or Space.
+5. "Open Plan" from Needs attention switches the tab and moves focus to the Plan panel; arrow keys on
+   the tab list keep focus on the trigger.
+6. Tab switches animate where view transitions exist, and are instant elsewhere and under reduced
+   motion, with no errors.
+7. The Now cards reflow at 360, 768 and 1280 px.
+8. axe finds 0 violations on the Command Center.
+9. The diff has no new store write call; Firestore rules are untouched.
+10. Unit tests cover the attention grouping and the past-block check.
+
+**Out of scope (deferred):** Done / Skip / Carry-over on past blocks (writes; overlaps Close day and
+the carry-over prompt); per-day load dots on the day chips; a scroll shadow on the chip row.
+
+**Open question (Roman, DECISIONS_LOG, not UI):** canon lists 5 lanes and 3 outcomes while the load
+row counts 4 active projects against a limit of 3; which list the WIP limit counts is unresolved.
 
 ---
 
