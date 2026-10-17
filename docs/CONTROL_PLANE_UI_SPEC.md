@@ -558,6 +558,12 @@ route unfreeze is ADR-024 §6.
 
 **Status:** open (2026-10-15, first slice: Close day)
 
+**First slice done 2026-10-17:** Close day shipped as #166 (ADR-032) and #167 (missed days,
+ADR-033). Checked on production by Roman: the form opened (2026-10-16), and closing 16 Oct produced
+OS commit `7634893` (`daily-close: 2026-10-16 (Magic Kick)`, one file
+`06_REVIEWS/daily/2026-10-16.md`, with the written-on line). P11 stays open for criterion 2
+(strategy-file edits through a PR), which needs a scope ruling from Roman.
+
 **Why:** ADR-024. Reading the OS (P7) makes Magic Kick a window onto it; a usable UI also has to change
 it. Without write-back, every update still needs a laptop session with the repo checked out.
 
