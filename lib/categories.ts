@@ -3,10 +3,11 @@
 
 import type { OsDomain } from "@/lib/types"
 
-export const DEFAULT_TASK_CATEGORIES = ["Learning", "Sport", "Family/Home", "Hobby", "Travel"]
+export const DEFAULT_TASK_CATEGORIES = ["General", "Learning", "Sport", "Family/Home", "Hobby", "Travel"]
 export const FALLBACK_CATEGORY = "General"
 
 export const DEFAULT_TASK_CATEGORY_COLORS: Record<string, string> = {
+  General: "#64748b",
   Learning: "#22c55e",
   Sport: "#f97316",
   "Family/Home": "#06b6d4",
@@ -19,9 +20,16 @@ export function resolveCategories(categories?: string[]) {
   return categories?.length ? categories : DEFAULT_TASK_CATEGORIES
 }
 
-/** The category new items get when nothing more specific applies. */
+/** The category new items get when nothing more specific applies: "General" when the list has it, else the first. */
 export function firstCategory(categories?: string[]) {
-  return resolveCategories(categories)[0] ?? FALLBACK_CATEGORY
+  const list = resolveCategories(categories)
+  const general = list.find((name) => categoryKey(name) === categoryKey(FALLBACK_CATEGORY))
+  return general ?? list[0] ?? FALLBACK_CATEGORY
+}
+
+/** Alphabetical, ignoring case, so every picker, filter and the manager list categories the same way. */
+export function sortCategories(categories: string[]) {
+  return [...categories].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
 }
 
 export function colorFromCategoryName(name: string) {
@@ -75,7 +83,7 @@ export function categoryDomain(name: string, domains?: Record<string, OsDomain |
 }
 
 /**
- * The category list the app shows: the profile's list plus every category a live task, goal or
+ * The category list the app shows, alphabetical: the profile's list plus every category a live task, goal or
  * project still uses. The profile syncs as one document (newest wins), so its list can lose names
  * that tasks still carry; this keeps those names visible and editable (P14).
  */
@@ -87,5 +95,5 @@ export function withUsedCategories(categories: string[] | undefined, items: Arra
     const name = item.category?.trim()
     if (!item.deleted && name && !known.has(name)) extra.add(name)
   }
-  return [...list, ...[...extra].sort((a, b) => a.localeCompare(b))]
+  return sortCategories([...list, ...extra])
 }
