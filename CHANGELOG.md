@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-18 - Schedule block card opens in a dialog (P21)
+
+### Changed
+- Clicking a block on Schedule opens its card in a centred dialog instead of at the top of the side column. Week allocation, Unscheduled tasks and the collapsed rail stay where they are. Esc, clicking outside or Close shuts it and puts focus back on the block.
+- Blocks can be reached with Tab and opened with Enter or Space.
+
+### Fixed
+- Dragging or resizing a block no longer opens or closes its card when you let go.
+- Screen readers now announce each field in the card with its label.
+
+---
+
 ## [Unreleased] - 2026-10-17 - One attention row for an unplanned week (P20)
 
 ### Changed
