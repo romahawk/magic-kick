@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -53,6 +53,7 @@ P20 was added on 2026-10-17 by Roman, ranked now, after P11 and before P19: P11'
 his strategy-file ruling (`decision`), and P20 is presentation only.
 P21 was added on 2026-10-18 by Roman, ranked after P20, and opened while P20 waits only on its
 landing PR (#172) and his real-data check: an exception to WIP = 1 he approved for one UI-only PR.
+P22 was added on 2026-10-18 by Roman, straight after P21 and stacked on it (same file).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -742,6 +743,28 @@ change, no new dependency. The card (EditPanel, same props and handlers) opens i
 4. A drag or resize never opens the dialog; blocks still drag and resize.
 5. Keyboard: Tab to a block, Enter or Space opens it, Esc closes it, focus comes back.
 6. axe with the dialog open: no violations that this change adds (theme-colour contrast is deferred).
+
+### P22 — Schedule blocks show their category · S
+
+**Status:** open (2026-10-18, stacked on P21)
+
+**Why:** a block's colour showed only its project, so a block without a project carried no colour
+signal and the week's balance across life areas (categories) could not be read from the grid. The
+project-coloured text also failed AA contrast on 11 grid labels (axe, P21).
+
+**Shape.** UI only, in `components/modules/schedule-module.tsx`: fill = project tint (neutral without
+a project); 3 px left edge = the task's category colour from `categoryColor` (the same colours as
+the category chips; neutral when the block has no task); text in the foreground colour; the
+category in the block's accessible name. No store, type or rules change. Plain time blocks have no
+category field, so they keep a neutral edge (a category on time blocks would be a data change).
+
+**Acceptance criteria:**
+1. A task block's left edge has its category colour, with or without a project; the fill is the
+   project tint, or neutral without one.
+2. A plain time block has a neutral edge; Google Calendar blocks are unchanged.
+3. The drag preview and the drop preview from Unscheduled tasks follow the same rule.
+4. The block's accessible name includes the category; axe on the grid has no colour-contrast
+   violations.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

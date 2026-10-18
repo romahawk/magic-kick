@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-18 - Schedule blocks show their category (P22)
+
+### Changed
+- A Schedule block's left edge now shows its task's category colour (the same colour as its category chip), whether or not it has a project. The fill still shows the project; a block without a project has a neutral fill instead of the default purple. Plain time blocks without a task have a grey edge.
+- Block text uses the normal text colour, so titles are easier to read on every project colour. Screen readers now announce the category with each block.
+
+---
+
 ## [Unreleased] - 2026-10-18 - Schedule block card opens in a dialog (P21)
 
 ### Changed
