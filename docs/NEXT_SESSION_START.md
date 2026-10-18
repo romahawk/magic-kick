@@ -1,25 +1,25 @@
 # Next Session Start
 
-**Last updated:** 2026-10-17 (P11 second slice "Close day UX", ADR-034, open as a PR on `feat/p11-close-day-ux`, not merged. First slice proven on production: #167 merged, Roman closed 16 Oct, OS commit `7634893`)
-**Resume on:** `feat/p11-close-day-ux` until its PR is merged, then `main`. Start new work from `main`.
-**Build status:** passing as of 2026-10-17 — `npm run build` exit 0 by hand on `feat/p11-close-day-ux`
+**Last updated:** 2026-10-17 (P20 "Command Center UX v2" open: three stacked PRs, CC-1 → CC-2 → CC-3, not merged. #168 (P11 Close day UX, ADR-034) merged as `58ccc5b` and checked on production by Roman; P11 → `decision`)
+**Resume on:** `feat/p20-cc3-semantics` (stacked on `feat/p20-cc2-one-today`, stacked on `feat/p20-cc1-attention-grouping`, off `main` `58ccc5b`) until the three PRs merge, then `main`.
+**Build status:** passing as of 2026-10-17 — `npm run build` exit 0 by hand on `feat/p20-cc3-semantics`
 **Typecheck status:** passing as of 2026-10-17 — `npm run typecheck` exit 0 (same run, inside `npm test`)
 **Lint status:** passing as of 2026-10-17 — `npm run lint` exit 0 (same run)
-**Test status:** passing as of 2026-10-17 — `npm test` (typecheck + `vitest run`) exit 0, 54 tests in 5 files (`lib/os-feed/` and `lib/close-day*.test.ts`)
-**Note:** `main` is `aac6065` (#166, #167). The branch adds the session-close docs (`2aaac21`, cherry-picked from the unpushed `docs/session-close-2026-10-17`) and the Close day UX slice.
+**Test status:** passing as of 2026-10-17 — `npm test` (typecheck + `vitest run`) exit 0, 64 tests in 7 files
+**Note:** P20 is presentation only (no store write, schema, rules or route change). `chore/tailwind-canonical-classes` (`b5d97e2`, one class) is local only, waiting on Roman.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P11 is `open`.** First slice (Close day, ADR-032 and ADR-033) done and proven. Second slice
-   (Close day UX, ADR-034) is a PR on `feat/p11-close-day-ux`, **not merged**: Roman checks the
-   signed-in close and a real commit on the Vercel preview (sign-in there needs the preview domain in
-   Firebase, step 8) or on production after merge. Then the next slice is criterion 2 (a strategy
-   file edit opens an OS PR), which needs a scope ruling from Roman and **Pull requests: read and
-   write** on the write token. Next by rank after P11: P19 (its own ADR first; `ANTHROPIC_API_KEY`
-   must be set in Vercel to check it on production).
+2. **P20 is `open`** (Command Center UX v2, added 2026-10-17 by Roman, ranked after P11). Three
+   stacked PRs: CC-1 (one "Week not planned" attention row), CC-2 (Daily Focus is the one Today
+   surface, past rows flagged), CC-3 (semantics, container queries, tab view transition). **Merge
+   order CC-1 → CC-2 → CC-3, and retarget each stacked PR to `main` after its base merges** (step 11).
+   Then Roman checks it on real data; P20 → `done`. **P11 is `decision`:** its next slice (strategy
+   files through an OS PR) waits on Roman's scope ruling and the write token's **Pull requests**
+   permission. Next by rank: P19 (its own ADR first; `ANTHROPIC_API_KEY` must be set in Vercel).
 3. **Close day follow-ups (Roman to choose):** field labels follow Roman's canon text for the
    daily-close workflow (still to come). Feeding unticked items into tomorrow's P18 carry-over is a
    later slice with its own ADR (ADR-034, Consequences).
@@ -30,9 +30,9 @@
    (add, edit, delete + Undo, complete, next free slot + Undo, chips, inactive projects hidden).
 5. **Still open from P14:** Goals → Categories on the real account: merge or map categories only
    tasks still use ("Trading", "Job / Career", "Self-performance").
-6. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+6. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
    Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5.
-   **P11:** `open` (2026-10-15), first slice done 2026-10-17, second slice in review. **P19:** `queued` (2026-10-15), gated
+   **P11:** `decision` (2026-10-17), Close day and Close day UX done. **P20:** `open` (2026-10-17). **P19:** `queued` (2026-10-15), gated
    on its own ADR (the AI route freeze, ADR-017). **P10, P15:** still `gated` on P7 in the spec; P7
    is done, so their gates need re-checking when they come up.
 7. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN` (P7,
@@ -52,6 +52,41 @@
 
 ---
 
+## Where we left off (2026-10-17, evening) — P20 Command Center UX v2
+
+**Why:** Roman's audit of the Command Center on real data (17 Oct 13:44, local
+`Claude outputs/command-center-ux-v2.md`) found blocks listed twice, past blocks reading "planned",
+four attention rows with one cause, a static canon block in prime space, "Free" read as a bug, and
+semantics gaps. He made it P20 and ruled "flag only" for past blocks (Close day stays the one place
+that resolves a day).
+
+**What changed (three stacked PRs, not merged):**
+- CC-1 `feat/p20-cc1-attention-grouping`: `selectAttentionItems` groups 2+ missing outcomes into one
+  row (3 titles, "+N more", "Open Plan"); one keeps its row ("Set outcome"). `lib/execution-os.test.ts`.
+  Spec: P20 added, P11 → `decision`.
+- CC-2 `feat/p20-cc2-one-today`: Week-tab Today column removed; today's agenda shows in Daily Focus as
+  "Also scheduled" minus blocks of tasks the card lists (keeps blocks without a task, the #158
+  list); "past" label via `lib/time-blocks.ts` `isPast` (minute timer); status badge only when not
+  "planned"; canon in `<details>`; "Unallocated"; "Plan week"; "Set weekly plan" bug fixed.
+- CC-3 `feat/p20-cc3-semantics`: `aria-labelledby` region, `role="list"`, sr-only action context,
+  `aria-current="date"`, focus rings, `@container` rows, view transition with panel focus from Needs
+  attention only, reduced-motion CSS, Plan/Review labels linked (axe).
+
+**Verified (confirmed):** gates per branch (commit hook) and `npm test` 64 tests. Headless Edge, demo
+mode with seeded time blocks and an empty plan, 360/768/1280 px: each block once, 0 "planned" badges,
+"past" on ended rows, grouped attention row, no overflow, no console errors; "Open Plan" → Plan
+panel focused; ArrowRight keeps focus on the tab; reduced motion switches; axe-core 4.10.2 on
+`<main>`: 0 violations on Week, Plan and Review.
+
+**Not verified:** real account data; canon disclosure in a browser (demo has no canon); the visual
+cross-fade (only that `startViewTransition` runs without errors); Safari and Firefox; light theme;
+axe outside `<main>` (sidebar, top bar).
+
+**Found, not changed:** attention rows are not sorted by severity (fixed push order: a medium "Last
+week not reviewed" sits above high overdue tasks). Roman to decide.
+
+---
+
 ## Where we left off (2026-10-17, later) — P11 second slice, Close day UX (ADR-034)
 
 **Why:** Roman's first real close (16 Oct) was eight empty fields; he retyped his plan and six of
@@ -59,7 +94,7 @@ eight sections were "None.". A missed day's Carry Forward started empty because 
 Daily Focus history. Roman's slice brief (2026-10-17) asked for a checklist from the plan, chips,
 four essentials with "More", and a 7-day snapshot, on the same write path.
 
-**What changed (on `feat/p11-close-day-ux`, PR open, not merged):**
+**What changed (#168, merged 2026-10-17 as `58ccc5b`, checked on production by Roman):**
 - `lib/close-day.ts` (new, pure): checklist (Daily Focus, then `selectDayAgenda` blocks, then other
   completed tasks, once each), `composeCloseDayFields` (ticked → Completed, unticked → Carry
   Forward as `- <title>: <note>`, own text after), chips (presets, save, remove, insert), snapshots
@@ -178,9 +213,12 @@ to close a missed day too (6 days back, marked "Written on …").
   rail; also light theme and a narrow window.
 - **Real-data check of P14** (Start here, step 5): orphaned categories listed, merged or mapped;
   then confirm the new fields round-trip through Firestore on a second device.
-- **Bug (found 2026-10-14):** Command Center with no weekly plan shows "Set weekly plan", which
-  calls `setActiveModule("command-center")`, the module already open, so it does nothing. It
-  should open the Plan tab.
+- **Bug (found 2026-10-14):** "Set weekly plan" did nothing; fixed in P20 CC-2 (opens the Plan tab).
+- **Attention order (found 2026-10-17):** rows are not sorted by severity. Roman to decide.
+- **P20 deferred:** Done / Skip on past blocks (writes; overlaps Close day), per-day load dots on the
+  day chips, a scroll shadow on the chip row. **Canon vs WIP limit:** canon lists 5 lanes and 3
+  outcomes while the load row counts 4 active projects against a limit of 3; which list counts is a
+  DECISIONS_LOG question.
 - **Bug (found 2026-10-14):** in demo mode a loading skeleton stays under the Week tab
   (probably `coachingLoading` never cleared when AI is off or there is no auth token). Not investigated.
 - **P18 follow-ups (Roman to decide):** ToDo's default "Date: earliest" sort orders Daily Focus
@@ -223,7 +261,8 @@ to close a missed day too (6 days back, marked "Written on …").
   (#159), `fix/land-p18-on-main` (#160), `docs/session-close-2026-10-14-p18` (#161),
   `feat/p7-plan-feed` (#162), `feat/p7-canon-feed` (#163), `fix/schedule-block-category` (#164),
   `docs/session-close-2026-10-15` (#165), `feat/p11-close-day` (#166),
-  `feat/p11-close-missed-day` (#167). Their work is on `main`; the only commit not on `main` is
+  `feat/p11-close-missed-day` (#167). `feat/p11-close-day-ux` (#168) and the screenshot branch were
+  deleted 2026-10-17 (screenshots kept under tag `pr168-screenshots`). Their work is on `main`; the only commit not on `main` is
   `08f859d`, carried by `fix/p18-carryover-button`.
 - **Older branches.** Local `dev` is merged into `origin/main` (confirmed 2026-10-17) and can be
   deleted. Not confirmed merged: local `ai-control-tower` (origin gone),

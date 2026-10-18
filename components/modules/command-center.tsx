@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import type { Dispatch, SetStateAction } from "react"
 import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
@@ -61,7 +62,6 @@ export function CommandCenter() {
   const weeklyReviews = useAppStore((s) => s.weeklyReviews)
   const saveWeeklyPlan = useAppStore((s) => s.saveWeeklyPlan)
   const saveWeeklyReview = useAppStore((s) => s.saveWeeklyReview)
-  const setActiveModule = useAppStore((s) => s.setActiveModule)
   const insights = useAppStore((s) => s.insights)
   const insightsLoading = useAppStore((s) => s.insightsLoading)
   const insightsFetchedWeek = useAppStore((s) => s.insightsFetchedWeek)
@@ -101,6 +101,23 @@ export function CommandCenter() {
   const reviewPlanHours = selectProjectHours(reviewPlan, timeBlocks, executionLogs)
 
   const [tab, setTab] = useState("week")
+  const panelRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // P20: a tab switch cross-fades where view transitions exist, instantly otherwise and under
+  // reduced motion. Focus moves to the new panel only when the switch came from Needs attention;
+  // arrow keys on the tab list keep focus on the trigger.
+  function switchTab(next: string, focusPanel = false) {
+    const focus = () => {
+      if (focusPanel) panelRefs.current[next]?.focus({ preventScroll: true })
+    }
+    if (typeof document.startViewTransition !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setTab(next)
+      requestAnimationFrame(focus)
+      return
+    }
+    const transition = document.startViewTransition(() => flushSync(() => setTab(next)))
+    transition.finished.finally(focus)
+  }
   const [planSaveModal, setPlanSaveModal] = useState<{
     open: boolean
     status: "success" | "error"
@@ -184,28 +201,41 @@ export function CommandCenter() {
         </p>
       </div>
 
-      <AttentionBlock onOpenTab={setTab} />
+      <AttentionBlock onOpenTab={(next) => switchTab(next, true)} />
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
+      <Tabs value={tab} onValueChange={(next) => switchTab(next)} className="w-full">
         <TabsList className="grid w-full max-w-sm grid-cols-3">
           <TabsTrigger value="week">Week</TabsTrigger>
           <TabsTrigger value="plan">Plan</TabsTrigger>
           <TabsTrigger value="review">Review</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="week" className="mt-4 space-y-4">
+        <TabsContent
+          value="week"
+          ref={(element) => {
+            panelRefs.current.week = element
+          }}
+          tabIndex={-1}
+          className="mt-4 focus-visible:outline-none space-y-4">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border/60 bg-card px-4 py-2.5 text-sm">
             <div className="flex flex-wrap gap-1.5">
               {weekDays.map((day) => (
-                <Badge key={day.iso} variant={day.iso === todayISO ? "default" : "secondary"} className="text-[11px]">
+                <Badge
+                  key={day.iso}
+                  variant={day.iso === todayISO ? "default" : "secondary"}
+                  className="text-[11px]"
+                  aria-current={day.iso === todayISO ? "date" : undefined}
+                >
                   {day.label} {day.dayNumber}
+                  {day.iso === todayISO ? <span className="sr-only"> (today)</span> : null}
                 </Badge>
               ))}
             </div>
             <div className="ml-auto flex items-center gap-5">
               <StatusPill label="Capacity" value={activePlan ? `${activePlan.totalCapacityHours}h` : "—"} />
               <StatusPill
-                label="Free"
+                label="Unallocated"
+                title="Capacity minus project allocations"
                 value={activePlan ? `${activePlanValidation.remainingHours}h` : "—"}
                 highlight={activePlan ? (activePlanValidation.isOverCapacity ? "warn" : "ok") : undefined}
               />
@@ -226,74 +256,56 @@ export function CommandCenter() {
                     Set capacity, pick up to three projects, assign hours — then go execute.
                   </p>
                 </div>
-                <Button onClick={() => setActiveModule("command-center")}>Set weekly plan</Button>
+                <Button onClick={() => setTab("plan")}>Set weekly plan</Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-              <div className="space-y-1.5">
-                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Committed this week
-                </p>
-                {projectHours.length === 0 ? (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                    No projects committed this week.{" "}
-                    <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab("plan")}>
-                      Open Plan
-                    </button>.
-                  </div>
-                ) : null}
-                {projectHours.map((item) => {
-                  const project = projects.find((p) => p.id === item.projectId)
-                  const deliveredPct =
-                    item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
-                  return (
-                    <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
-                      <PriorityDot priority={item.priority} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium leading-tight">{project?.title ?? "Unknown"}</p>
-                        <p className="truncate text-xs text-muted-foreground">{item.weeklyOutcome}</p>
-                      </div>
-                      <div className="w-36 shrink-0">
-                        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{item.actualHours}h / {item.allocatedHours}h</span>
-                          <span>{Math.round(deliveredPct)}%</span>
-                        </div>
-                        <Progress value={deliveredPct} className="h-1" />
-                      </div>
+            <div className="space-y-1.5">
+              <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Committed this week
+              </h3>
+              {projectHours.length === 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                  No projects committed this week.
+                  <Button size="sm" onClick={() => setTab("plan")}>
+                    Plan week
+                  </Button>
+                </div>
+              ) : null}
+              {projectHours.map((item) => {
+                const project = projects.find((p) => p.id === item.projectId)
+                const deliveredPct =
+                  item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
+                return (
+                  <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
+                    <PriorityDot priority={item.priority} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium leading-tight">{project?.title ?? "Unknown"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{item.weeklyOutcome}</p>
                     </div>
-                  )
-                })}
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Today — {format(new Date(`${todayISO}T12:00:00`), "EEE d")}
-                </p>
-                {todayBlocks.length === 0 ? (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                    No blocks yet. Open{" "}
-                    <button className="underline underline-offset-2 hover:text-foreground" onClick={() => setActiveModule("schedule")}>
-                      Schedule
-                    </button>.
-                  </div>
-                ) : (
-                  todayBlocks.map((block) => (
-                    <div key={block.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2">
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{block.startTime}–{block.endTime}</span>
-                      <span className="flex-1 truncate text-sm">{block.title}</span>
-                      <Badge variant={block.status === "done" ? "default" : "outline"} className="text-[10px]">{block.status}</Badge>
+                    <div className="w-36 shrink-0">
+                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{item.actualHours}h / {item.allocatedHours}h</span>
+                        <span>{Math.round(deliveredPct)}%</span>
+                      </div>
+                      <Progress value={deliveredPct} className="h-1" />
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+                )
+              })}
             </div>
           )}
 
           <InsightList insights={insights} loading={insightsLoading} onDismiss={dismissInsight} />
         </TabsContent>
 
-        <TabsContent value="plan" className="mt-4">
+        <TabsContent
+          value="plan"
+          ref={(element) => {
+            panelRefs.current.plan = element
+          }}
+          tabIndex={-1}
+          className="mt-4 focus-visible:outline-none">
           <PlanTabContent
             key={`${activePlan?.id ?? weekStartISO}:${activePlan?.clientUpdatedAt ?? 0}`}
             activePlan={activePlan}
@@ -305,7 +317,13 @@ export function CommandCenter() {
           />
         </TabsContent>
 
-        <TabsContent value="review" className="mt-4">
+        <TabsContent
+          value="review"
+          ref={(element) => {
+            panelRefs.current.review = element
+          }}
+          tabIndex={-1}
+          className="mt-4 focus-visible:outline-none">
           <WeeklyReviewCard
             key={reviewPlan?.id ?? "none"}
             plan={reviewPlan}
@@ -460,9 +478,9 @@ function PlanTabContent({
             {draftAllocations.map((allocation, index) => (
               <div key={`${allocation.projectId || "empty"}-${index}`} className="grid gap-2 rounded-lg border border-border/70 p-3 lg:grid-cols-[1.8fr_0.7fr_0.7fr_2fr_auto]">
                 <div className="space-y-1">
-                  <Label className="text-xs">Project</Label>
+                  <Label htmlFor={`allocation-${index}-project`} className="text-xs">Project</Label>
                   <Select value={allocation.projectId || "none"} onValueChange={(value) => updateAllocation(index, { projectId: value === "none" ? "" : value })}>
-                    <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                    <SelectTrigger id={`allocation-${index}-project`}><SelectValue placeholder="Select project" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Select project</SelectItem>
                       {[
@@ -475,19 +493,19 @@ function PlanTabContent({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Priority</Label>
+                  <Label htmlFor={`allocation-${index}-priority`} className="text-xs">Priority</Label>
                   <Select value={allocation.priority} onValueChange={(value) => updateAllocation(index, { priority: value as ProjectPriority })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id={`allocation-${index}-priority`}><SelectValue /></SelectTrigger>
                     <SelectContent>{PRIORITY_OPTIONS.map((priority) => <SelectItem key={priority} value={priority}>{priority}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Hours</Label>
-                  <Input type="number" min={1} max={40} value={allocation.hoursAllocated || ""} onChange={(e) => updateAllocation(index, { hoursAllocated: Number(e.target.value) || 0 })} />
+                  <Label htmlFor={`allocation-${index}-hours`} className="text-xs">Hours</Label>
+                  <Input id={`allocation-${index}-hours`} type="number" min={1} max={40} value={allocation.hoursAllocated || ""} onChange={(e) => updateAllocation(index, { hoursAllocated: Number(e.target.value) || 0 })} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Weekly outcome</Label>
-                  <Input value={allocation.weeklyOutcome} onChange={(e) => updateAllocation(index, { weeklyOutcome: e.target.value })} placeholder="One concrete result for this week" />
+                  <Label htmlFor={`allocation-${index}-outcome`} className="text-xs">Weekly outcome</Label>
+                  <Input id={`allocation-${index}-outcome`} value={allocation.weeklyOutcome} onChange={(e) => updateAllocation(index, { weeklyOutcome: e.target.value })} placeholder="One concrete result for this week" />
                 </div>
                 <div className="flex items-end">
                   <Button type="button" variant="ghost" size="icon" onClick={() => removeAllocation(index)} aria-label={`Remove allocation ${index + 1}`}>
@@ -534,9 +552,9 @@ function PriorityDot({ priority }: { priority: string }) {
   )
 }
 
-function StatusPill({ label, value, highlight }: { label: string; value: string; highlight?: "ok" | "warn" }) {
+function StatusPill({ label, value, highlight, title }: { label: string; value: string; highlight?: "ok" | "warn"; title?: string }) {
   return (
-    <span className="text-sm">
+    <span className="text-sm" title={title}>
       <span className="text-muted-foreground">{label} </span>
       <span className={cn("font-medium", highlight === "ok" && "text-emerald-400", highlight === "warn" && "text-amber-400")}>
         {value}
@@ -646,9 +664,9 @@ function WeeklyReviewCard({
                   </div>
                   <div className="grid gap-2 sm:grid-cols-[auto_1fr_2fr]">
                     <div className="space-y-1">
-                      <Label className="text-xs">Achieved?</Label>
+                      <Label htmlFor={`review-${allocation.projectId}-achieved`} className="text-xs">Achieved?</Label>
                       <Select value={String(entry?.achieved ?? false)} onValueChange={(value) => updateReview(allocation.projectId, { achieved: value === "true" })}>
-                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectTrigger id={`review-${allocation.projectId}-achieved`} className="w-24"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="true">Yes</SelectItem>
                           <SelectItem value="false">No</SelectItem>
@@ -656,9 +674,9 @@ function WeeklyReviewCard({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Decision</Label>
+                      <Label htmlFor={`review-${allocation.projectId}-decision`} className="text-xs">Decision</Label>
                       <Select value={entry?.decision ?? "continue"} onValueChange={(value) => updateReview(allocation.projectId, { decision: value as "continue" | "adjust" | "remove" })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger id={`review-${allocation.projectId}-decision`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="continue">Continue</SelectItem>
                           <SelectItem value="adjust">Adjust</SelectItem>
@@ -667,8 +685,8 @@ function WeeklyReviewCard({
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Notes</Label>
-                      <Textarea value={entry?.notes ?? ""} onChange={(e) => updateReview(allocation.projectId, { notes: e.target.value })} placeholder="What should change next week?" className="min-h-9 resize-none" rows={1} />
+                      <Label htmlFor={`review-${allocation.projectId}-notes`} className="text-xs">Notes</Label>
+                      <Textarea id={`review-${allocation.projectId}-notes`} value={entry?.notes ?? ""} onChange={(e) => updateReview(allocation.projectId, { notes: e.target.value })} placeholder="What should change next week?" className="min-h-9 resize-none" rows={1} />
                     </div>
                   </div>
                 </div>
