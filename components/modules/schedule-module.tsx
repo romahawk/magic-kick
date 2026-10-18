@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, externalBlockDateParts, selectTaskTimeSlots, selectTimeBlocksForDates, taskDurationMin } from "@/lib/weekly-plan"
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { ChevronLeft, ChevronRight, X, CheckCircle2, Focus, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
 import { toast } from "sonner"
 import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
@@ -146,6 +147,7 @@ interface DragState {
   origStart: string
   origEnd: string
   origDay: string
+  mouseStartX: number
   mouseStartY: number
   blockOffsetY: number
 }
@@ -233,6 +235,11 @@ export function ScheduleModule() {
   })
 
   const dragRef = useRef<DragState | null>(null)
+  // A drag or resize ends in a click on the block; this stops that click opening the card.
+  const suppressClickRef = useRef(false)
+  // The block the card was opened from, so focus goes back to it when the dialog closes.
+  const editOriginRef = useRef<HTMLElement | null>(null)
+  const gridScrollRef = useRef<HTMLDivElement | null>(null)
   const tasksPanelRef = useRef<HTMLDivElement | null>(null)
   const externalCalendarBlocksRef = useRef(allExternalCalendarBlocks)
 
@@ -432,7 +439,21 @@ export function ScheduleModule() {
   const openUnscheduledTasks = tasks.filter((task) => !task.completed && !taskTimeSlots[task.id])
   const unscheduledTasks = openUnscheduledTasks.filter((task) => !task.linkedProjectId || activeProjectIds.has(task.linkedProjectId))
   const hiddenUnscheduledCount = openUnscheduledTasks.length - unscheduledTasks.length
-  const showSideColumn = !tasksPanelCollapsed || editBlock !== null
+  const showSideColumn = !tasksPanelCollapsed
+
+  function openBlockCard(blockId: string, origin: HTMLElement) {
+    editOriginRef.current = origin
+    setEditId(blockId)
+    setCreating(null)
+  }
+
+  function returnFocusToBlock(e: Event) {
+    e.preventDefault()
+    const origin = editOriginRef.current
+    editOriginRef.current = null
+    if (origin?.isConnected) origin.focus()
+    else gridScrollRef.current?.focus()
+  }
 
   const visibleDateLabel =
     view === "week"
@@ -556,6 +577,7 @@ export function ScheduleModule() {
   function blockMouseDown(e: React.MouseEvent, block: DisplayBlock, mode: "move" | "resize") {
     e.stopPropagation()
     e.preventDefault()
+    suppressClickRef.current = false
     const colEl = document.querySelector(`[data-day="${block.dateISO}"]`) as HTMLElement | null
     const colTop = colEl?.getBoundingClientRect().top ?? 0
     dragRef.current = {
@@ -565,6 +587,7 @@ export function ScheduleModule() {
       origStart: block.startTime,
       origEnd: block.endTime,
       origDay: block.dateISO,
+      mouseStartX: e.clientX,
       mouseStartY: e.clientY,
       blockOffsetY: e.clientY - colTop - toY(block.startTime),
     }
@@ -580,6 +603,9 @@ export function ScheduleModule() {
     function onMove(e: MouseEvent) {
       const drag = dragRef.current
       if (!drag) return
+      if (Math.abs(e.clientX - drag.mouseStartX) > 4 || Math.abs(e.clientY - drag.mouseStartY) > 4) {
+        suppressClickRef.current = true
+      }
 
       let targetDay = drag.origDay
       const cols = document.querySelectorAll("[data-day]")
@@ -743,7 +769,7 @@ export function ScheduleModule() {
 
       <div className="flex flex-1 gap-4 overflow-hidden">
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
-          <div className="flex flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <div ref={gridScrollRef} tabIndex={-1} className="flex flex-1 overflow-y-auto outline-none [scrollbar-gutter:stable]">
             <div className="flex min-h-full min-w-full flex-col">
               <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85">
                 <div className="w-14 shrink-0 border-r" />
@@ -886,8 +912,11 @@ export function ScheduleModule() {
                           return (
                             <div
                               key={block.id}
+                              tabIndex={isExternal ? undefined : 0}
+                              role={isExternal ? undefined : "button"}
+                              aria-label={isExternal ? undefined : `${block.taskDescription}, ${displayStart}–${displayEnd}`}
                               className={cn(
-                                "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs",
+                                "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 isExternal && "border border-dashed",
                                 isEditing && "ring-2 ring-primary ring-offset-1",
                                 isPreview && "opacity-90"
@@ -907,9 +936,25 @@ export function ScheduleModule() {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation()
+                                if (suppressClickRef.current) {
+                                  suppressClickRef.current = false
+                                  return
+                                }
                                 if (isExternal) return
-                                setEditId(editId === block.id ? null : block.id)
-                                setCreating(null)
+                                openBlockCard(block.id, e.currentTarget)
+                              }}
+                              onKeyDown={(e) => {
+                                if (isExternal || e.target !== e.currentTarget) return
+                                if (e.key === "Enter") {
+                                  e.preventDefault()
+                                  openBlockCard(block.id, e.currentTarget)
+                                } else if (e.key === " ") {
+                                  e.preventDefault()
+                                }
+                              }}
+                              onKeyUp={(e) => {
+                                if (isExternal || e.target !== e.currentTarget || e.key !== " ") return
+                                openBlockCard(block.id, e.currentTarget)
                               }}
                             >
                               <TruncatedTooltip
@@ -1058,37 +1103,6 @@ export function ScheduleModule() {
 
         {showSideColumn ? (
         <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
-          {editBlock ? (
-            <EditPanel
-              key={editBlock.id}
-              block={editBlock}
-              linkedTask={editTask}
-              project={projects.find((p) => p.id === editBlock.projectId)}
-              allProjects={activeProjects}
-              allCategories={categories}
-              onUpdateTask={(updates, timing) => {
-                if (!editBlock.linkedTaskId) return
-                updateTask(editBlock.linkedTaskId, updates, timing)
-              }}
-              onUpdateTimeBlock={(updates) => {
-                if (editBlock.sourceType !== "time-block") return
-                updateTimeBlock(editBlock.id, updates)
-              }}
-              onToggleOccurrenceDone={() => {
-                if (!editTask || !isRecurringTask(editTask)) return
-                toggleTaskOccurrence(editTask.id, editBlock.dateISO)
-              }}
-              onRemoveFromSchedule={() => {
-                if (editBlock.linkedTaskId) {
-                  updateTask(editBlock.linkedTaskId, { dueDate: undefined, repeat: "none" }, { clearTimeSlot: true })
-                } else {
-                  deleteTimeBlock(editBlock.id)
-                }
-                setEditId(null)
-              }}
-              onClose={() => setEditId(null)}
-            />
-          ) : null}
 
           {!tasksPanelCollapsed && activePlan && projectHours.length > 0 ? (
             <div className="rounded-xl border bg-card p-4">
@@ -1165,6 +1179,42 @@ export function ScheduleModule() {
         )}
       </div>
 
+      <Dialog open={editBlock !== null} onOpenChange={(open) => { if (!open) setEditId(null) }}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-md" onCloseAutoFocus={returnFocusToBlock}>
+          {editBlock ? (
+            <EditPanel
+              key={editBlock.id}
+              block={editBlock}
+              linkedTask={editTask}
+              project={projects.find((p) => p.id === editBlock.projectId)}
+              allProjects={activeProjects}
+              allCategories={categories}
+              onUpdateTask={(updates, timing) => {
+                if (!editBlock.linkedTaskId) return
+                updateTask(editBlock.linkedTaskId, updates, timing)
+              }}
+              onUpdateTimeBlock={(updates) => {
+                if (editBlock.sourceType !== "time-block") return
+                updateTimeBlock(editBlock.id, updates)
+              }}
+              onToggleOccurrenceDone={() => {
+                if (!editTask || !isRecurringTask(editTask)) return
+                toggleTaskOccurrence(editTask.id, editBlock.dateISO)
+              }}
+              onRemoveFromSchedule={() => {
+                if (editBlock.linkedTaskId) {
+                  updateTask(editBlock.linkedTaskId, { dueDate: undefined, repeat: "none" }, { clearTimeSlot: true })
+                } else {
+                  deleteTimeBlock(editBlock.id)
+                }
+                setEditId(null)
+              }}
+              onClose={() => setEditId(null)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <TaskDetailSheet
         taskId={openTaskId}
         timeSlot={openTaskId ? taskTimeSlots[openTaskId] : undefined}
@@ -1205,6 +1255,7 @@ function EditPanel({
   const dailyFocusLimit = useAppStore((s) => s.profile.systemConfig?.dailyFocusLimit ?? 3)
   const focusCount = useAppStore((s) => s.tasks.filter((t) => !t.deleted && !t.completed && t.lane === "daily-focus").length)
   const inFocus = linkedTask?.lane === "daily-focus"
+  const fieldId = useId()
 
   // P18: the block shows, and can change, whether its task is in today's Daily Focus.
   function toggleFocus() {
@@ -1260,19 +1311,15 @@ function EditPanel({
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: project ? normalizeProjectColor(project.color) : "#94a3b8" }} />
-          <TruncatedTooltip
-            as="p"
-            content={project?.title ?? "No project"}
-            className="truncate text-sm font-semibold"
-          />
-        </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="h-4 w-4" />
-        </button>
+    <div>
+      <div className="mb-3 flex items-center gap-2 pr-6">
+        <div className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: project ? normalizeProjectColor(project.color) : "#94a3b8" }} />
+        <DialogTitle className="min-w-0 truncate text-sm font-semibold">
+          <TruncatedTooltip content={project?.title ?? "No project"} />
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          {block.taskDescription} · {format(parseISO(`${block.dateISO}T12:00:00`), "EEE, MMM d")} · {block.startTime}–{block.endTime}
+        </DialogDescription>
       </div>
       <div className="space-y-3">
         {linkedTask ? (
@@ -1302,15 +1349,15 @@ function EditPanel({
         ) : null}
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Description</Label>
-          <Input value={block.taskDescription} onChange={(e) => updateDescription(e.target.value)} />
+          <Label htmlFor={`${fieldId}-desc`} className="text-xs">Description</Label>
+          <Input id={`${fieldId}-desc`} value={block.taskDescription} onChange={(e) => updateDescription(e.target.value)} />
         </div>
 
         {linkedTask ? (
           <div className="space-y-1.5">
-            <Label className="text-xs">Category</Label>
+            <Label htmlFor={`${fieldId}-category`} className="text-xs">Category</Label>
             <Select value={linkedTask.category} onValueChange={(value) => onUpdateTask({ category: value })}>
-              <SelectTrigger>
+              <SelectTrigger id={`${fieldId}-category`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1324,9 +1371,10 @@ function EditPanel({
 
         {linkedTask ? (
           <div className="space-y-1.5">
-            <Label className="text-xs">Due date</Label>
+            <Label htmlFor={`${fieldId}-due`} className="text-xs">Due date</Label>
             <div className="flex gap-1.5">
               <Input
+                id={`${fieldId}-due`}
                 type="date"
                 value={linkedTask.dueDate ?? ""}
                 onChange={(e) => onUpdateTask({ dueDate: e.target.value || undefined })}
@@ -1346,11 +1394,11 @@ function EditPanel({
         ) : null}
 
         <div className="space-y-1.5">
-          <Label className="text-xs">
+          <Label htmlFor={`${fieldId}-project`} className="text-xs">
             Project <span className="text-muted-foreground">(optional)</span>
           </Label>
           <Select value={block.projectId ?? "none"} onValueChange={(value) => updateProject(value === "none" ? "" : value)}>
-            <SelectTrigger>
+            <SelectTrigger id={`${fieldId}-project`}>
               <SelectValue placeholder="No project" />
             </SelectTrigger>
             <SelectContent>
@@ -1365,20 +1413,20 @@ function EditPanel({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Start</Label>
-            <Input type="time" value={block.startTime} onChange={(e) => updateTimes(e.target.value, block.endTime)} />
+            <Label htmlFor={`${fieldId}-start`} className="text-xs">Start</Label>
+            <Input id={`${fieldId}-start`} type="time" value={block.startTime} onChange={(e) => updateTimes(e.target.value, block.endTime)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">End</Label>
-            <Input type="time" value={block.endTime} onChange={(e) => updateTimes(block.startTime, e.target.value)} />
+            <Label htmlFor={`${fieldId}-end`} className="text-xs">End</Label>
+            <Input id={`${fieldId}-end`} type="time" value={block.endTime} onChange={(e) => updateTimes(block.startTime, e.target.value)} />
           </div>
         </div>
 
         {linkedTask ? (
           <div className="space-y-1.5">
-            <Label className="text-xs">Repeat</Label>
+            <Label htmlFor={`${fieldId}-repeat`} className="text-xs">Repeat</Label>
             <Select value={repeatValue} onValueChange={(value) => onUpdateTask({ repeat: value as TaskRepeat })}>
-              <SelectTrigger>
+              <SelectTrigger id={`${fieldId}-repeat`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1428,7 +1476,7 @@ function EditPanel({
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Notes</Label>
+            <Label htmlFor={`${fieldId}-notes`} className="text-xs">Notes</Label>
             {notesMode === "view" ? (
               <button
                 onClick={() => setNotesMode("edit")}
@@ -1445,6 +1493,7 @@ function EditPanel({
           ) : (
             <>
               <Textarea
+                id={`${fieldId}-notes`}
                 value={localNotes}
                 onChange={(e) => setLocalNotes(e.target.value)}
                 placeholder="Add notes…"
@@ -1474,8 +1523,9 @@ function EditPanel({
           <>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
-                <Label className="text-xs">Actual hours</Label>
+                <Label htmlFor={`${fieldId}-actual`} className="text-xs">Actual hours</Label>
                 <Input
+                  id={`${fieldId}-actual`}
                   type="number"
                   min={0}
                   step={0.25}
@@ -1484,9 +1534,9 @@ function EditPanel({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Status</Label>
+                <Label htmlFor={`${fieldId}-status`} className="text-xs">Status</Label>
                 <Select value={block.status} onValueChange={(value) => onUpdateTimeBlock({ status: value as TimeBlock["status"] })}>
-                  <SelectTrigger>
+                  <SelectTrigger id={`${fieldId}-status`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
