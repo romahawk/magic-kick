@@ -10,6 +10,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Changed
 - Category lists are alphabetical everywhere: pickers, filters and Goals → Categories. Their stored order is unchanged.
 - New tasks, blocks and goals start in "General" when your list has it, instead of the first category in the list. A project's own category still wins for tasks added to that project. New profiles and demo mode now include "General".
+## [Unreleased] - 2026-10-18 - Schedule block card opens in a dialog (P21)
+
+### Changed
+- Clicking a block on Schedule opens its card in a centred dialog instead of at the top of the side column. Week allocation, Unscheduled tasks and the collapsed rail stay where they are. Esc, clicking outside or Close shuts it and puts focus back on the block.
+- Blocks can be reached with Tab and opened with Enter or Space.
+
+### Fixed
+- Dragging or resizing a block no longer opens or closes its card when you let go.
+- Screen readers now announce each field in the card with its label.
 
 ---
 

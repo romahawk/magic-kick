@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -51,6 +51,8 @@ P18 was added on 2026-10-14 by Roman, ranked straight after P17 (nothing else wa
 P19 was added on 2026-10-15 by Roman, ranked after P11: it starts only after P7 is `done`, and P11 goes first.
 P20 was added on 2026-10-17 by Roman, ranked now, after P11 and before P19: P11's next slice waits on
 his strategy-file ruling (`decision`), and P20 is presentation only.
+P21 was added on 2026-10-18 by Roman, ranked after P20, and opened while P20 waits only on its
+landing PR (#172) and his real-data check: an exception to WIP = 1 he approved for one UI-only PR.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -717,6 +719,29 @@ the carry-over prompt); per-day load dots on the day chips; a scroll shadow on t
 row counts 4 active projects against a limit of 3; which list the WIP limit counts is unresolved.
 
 ---
+
+### P21 — Schedule block card in a dialog · S
+
+**Status:** open (2026-10-18, alongside P20 by Roman's exception)
+
+**Why:** clicking a Schedule block opened its card at the top of the side column, which expanded a
+collapsed tasks panel and pushed Week allocation and Unscheduled tasks down, so the grid and the side
+column changed size on every click.
+
+**Shape.** UI only, in `components/modules/schedule-module.tsx`: no store, Firestore, rules or type
+change, no new dependency. The card (EditPanel, same props and handlers) opens in the existing
+`components/ui/dialog.tsx`. One PR, revertable on its own.
+
+**Acceptance criteria:**
+1. Clicking a block opens a centred dialog; the side column does not move, resize or reorder, and a
+   collapsed tasks panel stays collapsed.
+2. Esc, the overlay and the Close button close it, and focus returns to the block (to the grid when
+   the block is gone, after Remove from schedule).
+3. Every edit works as before; selects open above the dialog; at 1366×768 and 390 px the dialog fits
+   and scrolls inside itself.
+4. A drag or resize never opens the dialog; blocks still drag and resize.
+5. Keyboard: Tab to a block, Enter or Space opens it, Esc closes it, focus comes back.
+6. axe with the dialog open: no violations that this change adds (theme-colour contrast is deferred).
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 
