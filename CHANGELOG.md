@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-18 - New tasks start in General; categories listed A–Z
+
+### Changed
+- Category lists are alphabetical everywhere: pickers, filters and Goals → Categories. Their stored order is unchanged.
+- New tasks, blocks and goals start in "General" when your list has it, instead of the first category in the list. A project's own category still wins for tasks added to that project. New profiles and demo mode now include "General".
 ## [Unreleased] - 2026-10-18 - Schedule block card opens in a dialog (P21)
 
 ### Changed
