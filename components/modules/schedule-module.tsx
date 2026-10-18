@@ -25,7 +25,7 @@ import { ScheduleSuggestionPanel } from "@/components/ai/ScheduleSuggestionPanel
 import { syncGoogleCalendarEvents } from "@/lib/calendar/google-calendar-sync"
 import { getCachedGoogleCalendarAccessToken } from "@/lib/calendar/google-oauth"
 import { useCategories } from "@/hooks/use-categories"
-import { defaultTaskCategory } from "@/lib/categories"
+import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
@@ -96,12 +96,12 @@ function hexToRgb(hex: string) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-function blockStyle(color: string) {
-  const [r, g, b] = hexToRgb(normalizeProjectColor(color || "#6366f1"))
+/** Fill is the project's tint (neutral without one); the left edge is the task's category colour (P22). */
+function blockStyle(projectColor?: string, edgeColor?: string) {
+  const fill = projectColor ? hexToRgb(normalizeProjectColor(projectColor)) : null
   return {
-    backgroundColor: `rgba(${r},${g},${b},0.18)`,
-    borderColor: `rgba(${r},${g},${b},0.7)`,
-    color: `rgb(${r},${g},${b})`,
+    backgroundColor: fill ? `rgba(${fill[0]},${fill[1]},${fill[2]},0.18)` : "var(--muted)",
+    borderColor: edgeColor ?? "rgba(148, 163, 184, 0.7)",
   }
 }
 
@@ -188,6 +188,7 @@ interface DisplayBlock {
 
 export function ScheduleModule() {
   const categories = useCategories()
+  const categoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const projects = useAppStore((s) => s.projects).filter((p) => !p.deleted)
   const tasks = useAppStore((s) => s.tasks).filter((t) => !t.deleted)
   const scheduleItems = useAppStore((s) => s.schedule)
@@ -879,7 +880,7 @@ export function ScheduleModule() {
                               style={{
                                 top: toY(taskDropPreview.startTime),
                                 height: blockH(taskDropPreview.startTime, taskDropPreview.endTime),
-                                ...blockStyle(project?.color ?? "#6366f1"),
+                                ...blockStyle(project?.color, task?.category ? categoryColor(task.category, categoryColors) : undefined),
                               }}
                             >
                               <p className="truncate font-medium leading-tight">{task?.title}</p>
@@ -906,7 +907,10 @@ export function ScheduleModule() {
 
                           const isExternal = block.sourceType === "external-calendar"
                           const project = projects.find((p) => p.id === block.projectId)
-                          const style = isExternal ? externalBlockStyle(block.blocksTime ?? true) : blockStyle(project?.color ?? "#6366f1")
+                          const category = block.linkedTaskId ? tasks.find((t) => t.id === block.linkedTaskId)?.category : undefined
+                          const style = isExternal
+                            ? externalBlockStyle(block.blocksTime ?? true)
+                            : blockStyle(project?.color, category ? categoryColor(category, categoryColors) : undefined)
                           const isEditing = editId === block.id
 
                           return (
@@ -914,9 +918,9 @@ export function ScheduleModule() {
                               key={block.id}
                               tabIndex={isExternal ? undefined : 0}
                               role={isExternal ? undefined : "button"}
-                              aria-label={isExternal ? undefined : `${block.taskDescription}, ${displayStart}–${displayEnd}`}
+                              aria-label={isExternal ? undefined : [block.taskDescription, category, `${displayStart}–${displayEnd}`].filter(Boolean).join(", ")}
                               className={cn(
-                                "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                "absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 isExternal && "border border-dashed",
                                 isEditing && "ring-2 ring-primary ring-offset-1",
                                 isPreview && "opacity-90"
@@ -998,10 +1002,11 @@ export function ScheduleModule() {
                           const block = displayBlocks.find((entry) => entry.id === preview.blockId)
                           if (!block) return null
                           const project = projects.find((p) => p.id === block.projectId)
-                          const style = blockStyle(project?.color ?? "#6366f1")
+                          const category = block.linkedTaskId ? tasks.find((t) => t.id === block.linkedTaskId)?.category : undefined
+                          const style = blockStyle(project?.color, category ? categoryColor(category, categoryColors) : undefined)
                           return (
                             <div
-                              className="pointer-events-none absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs opacity-80"
+                              className="pointer-events-none absolute inset-x-1 z-20 overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-xs text-foreground opacity-80"
                               style={{
                                 top: toY(preview.startTime),
                                 height: blockH(preview.startTime, preview.endTime),
