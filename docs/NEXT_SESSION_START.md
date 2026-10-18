@@ -1,22 +1,21 @@
 # Next Session Start
 
 **Last updated:** 2026-10-18 (P20 fully on `main`: CC-2 and CC-3 landed by #172 as `45ef659`. P21 "Schedule block card in a dialog" (#173) and P22 "Schedule blocks show their category" (#174, stacked on #173) open, not merged)
-**Resume on:** `feat/schedule-category-edge` (stacked on `feat/schedule-block-dialog`, off `main` `9fb4e6a`) until #173 and #174 merge, then `main`.
-**Build status:** passing as of 2026-10-18 — `npm run build` exit 0 on `feat/schedule-category-edge` (commit hook, `2817945`)
+**Resume on:** `feat/schedule-category-edge` (stacked on `feat/schedule-block-dialog`, which has `main` `45ef659` merged in) until #173 and #174 merge, then `main`.
+**Build status:** passing as of 2026-10-18 — `npm run build` exit 0 on `feat/schedule-category-edge` (commit hook, on the merge with `main`)
 **Typecheck status:** passing as of 2026-10-18 — `npm run typecheck` exit 0 (same hook run, and inside `npm test`)
 **Lint status:** passing as of 2026-10-18 — `npm run lint` exit 0 (same hook run)
-**Test status:** passing as of 2026-10-18 — `npm test` (typecheck + `vitest run`) exit 0, 60 tests in 6 files on the P21/P22 branches (they are off `9fb4e6a`, before CC-2's tests); 64 in 7 on `fix/land-p20-on-main`
-**Note:** P21 and P22 are UI only (no store, type, rules or data change). #173 conflicts with `main` in `CHANGELOG.md` only (one hunk, since #172 merged).
+**Test status:** passing as of 2026-10-18 — `npm test` (typecheck + `vitest run`) exit 0, 64 tests in 7 files on both P21/P22 branches after merging `main`
+**Note:** P21 and P22 are UI only (no store, type, rules or data change). The `CHANGELOG.md` conflict with `main` is fixed by merge commits (no force-push): `main` → `feat/schedule-block-dialog` (`e1dfff1`) → `feat/schedule-category-edge`.
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Land P21 and P22 (Roman decides how):** #173 conflicts with `main` in `CHANGELOG.md`. Fix by
-   merging `origin/main` into `feat/schedule-block-dialog` (no force-push), push, merge #173; then
-   **retarget #174 to `main`** (step 11), merge `main` into it if GitHub asks, and merge. Then
-   Roman checks both on real data (his categories and colours) → P21, P22 `done`.
+2. **Land P21 and P22:** merge #173 (now clean against `main`); then **retarget #174 to `main`**
+   (step 11) before merging it. Then Roman checks both on real data (his categories and colours)
+   → P21, P22 `done`.
 3. **P20:** all three slices are on `main` (#169, #172). Roman checks it on real data → P20 `done`.
    The stale `feat/p20-*` branches can be deleted (remote: cc1, cc2, cc3; local `feat/p20-cc3-semantics`
    carries an unpushed handoff commit `1597229`, superseded by this note).
@@ -71,9 +70,10 @@ coloured by category as well as project (P22). He approved both as roadmap items
 
 **Branch map (2026-10-18):**
 - `fix/land-p20-on-main` off `main` `9fb4e6a` → **#172 merged** as `45ef659`. Branch can be deleted.
-- `feat/schedule-block-dialog` off `main` `9fb4e6a`, head `a8f6f62`, pushed → **#173** → `main`
-  (CHANGELOG conflict since #172).
-- `feat/schedule-category-edge` on `feat/schedule-block-dialog`, head `2817945` + this handoff →
+- `feat/schedule-block-dialog` off `main` `9fb4e6a`, P21 `a8f6f62` + merge of `main` `e1dfff1`,
+  pushed → **#173** → `main` (clean).
+- `feat/schedule-category-edge` on `feat/schedule-block-dialog`, P22 `2817945`, handoff `cfab56c`,
+  merge of the dialog branch, this handoff update →
   **#174** → `feat/schedule-block-dialog`. Retarget to `main` after #173 merges.
 - Screenshots: tags `pr-p21-screenshots`, `pr-p22-screenshots` (assets only, no branch).
 - `chore/tailwind-canonical-classes` (`b5d97e2`) still **local only**.

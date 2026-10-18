@@ -672,7 +672,7 @@ fields, six of them ending "None.". The dialog now starts from the plan.
 
 ### P20 — Command Center UX v2 · M
 
-**Status:** open (2026-10-17)
+**Status:** open (2026-10-17; CC-1, CC-2, CC-3 in review as stacked PRs)
 
 **Why:** an audit of the Command Center on real data (17 Oct, 13:44)
 (Roman's local `Claude outputs/command-center-ux-v2.md`, not in the repo)
