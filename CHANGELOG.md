@@ -5,11 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-18 - Schedule blocks show their category (P22)
+
+### Changed
+- A Schedule block's left edge now shows its task's category colour (the same colour as its category chip), whether or not it has a project. The fill still shows the project; a block without a project has a neutral fill instead of the default purple. Plain time blocks without a task have a grey edge.
+- Block text uses the normal text colour, so titles are easier to read on every project colour. Screen readers now announce the category with each block.
+
+---
+
 ## [Unreleased] - 2026-10-18 - New tasks start in General; categories listed A–Z
 
 ### Changed
 - Category lists are alphabetical everywhere: pickers, filters and Goals → Categories. Their stored order is unchanged.
 - New tasks, blocks and goals start in "General" when your list has it, instead of the first category in the list. A project's own category still wins for tasks added to that project. New profiles and demo mode now include "General".
+
+---
+
 ## [Unreleased] - 2026-10-18 - Schedule block card opens in a dialog (P21)
 
 ### Changed
