@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-19 - "Move to" milestone works again
+
+### Fixed
+- Projects: a task's "Move to" menu now shows the project's milestones, so a task under "No milestone" can be moved into one (or back out). The list was being cut off inside the task menu and couldn't be seen or clicked. It also works with the keyboard (→ opens it).
+
+---
+
 ## [Unreleased] - 2026-10-18 - Schedule blocks show their category (P22)
 
 ### Changed
