@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -765,6 +765,27 @@ category field, so they keep a neutral edge (a category on time blocks would be 
 3. The drag preview and the drop preview from Unscheduled tasks follow the same rule.
 4. The block's accessible name includes the category; axe on the grid has no colour-contrast
    violations.
+
+### P23 — Share a project roadmap · S
+
+**Status:** open
+
+**Why:** a roadmap could only be seen inside Roman's account. Sharing it with a collaborator, a mentor
+or in a post meant screenshots of a dark side panel.
+
+**Shape (ADR-035).** A Share button in the Roadmap section opens a dialog with a live preview, toggles
+(tasks, definitions of done, resources) and three outputs: Download image (2x PNG; Share image on
+phones), Save as PDF (vector, via print), Copy as Markdown. One pure renderer in
+`lib/roadmap-share.ts`; generated on the device, nothing uploaded. No store, rules or route change.
+
+**Acceptance criteria:**
+1. The Share button appears when the roadmap has milestones or tasks; the dialog previews the card.
+2. Download image saves `<project>-roadmap-<date>.png`, light theme, readable at phone size.
+3. Save as PDF opens the print dialog with the card only; the saved PDF has selectable text.
+4. Copy as Markdown puts headings, status lines, task checkboxes and resource links on the clipboard
+   and confirms with "Copied".
+5. Each toggle removes its content from the preview and from all three outputs.
+6. Titles and text are escaped (no markup injection into the SVG or Markdown).
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

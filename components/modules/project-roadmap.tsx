@@ -57,6 +57,7 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { RoadmapShareDialog } from "./roadmap-share-dialog"
 import {
   ArrowDown,
   ArrowUp,
@@ -70,6 +71,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Share2,
   Trash2,
   X,
 } from "lucide-react"
@@ -883,7 +885,9 @@ function MilestoneBlock({
 export function ProjectRoadmap({ project }: { project: Project }) {
   const tasks = useAppStore((s) => s.tasks)
   const addMilestone = useAppStore((s) => s.addMilestone)
+  const resources = useAppStore((s) => s.resources)
   const roadmap = useMemo(() => buildProjectRoadmap(project, tasks), [project, tasks])
+  const [shareOpen, setShareOpen] = useState(false)
   const milestones = roadmap.milestones.map((entry) => entry.milestone)
   const [createOpen, setCreateOpen] = useState(false)
   const [createKey, setCreateKey] = useState(0)
@@ -911,9 +915,28 @@ export function ProjectRoadmap({ project }: { project: Project }) {
             {totals.milestones > 0 ? <> · {Math.round((totals.milestonesDone / totals.milestones) * 100)}%</> : null}
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={openCreate}>
-          <Plus className="h-3 w-3" /> Milestone
-        </Button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {!isEmpty ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setShareOpen(true)}
+                  aria-label="Share roadmap"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Share as image, PDF or Markdown</TooltipContent>
+            </Tooltip>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={openCreate}>
+            <Plus className="h-3 w-3" /> Milestone
+          </Button>
+        </div>
       </div>
 
       {/* Segmented strip: one segment per milestone, in roadmap order */}
@@ -979,6 +1002,16 @@ export function ProjectRoadmap({ project }: { project: Project }) {
             <AddTaskInline projectId={project.id} />
           </div>
         </div>
+      ) : null}
+
+      {shareOpen ? (
+        <RoadmapShareDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          project={project}
+          roadmap={roadmap}
+          resources={resources}
+        />
       ) : null}
 
       {createOpen ? (

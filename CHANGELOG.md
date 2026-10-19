@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-19 - Share a project roadmap (P23)
+
+### Added
+- Projects: a Share button on the roadmap opens a preview of a clean, light roadmap card. Download it as an image, save it as a PDF, or copy it as Markdown for Notion, GitHub or email. On phones, "Share image" sends it straight to WhatsApp, Slack or any other app.
+- Switches let you leave tasks, definitions of done or resources out before sharing. The snapshot is made on your device; nothing is uploaded or made public.
+
+---
+
 ## [Unreleased] - 2026-10-19 - "Move to" milestone works again
 
 ### Fixed
