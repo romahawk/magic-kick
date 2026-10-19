@@ -13,9 +13,8 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P26 is `open`:** PR #181 (from `main`, one commit). **Roman to decide:** accept 7 visible task
-   rows at 1366×768 (the brief asked for 8; the page header leaves about 526 px), or shrink the page
-   header in a separate change. **Roman to check on real data:** P24 (how many of his 73 tasks stay in
+2. **P26 is `open`:** PR #181 (from `main`, one commit). Roman accepted 7 visible task rows at
+   1366×768 on 2026-10-19 (the brief asked for 8); revisit only if 7 feels cramped on real data. **Roman to check on real data:** P24 (how many of his 73 tasks stay in
    This week) and P26 (his allocations as filter rows). After #181 merges: set P26 `done`, delete
    its branch, then P25 (roadmap multi-select with done tasks folded; Roman's choices of 2026-10-19
    are in the spec). P23 and P24 are `done`; P23's real print dialog, Share image on a phone and
@@ -97,7 +96,7 @@ scope, search and category; arrows/Space; popover Esc returns focus; drag to cal
 schedule next, open task while filtered; stale stored id → All; no plan → rows without bars; 7
 rows → 4 + "+3 more" (header 228 px); axe on `<main>` 0 violations.
 
-**Not verified:** Roman's real data for P23, P24, P26; P26's 8-rows target (7 fit); a real plan with
+**Not verified:** Roman's real data for P23, P24, P26; P26's 8-rows target (7 fit, accepted by Roman); a real plan with
 more than 5 allocations; P23 real print dialog and phone share; light theme; Safari, Firefox; phone
 width.
 
