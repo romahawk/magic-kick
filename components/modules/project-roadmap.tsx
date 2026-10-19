@@ -171,7 +171,7 @@ function ResourceChip({ resource, onRemove }: { resource: Resource; onRemove?: (
   const body = (
     <>
       <BookOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
-      <span className="max-w-[11rem] truncate">{resource.title}</span>
+      <span className="max-w-44 truncate">{resource.title}</span>
       {href ? <ExternalLink className="h-2.5 w-2.5 shrink-0 text-muted-foreground" /> : null}
     </>
   )
@@ -665,7 +665,7 @@ function MilestoneBlock({
         <span
           aria-hidden
           className={cn(
-            "absolute left-[9px] top-6 bottom-0 w-0.5 rounded-full",
+            "absolute left-2.25 top-6 bottom-0 w-0.5 rounded-full",
             milestone.completed ? "bg-primary/60" : "bg-border"
           )}
         />
@@ -683,7 +683,7 @@ function MilestoneBlock({
         <div
           className={cn(
             "group/ms rounded-lg border px-3 py-2 transition-colors",
-            isNext ? "border-primary/30 bg-primary/[0.03]" : "border-transparent hover:border-border hover:bg-muted/30"
+            isNext ? "border-primary/30 bg-primary/3" : "border-transparent hover:border-border hover:bg-muted/30"
           )}
         >
           <div className="flex items-start gap-2">
