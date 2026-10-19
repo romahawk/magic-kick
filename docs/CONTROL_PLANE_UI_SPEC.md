@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -789,7 +789,7 @@ phones), Save as PDF (vector, via print), Copy as Markdown. One pure renderer in
 
 ### P24 — Schedule shows this week's tasks, not every open task · S
 
-**Status:** open
+**Status:** done (2026-10-19, #180. Roman's real data not checked)
 
 **Why:** Schedule's Unscheduled tasks panel listed every open task without a time slot (73 on
 Roman's account, 2026-10-19), most of them project tasks for later milestones. Planning the week
@@ -813,9 +813,43 @@ No store, type or rules change.
 5. A roadmap task without a time slot offers Schedule next free slot; it lands in the calendar with
    an Undo toast, and the action is gone once it has a slot.
 
+### P26 — Week allocation as a project filter in Unscheduled tasks · S
+
+**Status:** open
+
+**Why:** Schedule's side column stacked a "Week allocation" card above Unscheduled tasks, and the
+panel's header (title, help text, switch, search, sort, category chips) took about 270 px before the
+first 80 px task, so only about three tasks showed at 1366×768. Allocation and the task list answer
+one question: what goes into the week for each project. Roman's brief, 2026-10-19.
+
+**Shape.** UI only. The allocation card is gone; its bars live in a project filter inside the panel
+(`role="radiogroup"`): All projects, each allocated project in plan order with "planned/allocated h"
+and a thin bar (every active project with tasks when there is no plan), then Other projects and No
+project when they have tasks. Counts follow scope, search and category; the project filter applies
+last. More than five rows show four and "+N more". The header is one title row ("Unscheduled · n"),
+one control row (This week / All, a search button that opens inline, a Filters popover with sort
+and categories) and the project list. Rows are two lines (about 46 px). The filter is kept in
+`localStorage` (`magic-kick-schedule-project-filter`) and falls back to All when the project is no
+longer listed. Pure helpers in `lib/unscheduled-filter.ts`. No store, type or rules change.
+
+**Acceptance criteria:**
+1. No separate Week allocation card; allocation bars appear in the project filter rows.
+2. Clicking a project shows only its unscheduled tasks; the counts match the list, together with
+   This week / All, search and categories.
+3. At 1366×768 the first task starts within about 240 px of the panel top.
+4. Drag to calendar, drop back to unschedule, schedule next and open task work, filtered or not.
+5. The filter survives a reload; a project no longer listed falls back to All.
+6. Keyboard: arrows move between project rows, Space/Enter selects; the Filters popover closes
+   with Esc and returns focus.
+7. Without a plan, project rows show without bars and the filter works.
+8. axe on Schedule: 0 violations.
+
+**Deferred:** bulk-select a project's tasks and auto-schedule them into free slots (bulk writes and
+an approval step); a "fill the allocation gap" suggestion per project (overlaps AI Suggest).
+
 ### P25 — Select several roadmap tasks at once · S
 
-**Status:** queued (after P24)
+**Status:** queued (after P26)
 
 **Why:** a project with many tasks (Job-Search: 23 under "No milestone", most done) can only be
 changed one task at a time. Roman asked for multi-select with delete, archive and "Move to

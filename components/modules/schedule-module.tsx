@@ -29,6 +29,7 @@ import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
+import type { ProjectAllocation } from "@/lib/unscheduled-filter"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 
@@ -199,7 +200,6 @@ export function ScheduleModule() {
   const externalCalendarBlocks = allExternalCalendarBlocks.filter((block) => !block.deleted && block.status !== "cancelled")
   const googleCalendarMetadata = useAppStore((s) => s.profile.googleCalendar)
   const displayExternalBlocks = useAppStore((s) => s.profile.googleCalendar?.displayExternalBlocks ?? true)
-  const executionLogs = useAppStore((s) => s.executionLogs)
   const saveTimeBlock = useAppStore((s) => s.saveTimeBlock)
   const updateTimeBlock = useAppStore((s) => s.updateTimeBlock)
   const updateTask = useAppStore((s) => s.updateTask)
@@ -422,24 +422,14 @@ export function ScheduleModule() {
   const editBlock = displayBlocks.find((block) => block.id === editId) ?? null
   const editTask = editBlock?.linkedTaskId ? tasks.find((task) => task.id === editBlock.linkedTaskId) : undefined
 
-  const projectHours = (() => {
-    if (!activePlan) return []
-    return activePlan.allocations.map((allocation) => {
-      const plannedHours = displayBlocks
-        .filter((block) => block.projectId === allocation.projectId)
-        .reduce((total, block) => total + block.plannedHours, 0)
-      const actualHours = executionLogs
-        .filter((log) => !log.deleted && log.weekPlanId === activePlan.id && log.projectId === allocation.projectId)
-        .reduce((total, log) => total + log.actualHours, 0)
-
-      return {
-        projectId: allocation.projectId,
-        allocatedHours: allocation.hoursAllocated,
-        plannedHours,
-        actualHours,
-      }
-    })
-  })()
+  // P26: the week's allocations feed the Unscheduled tasks panel's project filter.
+  const projectAllocations: ProjectAllocation[] = (activePlan?.allocations ?? []).map((allocation) => ({
+    projectId: allocation.projectId,
+    allocatedHours: allocation.hoursAllocated,
+    plannedHours: displayBlocks
+      .filter((block) => block.projectId === allocation.projectId)
+      .reduce((total, block) => total + block.plannedHours, 0),
+  }))
 
   // P16: tasks of paused, parked, completed or deleted projects stay off the planning list.
   const activeProjectIds = new Set(activeProjects.map((p) => p.id))
@@ -697,13 +687,13 @@ export function ScheduleModule() {
           <p className="text-sm text-muted-foreground">Click a slot to add · drag to move · drag edge to resize</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? -7 : -1)}>
+          <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? -7 : -1)} aria-label={view === "week" ? "Previous week" : "Previous day"}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setSelectedDateISO(todayISO())}>
             Week #{visibleWeekNumber}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? 7 : 1)}>
+          <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? 7 : 1)} aria-label={view === "week" ? "Next week" : "Next day"}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           {isAiEnabled() && (
@@ -1124,42 +1114,11 @@ export function ScheduleModule() {
 
         {showSideColumn ? (
         <div className="flex w-80 shrink-0 flex-col gap-3 overflow-y-auto">
-
-          {!tasksPanelCollapsed && activePlan && projectHours.length > 0 ? (
-            <div className="rounded-xl border bg-card p-4">
-              <p className="mb-3 text-sm font-semibold">Week allocation</p>
-              <div className="space-y-3">
-                {projectHours.map((item) => {
-                  const project = projects.find((p) => p.id === item.projectId)
-                  const pct = item.allocatedHours > 0 ? Math.min(100, (item.plannedHours / item.allocatedHours) * 100) : 0
-                  return (
-                    <div key={item.projectId} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="truncate font-medium">{project?.title ?? "Unknown"}</span>
-                        <span className="ml-2 shrink-0 text-muted-foreground">
-                          {item.plannedHours}h / {item.allocatedHours}h
-                        </span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: normalizeProjectColor(project?.color ?? "#6366f1"),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
-
           {!tasksPanelCollapsed ? (
             <UnscheduledTasksPanel
               tasks={unscheduledTasks}
               focusTaskIds={focusTaskIds}
+              allocations={projectAllocations}
               onTasksAdded={keepInFocus}
               hiddenCount={hiddenUnscheduledCount}
               projects={activeProjects}
