@@ -1492,7 +1492,7 @@ function EditPanel({
             ) : null}
           </div>
           {notesMode === "view" ? (
-            <div className="min-h-[4.5rem] rounded-md border border-input bg-background px-3 py-2 text-xs whitespace-pre-wrap">
+            <div className="min-h-18 rounded-md border border-input bg-background px-3 py-2 text-xs whitespace-pre-wrap">
               {localNotes}
             </div>
           ) : (
