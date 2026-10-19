@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-19 - Closed days in the Journal (P27)
+
+### Changed
+- Journal: every day you close from the Command Center now gets a card in the Journal, with what you committed (Completed, Blockers, Decisions, Carry forward and the rest), how many items were done and open, and a link to the day's file in the OS. Closing the same day again updates its card.
+- Journal: the page now lists closed days only and has its own Close day button. Days you closed before this change are listed with a link to their OS file.
+- Journal: the old manual entries (mood, highlights, gratitude) are hidden, and "Clear old entries" removes them after asking. New Entry, the streak badge and Quick Add's Journal tab are gone.
+- Journal: the Weekly tab's Markdown export takes friction and next steps from the week's closed days.
+
+---
+
 ## [Unreleased] - 2026-10-19 - Week allocation becomes a project filter on Schedule (P26)
 
 ### Changed

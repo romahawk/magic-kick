@@ -39,6 +39,7 @@ import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence
 import { findBySource } from "@/lib/provenance"
 import { moveMilestoneInList, nextMilestoneOrder, renumberMilestones, sortMilestones } from "./roadmap"
 import { addCloseDayChip, dailyFocusSnapshotTasks, nextDailyFocusSnapshots, removeCloseDayChip } from "@/lib/close-day"
+import type { CloseDayJournalFields } from "@/lib/close-day"
 import { berlinDateISO } from "@/lib/os-feed/daily-review"
 import {
   seedAchievements,
@@ -422,6 +423,10 @@ export interface AppState {
   updateResource: (id: string, updates: Partial<Omit<Resource, "id" | "deleted" | "clientUpdatedAt">>) => void
   deleteResource: (id: string) => void
   addJournalEntry: (j: Omit<JournalEntry, "id">) => void
+  /** P27: a closed day's card, stamped `closedAt`; closing the same date again updates its card. */
+  saveCloseDayJournalEntry: (entry: CloseDayJournalFields) => void
+  /** P27: tombstones the old manual entries (recoverable, like any delete). Returns how many. */
+  clearLegacyJournalEntries: () => number
   addScheduleItem: (s: Omit<ScheduleItem, "id">) => void
   updateScheduleItem: (id: string, updates: Partial<Omit<ScheduleItem, "id" | "deleted" | "clientUpdatedAt">>) => void
   ensureWeeklyPlan: (weekStartISO?: string) => string
@@ -2101,6 +2106,42 @@ export const useAppStore = create<AppState>()(
             },
           },
         }))
+      },
+
+      saveCloseDayJournalEntry: (entry) => {
+        const existing = get().journal.find((j) => !j.deleted && j.type === "close" && j.dateISO === entry.dateISO)
+        const id = existing?.id ?? generateId()
+        const item = touchEntity({ ...(existing ?? {}), ...entry, closedAt: now(), id, deleted: false })
+        set((s) => ({
+          journal: existing ? s.journal.map((j) => (j.id === id ? item : j)) : [item, ...s.journal],
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              journal: { ...s.sync.pending.journal, [id]: item.clientUpdatedAt ?? now() },
+            },
+          },
+        }))
+      },
+
+      clearLegacyJournalEntries: () => {
+        const ts = now()
+        const ids = get()
+          .journal.filter((j) => !j.deleted && j.type !== "close")
+          .map((j) => j.id)
+        if (ids.length === 0) return 0
+        const cleared = new Set(ids)
+        set((s) => ({
+          journal: s.journal.map((j) => (cleared.has(j.id) ? { ...j, deleted: true, clientUpdatedAt: ts } : j)),
+          sync: {
+            ...s.sync,
+            pending: {
+              ...s.sync.pending,
+              journal: { ...s.sync.pending.journal, ...Object.fromEntries(ids.map((id) => [id, ts])) },
+            },
+          },
+        }))
+        return ids.length
       },
 
       addScheduleItem: (scheduleItem) => {

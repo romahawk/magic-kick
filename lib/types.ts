@@ -239,12 +239,20 @@ export interface Resource extends SyncFields {
 export interface JournalEntry extends SyncFields {
   id: string
   dateISO: string
-  type: "daily" | "weekly"
+  /** "close": a closed day, written by Close day (P27). "daily" and "weekly": the old manual entries. */
+  type: "daily" | "weekly" | "close"
   mood: number
   highlights: string
   challenges: string
   nextSteps: string
   gratitude?: string
+  /** P27: the sections as committed to the OS review file, which stays the source of truth. */
+  review?: Record<string, string>
+  doneCount?: number
+  openCount?: number
+  osUrl?: string | null
+  commitUrl?: string | null
+  closedAt?: number
 }
 
 export type GoogleCalendarSyncStatus = "disconnected" | "connected" | "syncing" | "error"

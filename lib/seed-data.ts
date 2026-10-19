@@ -83,8 +83,34 @@ export const seedResources: Resource[] = [
   { id: "r7", category: "Growth", title: "Lenny's Newsletter", url: "https://lennysnewsletter.com", description: "Product growth strategy and benchmarks", tags: ["product", "growth"] },
 ]
 
+const daysAgo = (n: number) => format(addDays(new Date(), -n), "yyyy-MM-dd")
+const closedDay = (id: string, n: number, review: Record<string, string>, doneCount: number, openCount: number): JournalEntry => ({
+  id,
+  dateISO: daysAgo(n),
+  type: "close",
+  mood: 0,
+  highlights: review.completed ?? "",
+  challenges: review.blockers ?? "",
+  nextSteps: review.carryForward ?? "",
+  review,
+  doneCount,
+  openCount,
+  osUrl: null,
+  commitUrl: null,
+  closedAt: Date.now() - n * 86_400_000,
+})
+
+// P27: the Journal holds closed days. Demo cards have no OS link, since demo mode never commits.
 export const seedJournal: JournalEntry[] = [
-  { id: "j1", dateISO: today, type: "daily", mood: 4, highlights: "Stripe billing is finally live. Had a great user call — they confirmed the pain point is real.", challenges: "Landing page copy is still weak. Need to rewrite the value prop — too generic.", nextSteps: "Send landing page draft to 3 trusted users for brutal feedback tonight.", gratitude: "Grateful for the solo founder communities that share real revenue numbers. It keeps me grounded." },
-  { id: "j2", dateISO: d(-1), type: "daily", mood: 3, highlights: "Fixed the Safari auth bug. Shipped two small UX improvements based on user feedback.", challenges: "Distracted in the afternoon. Wasted ~90 min on Twitter vs. building.", nextSteps: "Block social media from 8am–12pm. Use the time for deep work only.", gratitude: "Had a good gym session. Physical energy directly impacts mental clarity." },
-  { id: "j3", dateISO: d(-7), type: "weekly", mood: 4, highlights: "Crossed $1,200 MRR. Closed two new customers from inbound. Product Hunt prep is on track.", challenges: "Scope creep on v2 features. Keep shipping what's needed for now, not what's exciting.", nextSteps: "Freeze v2 feature list. Focus 100% on launch and customer success this week.", gratitude: "Every user who pays is a vote of confidence. Remember why this matters." },
+  closedDay("j1", 1, {
+    completed: "- Fixed the Safari auth bug\n- Shipped two small UX improvements from user feedback",
+    blockers: "- Waiting on someone",
+    decisions: "- Decided to freeze the v2 feature list",
+    carryForward: "- Rewrite the landing page value prop: ran out of time",
+  }, 2, 1),
+  closedDay("j2", 2, {
+    completed: "- Stripe billing live\n- User call confirmed the pain point",
+    learning: "- Worked well: calls before building",
+    carryForward: "",
+  }, 2, 0),
 ]
