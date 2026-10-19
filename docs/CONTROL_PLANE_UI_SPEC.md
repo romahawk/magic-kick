@@ -815,7 +815,7 @@ No store, type or rules change.
 
 ### P26 — Week allocation as a project filter in Unscheduled tasks · S
 
-**Status:** open
+**Status:** done (2026-10-19, #181. 7 rows visible at 1366×768, accepted by Roman; real data not checked)
 
 **Why:** Schedule's side column stacked a "Week allocation" card above Unscheduled tasks, and the
 panel's header (title, help text, switch, search, sort, category chips) took about 270 px before the
@@ -849,7 +849,7 @@ an approval step); a "fill the allocation gap" suggestion per project (overlaps 
 
 ### P25 — Select several roadmap tasks at once · S
 
-**Status:** queued (after P26)
+**Status:** queued (next)
 
 **Why:** a project with many tasks (Job-Search: 23 under "No milestone", most done) can only be
 changed one task at a time. Roman asked for multi-select with delete, archive and "Move to

@@ -1,8 +1,8 @@
 # Next Session Start
 
-**Last updated:** 2026-10-19, afternoon (P23 and P24 `done` on `main` (#179, #180). **P26 `open`:** PR #181 awaits Roman's review, not merged. Next by rank: P25, then P19)
-**Resume on:** `feat/p26-schedule-project-filter` (`c4a0bfa` + this handoff) until #181 merges; then `main`.
-**Build status:** passing as of 2026-10-19 — `npm run build` exit 0 (on `c4a0bfa`, `next dev` stopped; and the commit hook)
+**Last updated:** 2026-10-19, afternoon (P23, P24, P26 `done` on `main` (#179, #180, #181). Nothing is `open`; next by rank: P25, then P19)
+**Resume on:** `main` (`5ee82a3`). Start new work on a branch from `origin/main`.
+**Build status:** passing as of 2026-10-19 — `npm run build` exit 0 (on `c4a0bfa`, whose tree #181 squash-merged; and the commit hook)
 **Typecheck status:** passing as of 2026-10-19 — `npm run typecheck` exit 0 (same run)
 **Lint status:** passing as of 2026-10-19 — `npm run lint` exit 0 (same run)
 **Test status:** passing as of 2026-10-19 — `npm test` (typecheck + `vitest run`) exit 0, 89 tests in 11 files
@@ -13,11 +13,11 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P26 is `open`:** PR #181 (from `main`, one commit). Roman accepted 7 visible task rows at
-   1366×768 on 2026-10-19 (the brief asked for 8); revisit only if 7 feels cramped on real data. **Roman to check on real data:** P24 (how many of his 73 tasks stay in
-   This week) and P26 (his allocations as filter rows). After #181 merges: set P26 `done`, delete
-   its branch, then P25 (roadmap multi-select with done tasks folded; Roman's choices of 2026-10-19
-   are in the spec). P23 and P24 are `done`; P23's real print dialog, Share image on a phone and
+2. **Nothing is `open`. Next: P25** (roadmap multi-select with done tasks folded; Roman's choices of
+   2026-10-19 are in the spec). P23, P24, P26 are `done` (2026-10-19). Roman accepted 7 visible task
+   rows at 1366×768 for P26 (the brief asked for 8); revisit only if 7 feels cramped on real data.
+   **Roman to check on real data:** P24 (how many of his 73 tasks stay in This week) and P26 (his
+   allocations as filter rows); P23's real print dialog, Share image on a phone and
    Safari/Firefox are unchecked. P20, P21, P22 are `done` (2026-10-18). **Roman to check on real data:**
    Command Center (P20: one Today list, "past" rows, grouped attention row); Schedule block card in a
    dialog (P21); category edge colours (P22) with his own categories; "Move to" milestone (#177).
@@ -43,7 +43,7 @@
    "Career-&-Business" use hyphens where others use spaces. P22 now shows categories on Schedule,
    and Marketing/Health-like colour pairs are hard to tell apart.
 8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24, P26.
    **P11:** `decision`. **P19:** `queued`, gated on its own ADR. **P10, P15:** `gated` on P7 in the
    spec; P7 is done, so their gates need re-checking.
 9. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN`,
@@ -62,7 +62,7 @@
 
 ---
 
-## Where we left off (2026-10-19, late morning → afternoon) — P23, P24 merged; P26 PR open
+## Where we left off (2026-10-19, late morning → afternoon) — P23, P24, P26 merged
 
 **Why:** P23 (share a roadmap) needed verifying and a PR. Roman then asked for a Schedule panel that
 does not list every open task (P24, "focused list"), for roadmap multi-select (P25, queued) and, by
@@ -74,18 +74,18 @@ P24 → P26 → P25 → P19.
 - **#180 P24** (merged): `lib/roadmap.ts` `isPlanningFocus` + `selectNextMilestoneByProject` (+ tests);
   panel opens on This week (Daily Focus, due by week end, Next milestone), All open, search over all;
   tasks added or unscheduled this session stay in view; roadmap task menu "Schedule next free slot".
-- **#181 P26** (open, `c4a0bfa`): `lib/unscheduled-filter.ts` (+ 9 tests); Week allocation card
+- **#181 P26** (merged as `5ee82a3`): `lib/unscheduled-filter.ts` (+ 9 tests); Week allocation card
   removed; project radiogroup with allocation hours and bars, roving tabindex, "+N more" past 5
   rows, persisted in `localStorage` key `magic-kick-schedule-project-filter`; header compacted
   (inline search, Filters popover with sort and categories); two-line rows (46 px, were 80); week
   chevrons labelled (axe `button-name`).
 - Docs: spec P23, P24 → `done`; P24, P25, P26 added; CHANGELOG entries for P23, P24, P26.
 
-**Branch map (2026-10-19):** `main` = `e5bb108`. `feat/p26-schedule-project-filter` from `e5bb108`,
-head `c4a0bfa` + this handoff, pushed (`c4a0bfa`), PR #181 OPEN, not stacked. Tag
-`pr-p26-screenshots` → `54b2daa` (parentless, images only). `feat/p23-share-roadmap` deleted
-(local and GitHub); local `feat/p24-schedule-focused-panel` deleted; **GitHub still has
-`feat/p24-schedule-focused-panel`** (merged as #180), to delete.
+**Branch map (2026-10-19):** everything is on `main` `5ee82a3` (#181 squash-merged the P26 change
+and its two handoff commits). This note's update is on `docs/session-close-2026-10-19-p26` → PR into
+`main`. `feat/p23-share-roadmap` and `feat/p24-schedule-focused-panel` deleted (local and GitHub);
+local `feat/p26-schedule-project-filter` deleted, **GitHub copy still there** (merged). Tag
+`pr-p26-screenshots` → `54b2daa` stays (images only).
 
 **Verified (confirmed):** gates as in the header. Headless Edge (playwright-core in the scratchpad,
 system Edge), demo mode. P23: preview, toggles, PNG 2160×1860, Markdown, print iframe → 1-page PDF
