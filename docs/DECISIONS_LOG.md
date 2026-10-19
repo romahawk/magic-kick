@@ -1244,3 +1244,54 @@ start empty because Magic Kick kept no record of what the Daily Focus lane held 
 
 **Revisit trigger:** the profile document grows near Firestore's limit, the missed-day window
 changes, or P18 starts reading Carry Forward.
+
+---
+
+## ADR-035: Share a project roadmap as image, PDF or Markdown, generated on the device (P23)
+
+**Date:** 2026-10-19
+**Status:** Accepted (Roman, 2026-10-19: P23 opened ahead of P19; format "Share menu: PNG + PDF + Markdown")
+**Relates to:** ADR-025 (roadmap data), ADR-024 (9-module ceiling, no secrets in the browser).
+
+### Context
+
+Roman wants to share a project's roadmap with other people. The roadmap lives in his private
+Firestore data and has no public surface.
+
+### Decision
+
+1. **A Share dialog in the Roadmap section** (icon button next to "+ Milestone"), not a new module or
+   route. It shows a live preview and three outputs:
+   - **Download image:** a 2x PNG (2160 px wide). On devices with the Web Share API for files
+     (phones), a **Share image** button hands the PNG to the system share sheet.
+   - **Save as PDF:** prints the same vector card from a hidden iframe, so the PDF text is
+     selectable and sharp; page size follows the card.
+   - **Copy as Markdown:** for Notion, GitHub, email or chat.
+2. **One renderer.** `lib/roadmap-share.ts` turns the built roadmap into a self-contained SVG card
+   (light theme, system fonts, text wrapped with canvas `measureText`) and into Markdown. Pure and
+   unit-tested; the dialog only rasterises, prints or copies.
+3. **Snapshot, not a link.** Everything is generated on the device; nothing is uploaded, stored or
+   made public. Toggles let Roman leave out tasks, definitions of done and resources before sharing.
+4. **No new dependency.** SVG drawn with plain `<text>` (no `foreignObject`) never taints the canvas,
+   so PNG export works without html-to-image or a PDF library.
+
+### Alternatives rejected
+
+- **Public share link.** Needs a public read path into private Firestore data (rules or an Admin-SDK
+  route), a revocation model and a stale-data story. Too much surface for one user; revisit if
+  sharing becomes regular and recipients need a live view.
+- **DOM capture (html-to-image / html2canvas).** Depends on the app's dark/light theme, web fonts and
+  `oklch` colours; uses `foreignObject`, which taints the canvas in some browsers.
+- **A PDF library (jsPDF, pdf-lib).** Adds weight for what the browser's print already does with
+  vector text.
+
+### Consequences
+
+- The card shows at most 6 tasks per milestone and 6 other tasks, with "+ N more"; long titles
+  wrap to two lines and notes to three, with an ellipsis.
+- Fonts: the card uses a system font stack, so it looks slightly different on Windows, macOS and
+  Android. Accepted; it keeps the export self-contained.
+- PDF: Chrome and Edge save one tall page; other browsers may split long roadmaps across pages.
+- **Rollback:** revert the PR. No data, store, rules or route change.
+
+**Revisit trigger:** recipients ask for a live link, or roadmaps regularly exceed one screen.
