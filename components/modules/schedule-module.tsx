@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, externalBlockDateParts, selectTaskTimeSlots, selectTimeBlocksForDates, taskDurationMin } from "@/lib/weekly-plan"
@@ -28,6 +28,7 @@ import { useCategories } from "@/hooks/use-categories"
 import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
+import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 
@@ -230,6 +231,11 @@ export function ScheduleModule() {
   const [rejectedTaskIds, setRejectedTaskIds] = useState<Set<string>>(new Set())
   const [taskDropPreview, setTaskDropPreview] = useState<HoverSlot | null>(null)
   const [unscheduleDrop, setUnscheduleDrop] = useState<UnscheduleDropState>(null)
+  // P24: tasks added or unscheduled in this session stay in the focus view, even without a date.
+  const [keptInFocusIds, setKeptInFocusIds] = useState<ReadonlySet<string>>(() => new Set())
+  const keepInFocus = useCallback((ids: string[]) => {
+    if (ids.length > 0) setKeptInFocusIds((current) => new Set([...current, ...ids]))
+  }, [])
   const [tasksPanelCollapsed, setTasksPanelCollapsed] = useState(() => {
     if (typeof window === "undefined") return false
     return window.localStorage.getItem(TASKS_PANEL_COLLAPSED_KEY) === "true"
@@ -257,7 +263,7 @@ export function ScheduleModule() {
   const weekDays = useMemo(() => getWeekDates(weekStartISO), [weekStartISO])
   const dayIndex = Math.max(0, weekDays.findIndex((d) => d.iso === selectedDateISO))
   const visibleDays = view === "week" ? weekDays : [weekDays[dayIndex]]
-  const activeProjects = projects.filter((p) => (p.status ?? "active") === "active")
+  const activeProjects = useMemo(() => projects.filter((p) => (p.status ?? "active") === "active"), [projects])
   const busyBlocks = useMemo(
     () => [
       ...timeBlocks,
@@ -440,6 +446,15 @@ export function ScheduleModule() {
   const openUnscheduledTasks = tasks.filter((task) => !task.completed && !taskTimeSlots[task.id])
   const unscheduledTasks = openUnscheduledTasks.filter((task) => !task.linkedProjectId || activeProjectIds.has(task.linkedProjectId))
   const hiddenUnscheduledCount = openUnscheduledTasks.length - unscheduledTasks.length
+  const weekEndISO = weekDays[weekDays.length - 1].iso
+  const focusTaskIds = useMemo(() => {
+    const nextMilestoneByProject = selectNextMilestoneByProject(activeProjects)
+    return new Set(
+      unscheduledTasks
+        .filter((task) => keptInFocusIds.has(task.id) || isPlanningFocus(task, weekEndISO, nextMilestoneByProject))
+        .map((task) => task.id)
+    )
+  }, [unscheduledTasks, activeProjects, weekEndISO, keptInFocusIds])
   const showSideColumn = !tasksPanelCollapsed
 
   function openBlockCard(blockId: string, origin: HTMLElement) {
@@ -549,6 +564,7 @@ export function ScheduleModule() {
     const slot = taskTimeSlots[taskId]
     if (!task) return
     updateTask(taskId, { dueDate: undefined, repeat: "none" }, { clearTimeSlot: true })
+    keepInFocus([taskId])
     if (editBlock?.linkedTaskId === taskId) setEditId(null)
     toast("Moved back to unscheduled tasks", {
       description: task.title,
@@ -1143,6 +1159,8 @@ export function ScheduleModule() {
           {!tasksPanelCollapsed ? (
             <UnscheduledTasksPanel
               tasks={unscheduledTasks}
+              focusTaskIds={focusTaskIds}
+              onTasksAdded={keepInFocus}
               hiddenCount={hiddenUnscheduledCount}
               projects={activeProjects}
               todayISO={nowDayISO}
@@ -1171,12 +1189,12 @@ export function ScheduleModule() {
                 unscheduleDrop === "near" && "border-dashed border-primary/60",
                 unscheduleDrop === "over" && "border-primary bg-primary/10 text-primary ring-2 ring-primary/40"
               )}
-              aria-label={`Show unscheduled tasks (${unscheduledTasks.length})`}
+              aria-label={`Show unscheduled tasks (${focusTaskIds.size} this week)`}
               title="Show unscheduled tasks"
             >
               <PanelRightOpen className="h-4 w-4" />
               <Badge variant="secondary" className="px-1.5 text-[10px] tabular-nums">
-                {unscheduledTasks.length}
+                {focusTaskIds.size}
               </Badge>
               <span className="text-xs font-medium [writing-mode:vertical-rl]">Unscheduled tasks</span>
             </button>

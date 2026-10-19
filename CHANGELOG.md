@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-19 - Schedule shows this week's tasks (P24)
+
+### Changed
+- Schedule: the Unscheduled tasks panel opens on "This week": overdue tasks, tasks due this week, your Daily Focus, and the tasks of each project's Next milestone. The rest of your open tasks are one click away under "All open", and search always looks through all of them.
+- A task you add from the panel, or drag back off the calendar, stays in view even without a date.
+
+### Added
+- Projects: a roadmap task's menu has "Schedule next free slot", so a project task goes onto the calendar when you ask for it.
+
+---
+
 ## [Unreleased] - 2026-10-19 - Share a project roadmap (P23)
 
 ### Added

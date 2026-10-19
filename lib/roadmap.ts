@@ -148,6 +148,31 @@ export function buildProjectRoadmap(project: Project, tasks: Task[], today: Date
 }
 
 /** Resolves ids to live resources, keeping the given order and dropping deleted or unknown ids. */
+/** Project id → id of its first open milestone in roadmap order (the "Next" one). */
+export function selectNextMilestoneByProject(projects: Pick<Project, "id" | "milestones">[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const project of projects) {
+    const next = sortMilestones(project.milestones ?? []).find((milestone) => !milestone.completed)
+    if (next) map.set(project.id, next.id)
+  }
+  return map
+}
+
+/**
+ * P24: whether an unscheduled task belongs in the Schedule panel's focus view. In focus: the
+ * Daily Focus lane, anything due by the end of the shown week (overdue too), and tasks in their
+ * project's Next milestone. Everything else waits behind "All open" and search.
+ */
+export function isPlanningFocus(
+  task: Pick<Task, "lane" | "dueDate" | "linkedProjectId" | "milestoneId">,
+  weekEndISO: string,
+  nextMilestoneByProject: ReadonlyMap<string, string>
+): boolean {
+  if ((task.lane ?? "backlog") === "daily-focus") return true
+  if (task.dueDate && task.dueDate <= weekEndISO) return true
+  return Boolean(task.linkedProjectId && task.milestoneId && nextMilestoneByProject.get(task.linkedProjectId) === task.milestoneId)
+}
+
 export function resolveResources(ids: string[] | undefined, resources: Resource[]): Resource[] {
   if (!ids || ids.length === 0) return []
   const byId = new Map(resources.filter((resource) => !resource.deleted).map((resource) => [resource.id, resource]))
