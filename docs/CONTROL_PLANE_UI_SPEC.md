@@ -672,7 +672,7 @@ fields, six of them ending "None.". The dialog now starts from the plan.
 
 ### P20 — Command Center UX v2 · M
 
-**Status:** open (2026-10-17; CC-1, CC-2, CC-3 in review as stacked PRs)
+**Status:** done (2026-10-18; CC-1 #169, CC-2 and CC-3 via #172. Roman's check on real data still to do)
 
 **Why:** an audit of the Command Center on real data (17 Oct, 13:44)
 (Roman's local `Claude outputs/command-center-ux-v2.md`, not in the repo)
@@ -723,7 +723,7 @@ row counts 4 active projects against a limit of 3; which list the WIP limit coun
 
 ### P21 — Schedule block card in a dialog · S
 
-**Status:** open (2026-10-18, alongside P20 by Roman's exception)
+**Status:** done (2026-10-18, #173)
 
 **Why:** clicking a Schedule block opened its card at the top of the side column, which expanded a
 collapsed tasks panel and pushed Week allocation and Unscheduled tasks down, so the grid and the side
@@ -746,7 +746,7 @@ change, no new dependency. The card (EditPanel, same props and handlers) opens i
 
 ### P22 — Schedule blocks show their category · S
 
-**Status:** open (2026-10-18, stacked on P21)
+**Status:** done (2026-10-18, #174 merged into its base, landed by #176)
 
 **Why:** a block's colour showed only its project, so a block without a project carried no colour
 signal and the week's balance across life areas (categories) could not be read from the grid. The
