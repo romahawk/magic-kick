@@ -7,6 +7,7 @@ import {
   addReason,
   buildCloseDayChecklist,
   closeDayChipsFor,
+  closeDayJournalEntry,
   composeCloseDayFields,
   dailyFocusSnapshotTasks,
   findDailyFocusSnapshot,
@@ -16,8 +17,11 @@ import {
   nextDailyFocusSnapshots,
   pruneDailyFocusSnapshots,
   removeCloseDayChip,
+  selectClosedDayEntries,
+  selectLegacyJournalEntries,
 } from "./close-day"
 import { DAILY_REVIEW_SECTIONS, buildDailyReview, emptyDailyReviewFields } from "./os-feed/daily-review"
+import type { JournalEntry } from "./types"
 import type { DayAgendaEntry } from "./weekly-plan"
 import type { DailyFocusSnapshot, Task } from "./types"
 
@@ -255,5 +259,48 @@ describe("buildCloseDayChecklist for a missed day", () => {
     composeCloseDayFields(emptyDailyReviewFields(), checklist.items, {}, {})
     dailyFocusSnapshotTasks(tasks, TODAY, toLocal)
     expect(JSON.stringify(tasks)).toBe(before)
+  })
+})
+
+describe("Journal cards (P27)", () => {
+  const fields = { ...emptyDailyReviewFields(), completed: "- Ship P27", blockers: "- Low energy", carryForward: "- Tests" }
+  const card = (id: string, dateISO: string, closedAt: number, extra: Partial<JournalEntry> = {}): JournalEntry => ({
+    ...closeDayJournalEntry({ dateISO, fields, doneCount: 1, openCount: 1, osUrl: null, commitUrl: null }),
+    closedAt,
+    id,
+    deleted: false,
+    clientUpdatedAt: closedAt,
+    ...extra,
+  })
+  const legacy = (id: string, extra: Partial<JournalEntry> = {}): JournalEntry => ({
+    id, dateISO: "2026-10-01", type: "daily", mood: 3, highlights: "x", challenges: "", nextSteps: "", deleted: false, clientUpdatedAt: 1, ...extra,
+  })
+
+  it("keeps every section as committed and mirrors three into the old fields", () => {
+    const entry = closeDayJournalEntry({
+      dateISO: "2026-10-19", fields, doneCount: 3, openCount: 1, osUrl: "https://os/file", commitUrl: "https://os/commit",
+    })
+    expect(entry).toMatchObject({
+      type: "close", dateISO: "2026-10-19", doneCount: 3, openCount: 1, osUrl: "https://os/file", commitUrl: "https://os/commit",
+      highlights: "- Ship P27", challenges: "- Low energy", nextSteps: "- Tests",
+    })
+    expect(entry.review).toEqual(fields)
+    expect(entry.review).not.toBe(fields)
+  })
+
+  it("lists one card per day, newest day first, the latest close winning", () => {
+    const list = selectClosedDayEntries([
+      card("a", "2026-10-17", 10),
+      card("b", "2026-10-19", 20),
+      card("c", "2026-10-17", 30),
+      card("d", "2026-10-18", 40, { deleted: true }),
+      legacy("e"),
+    ])
+    expect(list.map((entry) => entry.id)).toEqual(["b", "c"])
+  })
+
+  it("treats every live non-close entry as old", () => {
+    const old = selectLegacyJournalEntries([card("a", "2026-10-19", 1), legacy("b"), legacy("c", { type: "weekly" }), legacy("d", { deleted: true })])
+    expect(old.map((entry) => entry.id)).toEqual(["b", "c"])
   })
 })

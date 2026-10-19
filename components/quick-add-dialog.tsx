@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { findCategoryConflict, firstCategory } from "@/lib/categories"
 import { useCategories } from "@/hooks/use-categories"
-import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -20,7 +19,6 @@ export function QuickAddDialog() {
   const [open, setOpen] = useState(false)
   const addTask = useAppStore((s) => s.addTask)
   const addGoal = useAppStore((s) => s.addGoal)
-  const addJournalEntry = useAppStore((s) => s.addJournalEntry)
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const deleteCategory = useAppStore((s) => s.deleteCategory)
@@ -34,7 +32,6 @@ export function QuickAddDialog() {
   const [taskTime, setTaskTime] = useState("")
   const [taskRepeat, setTaskRepeat] = useState<TaskRepeat>("none")
   const [goalTitle, setGoalTitle] = useState("")
-  const [journalHighlights, setJournalHighlights] = useState("")
 
   const [managingCats, setManagingCats] = useState(false)
   const [newCatName, setNewCatName] = useState("")
@@ -69,13 +66,6 @@ export function QuickAddDialog() {
     if (!goalTitle.trim()) return
     addGoal({ title: goalTitle, horizon: "mid", category: activeGoalCategory, priority: "medium", notes: "", status: "active", progress: 0 })
     setGoalTitle("")
-    setOpen(false)
-  }
-
-  function handleAddJournal() {
-    if (!journalHighlights.trim()) return
-    addJournalEntry({ dateISO: format(new Date(), "yyyy-MM-dd"), type: "daily", mood: 3, highlights: journalHighlights, challenges: "", nextSteps: "", gratitude: "" })
-    setJournalHighlights("")
     setOpen(false)
   }
 
@@ -118,7 +108,6 @@ export function QuickAddDialog() {
           <TabsList className="w-full">
             <TabsTrigger value="task" className="flex-1">Task</TabsTrigger>
             <TabsTrigger value="goal" className="flex-1">Goal</TabsTrigger>
-            <TabsTrigger value="journal" className="flex-1">Journal</TabsTrigger>
           </TabsList>
 
           <TabsContent value="task" className="mt-4 flex flex-col gap-3">
@@ -251,14 +240,6 @@ export function QuickAddDialog() {
               <Input id="goal-title" placeholder="What do you want to achieve?" value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddGoal()} />
             </div>
             <Button onClick={handleAddGoal}>Add Goal</Button>
-          </TabsContent>
-
-          <TabsContent value="journal" className="mt-4 flex flex-col gap-3">
-            <div>
-              <Label htmlFor="journal-highlights">Today&apos;s highlights</Label>
-              <Input id="journal-highlights" placeholder="What went well today?" value={journalHighlights} onChange={(e) => setJournalHighlights(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddJournal()} />
-            </div>
-            <Button onClick={handleAddJournal}>Add Entry</Button>
           </TabsContent>
         </Tabs>
       </DialogContent>

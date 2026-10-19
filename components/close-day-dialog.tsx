@@ -23,6 +23,7 @@ import {
   addReason,
   buildCloseDayChecklist,
   closeDayChipsFor,
+  closeDayJournalEntry,
   composeCloseDayFields,
   findDailyFocusSnapshot,
   insertChip,
@@ -89,6 +90,7 @@ export function CloseDayDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const timeBlocks = useAppStore((s) => s.timeBlocks)
   const scheduleItems = useAppStore((s) => s.schedule)
   const snapshots = useAppStore((s) => s.profile.dailyFocusSnapshots)
+  const saveJournalEntry = useAppStore((s) => s.saveCloseDayJournalEntry)
   const [step, setStep] = useState<Step>("loading")
   const [state, setState] = useState<DailyReviewState | null>(null)
   const [date, setDate] = useState(localDateISO)
@@ -195,6 +197,17 @@ export function CloseDayDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       const next = (await response.json()) as DailyReviewCommitResult
       setResult(next)
       if (next.ok) {
+        // The Journal keeps a card of what was committed, linked to the OS file (P27).
+        saveJournalEntry(
+          closeDayJournalEntry({
+            dateISO: date,
+            fields,
+            doneCount,
+            openCount: checklist.items.length - doneCount,
+            osUrl: next.url,
+            commitUrl: next.commitUrl,
+          }),
+        )
         // Mark the day closed, so closing another missed day next starts from the right picture.
         setState((current) =>
           current && { ...current, days: current.days.map((day) => (day.date === date ? { ...day, closed: true, url: next.url } : day)) },
@@ -415,7 +428,8 @@ export function CloseDayDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
         {step === "done" && result ? (
           <p className="text-sm">
-            Committed to AI-Business-OS as <code className="font-mono text-xs">daily-close: {result.date}</code>.{" "}
+            Committed to AI-Business-OS as <code className="font-mono text-xs">daily-close: {result.date}</code>, and saved
+            to the Journal.{" "}
             {result.commitUrl ? (
               <a href={result.commitUrl} target="_blank" rel="noreferrer" className="underline underline-offset-4">
                 View the commit

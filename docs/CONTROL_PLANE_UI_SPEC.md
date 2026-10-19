@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -54,6 +54,7 @@ his strategy-file ruling (`decision`), and P20 is presentation only.
 P21 was added on 2026-10-18 by Roman, ranked after P20, and opened while P20 waits only on its
 landing PR (#172) and his real-data check: an exception to WIP = 1 he approved for one UI-only PR.
 P22 was added on 2026-10-18 by Roman, straight after P21 and stacked on it (same file).
+P27 was added on 2026-10-19 by Roman and opened straight away, ranked before P25 (nothing was `open`).
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -846,6 +847,37 @@ longer listed. Pure helpers in `lib/unscheduled-filter.ts`. No store, type or ru
 
 **Deferred:** bulk-select a project's tasks and auto-schedule them into free slots (bulk writes and
 an approval step); a "fill the allocation gap" suggestion per project (overlaps AI Suggest).
+
+### P27 — Close day writes a card to the Journal · S
+
+**Status:** open (2026-10-19, `feat/p27-close-day-journal`)
+
+**Why:** Close day (P11) commits the day's review to the OS but leaves no trace in Magic Kick, and the
+Journal held manual mood/highlights entries unrelated to it. Roman asked on 2026-10-19 that each
+closed day appears as a card in the Journal, and that the Journal's logic and UI follow. His
+choices: a new item opened now; old entries removed, recoverable; no import of days closed before;
+the Journal shows closed days only.
+
+**Shape.** When the commit to the OS succeeds, Close day saves a `journal` entry of type `close`
+with the sections as committed, the done/open counts and the links to the OS file and commit
+(`lib/close-day.ts` `closeDayJournalEntry`). One card per date; closing a date again updates its
+card. The OS file stays the source of truth; the card is a record that links to it. The Journal
+lists the cards newest first (filled sections only, "Open in OS"), has a Close day button that
+opens the same dialog, and lists days closed in the OS without a card (the last 7 days the route
+already returns) as links. Old manual entries are hidden; "Clear old entries" tombstones them
+(`deleted: true`, restorable from Firestore). Mood, gratitude, the streak badge, New Entry, the
+AI Draft button and Quick Add's Journal tab go; the Weekly tab keeps the retrospectives, and its
+Markdown export reads the week's closed days. Firestore rules check only the sync fields of
+`journal` documents, so no rules change.
+
+**Acceptance criteria:**
+1. After a successful Close day commit the Journal shows that day's card; a failed or refused
+   commit adds none.
+2. Closing the same date again leaves one card for it, with the latest text.
+3. The card shows only filled sections, the done/open counts and a working "Open in OS" link.
+4. Old entries are not listed; "Clear old entries" asks first, marks them deleted and syncs.
+5. Days closed in the OS without a card are listed with their OS link.
+6. Quick Add has no Journal tab; the Journal has no New Entry.
 
 ### P25 — Select several roadmap tasks at once · S
 

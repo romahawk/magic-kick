@@ -91,7 +91,7 @@ Persistence
 | Command Center | Daily execution surface | Shows Daily Focus, Weekly Outcomes, Focus Health, XP |
 | Achievements | Motivation layer | Rewards completed execution |
 | Schedule | Time allocation layer | Supports execution blocks |
-| Journal | Reflection layer | Captures weekly and daily feedback |
+| Journal | Reflection layer | Keeps a card per closed day (P27) and shows the weekly retrospective |
 | Resources | Knowledge base | Supports goals and projects |
 
 ## System Configuration Schema

@@ -113,7 +113,7 @@ No broad SaaS roadmap is planned.
 | Projects | Project identity, status, dates, links, milestones, detail panels, and workflow visibility |
 | Todo | Backlog, daily focus, task states, due dates, categories, and schedule-linked tasks |
 | Schedule | Time blocks, editable notes, linked tasks, category metadata, due-date scheduling and unscheduling |
-| Journal | Reflection and retrospective capture |
+| Journal | A card per closed day (from Close day, linked to the OS review file) and the weekly retrospective |
 | Resources | Personal knowledge and reusable references |
 | Achievements / XP | Motivation and feedback loop |
 | AI Layer | Coaching, planning, summaries, risk/pattern support, and workflow review experiments |

@@ -3,7 +3,7 @@
  * snapshots behind the dialog. Pure functions; the dialog turns their output into the same
  * `DailyReviewFields` the server already takes, so the write path does not change.
  */
-import type { CloseDayChip, CloseDayChipSection, DailyFocusSnapshot, Task } from "@/lib/types"
+import type { CloseDayChip, CloseDayChipSection, DailyFocusSnapshot, JournalEntry, Task } from "@/lib/types"
 import type { DayAgendaEntry } from "@/lib/weekly-plan"
 import { CLOSE_DAY_DAYS_BACK, closeDayDates, selectCompletedOn, toBulletList } from "@/lib/os-feed/daily-review"
 import type { DailyReviewFields, DailyReviewKey } from "@/lib/os-feed/daily-review"
@@ -251,4 +251,53 @@ export function mergeDailyFocusSnapshots(
 
 export function findDailyFocusSnapshot(snapshots: DailyFocusSnapshot[] = [], dateISO: string) {
   return snapshots.find((snapshot) => snapshot.date === dateISO)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Journal cards (P27)
+
+export type CloseDayJournalFields = Omit<JournalEntry, "id" | "deleted" | "clientUpdatedAt" | "createdAt" | "updatedAt" | "closedAt">
+
+/**
+ * A closed day as a Journal card: the sections as committed, the tick counts and the OS links. The
+ * old fields carry Completed, Blockers and Carry Forward, so readers of the old shape still get text.
+ */
+export function closeDayJournalEntry(input: {
+  dateISO: string
+  fields: DailyReviewFields
+  doneCount: number
+  openCount: number
+  osUrl: string | null
+  commitUrl: string | null
+}): CloseDayJournalFields {
+  const { dateISO, fields, doneCount, openCount, osUrl, commitUrl } = input
+  return {
+    dateISO,
+    type: "close",
+    mood: 0,
+    highlights: fields.completed,
+    challenges: fields.blockers,
+    nextSteps: fields.carryForward,
+    review: { ...fields },
+    doneCount,
+    openCount,
+    osUrl,
+    commitUrl,
+  }
+}
+
+/** One card per closed day, newest first; a day closed twice keeps its latest card. */
+export function selectClosedDayEntries(journal: JournalEntry[]): JournalEntry[] {
+  const byDate = new Map<string, JournalEntry>()
+  for (const entry of journal) {
+    if (entry.deleted || entry.type !== "close") continue
+    const existing = byDate.get(entry.dateISO)
+    if (!existing || (entry.closedAt ?? 0) > (existing.closedAt ?? 0)) byDate.set(entry.dateISO, entry)
+  }
+  return [...byDate.values()].sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+}
+
+/** The manual entries from before P27, which the Journal no longer shows. */
+export function selectLegacyJournalEntries(journal: JournalEntry[]): JournalEntry[] {
+  return journal.filter((entry) => !entry.deleted && entry.type !== "close")
 }
