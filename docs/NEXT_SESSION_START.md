@@ -1,24 +1,30 @@
 # Next Session Start
 
-**Last updated:** 2026-10-19 (P20, P21, P22 `done` and on `main`; #175 category default/order and #177 "Move to" milestone fix merged. Nothing is `open`; next by rank is P19)
-**Resume on:** `main` (`fc1d8f9`). Start new work on a branch from `origin/main`.
-**Build status:** passing as of 2026-10-19 — `npm run build` exit 0 (commit hook on `fix/roadmap-move-to`, now `main`; and this session close)
-**Typecheck status:** passing as of 2026-10-19 — `npm run typecheck` exit 0 (same runs)
-**Lint status:** passing as of 2026-10-19 — `npm run lint` exit 0 (same runs)
-**Test status:** passing as of 2026-10-19 — `npm test` (typecheck + `vitest run`) exit 0, 69 tests in 8 files
-**Note:** all work this session was UI only (no store schema, Firestore rules or route change). Stacked PRs merged into their old base twice (#170/#171, #174) and needed landing PRs (#172, #176): **do not stack PRs** (step 3).
+**Last updated:** 2026-10-19, afternoon (P23 and P24 `done` on `main` (#179, #180). **P26 `open`:** PR #181 awaits Roman's review, not merged. Next by rank: P25, then P19)
+**Resume on:** `feat/p26-schedule-project-filter` (`c4a0bfa` + this handoff) until #181 merges; then `main`.
+**Build status:** passing as of 2026-10-19 — `npm run build` exit 0 (on `c4a0bfa`, `next dev` stopped; and the commit hook)
+**Typecheck status:** passing as of 2026-10-19 — `npm run typecheck` exit 0 (same run)
+**Lint status:** passing as of 2026-10-19 — `npm run lint` exit 0 (same run)
+**Test status:** passing as of 2026-10-19 — `npm test` (typecheck + `vitest run`) exit 0, 89 tests in 11 files
+**Note:** all work today was UI only (no store schema, Firestore rules or route change). **Do not stack PRs** (step 3).
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Nothing is `open`.** P20, P21, P22 are `done` (2026-10-18). **Roman to check on real data:**
+2. **P26 is `open`:** PR #181 (from `main`, one commit). Roman accepted 7 visible task rows at
+   1366×768 on 2026-10-19 (the brief asked for 8); revisit only if 7 feels cramped on real data. **Roman to check on real data:** P24 (how many of his 73 tasks stay in
+   This week) and P26 (his allocations as filter rows). After #181 merges: set P26 `done`, delete
+   its branch, then P25 (roadmap multi-select with done tasks folded; Roman's choices of 2026-10-19
+   are in the spec). P23 and P24 are `done`; P23's real print dialog, Share image on a phone and
+   Safari/Firefox are unchecked. P20, P21, P22 are `done` (2026-10-18). **Roman to check on real data:**
    Command Center (P20: one Today list, "past" rows, grouped attention row); Schedule block card in a
    dialog (P21); category edge colours (P22) with his own categories; "Move to" milestone (#177).
    **P11 is `decision`:** its next slice (strategy files through an OS PR) waits on Roman's scope
-   ruling and the write token's **Pull requests** permission. **Next by rank: P19** (its own ADR
-   first, ADR-017 AI route freeze; `ANTHROPIC_API_KEY` must be set in Vercel).
+   ruling and the write token's **Pull requests** permission. **P19 follows P25** (its own ADR
+   first, ADR-017 AI route freeze; `ANTHROPIC_API_KEY` must be set in Vercel). Magic Kick stays
+   `primary` until 2026-12-31 (OS `DEC-2026-10-19-001`).
 3. **Do not stack PRs.** Open each PR from `main`; if one depends on another, wait for the first to
    merge, then branch from `main`. Three stacked PRs merged into their old base on 2026-10-14
    (#159), 2026-10-18 (#170, #171) and 2026-10-18 (#174); each needed a landing PR.
@@ -36,8 +42,8 @@
    tasks still use ("Self-performance" and others). Names like "Data-management" and
    "Career-&-Business" use hyphens where others use spaces. P22 now shows categories on Schedule,
    and Marketing/Health-like colour pairs are hard to tell apart.
-8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23.
+8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24.
    **P11:** `decision`. **P19:** `queued`, gated on its own ADR. **P10, P15:** `gated` on P7 in the
    spec; P7 is done, so their gates need re-checking.
 9. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN`,
@@ -50,6 +56,49 @@
 12. **Local dev:** `next build` fails with `spawn UNKNOWN` while `next dev` runs in the same
    checkout at times; Turbopack refuses a git worktree whose `node_modules` is a junction. If the
    browser shows old behaviour after an edit, hard-reload (Ctrl+Shift+R) or restart `next dev`.
+   On 2026-10-19 `next build` died with "JavaScript heap out of memory" at a 14 MB heap (1.5 GB, later
+   0.6 GB commit free) and with a TurbopackInternalError while `next dev` ran; stopping Magic Kick's
+   `next dev` (with Roman's OK) freed enough. Machine memory, not code.
+
+---
+
+## Where we left off (2026-10-19, late morning → afternoon) — P23, P24 merged; P26 PR open
+
+**Why:** P23 (share a roadmap) needed verifying and a PR. Roman then asked for a Schedule panel that
+does not list every open task (P24, "focused list"), for roadmap multi-select (P25, queued) and, by
+brief, for the Week allocation card to become a project filter in a compact panel (P26). He ranked
+P24 → P26 → P25 → P19.
+
+**What changed:**
+- **#179 P23** (merged): Share dialog on a project roadmap (PNG, PDF via print, Markdown), ADR-035.
+- **#180 P24** (merged): `lib/roadmap.ts` `isPlanningFocus` + `selectNextMilestoneByProject` (+ tests);
+  panel opens on This week (Daily Focus, due by week end, Next milestone), All open, search over all;
+  tasks added or unscheduled this session stay in view; roadmap task menu "Schedule next free slot".
+- **#181 P26** (open, `c4a0bfa`): `lib/unscheduled-filter.ts` (+ 9 tests); Week allocation card
+  removed; project radiogroup with allocation hours and bars, roving tabindex, "+N more" past 5
+  rows, persisted in `localStorage` key `magic-kick-schedule-project-filter`; header compacted
+  (inline search, Filters popover with sort and categories); two-line rows (46 px, were 80); week
+  chevrons labelled (axe `button-name`).
+- Docs: spec P23, P24 → `done`; P24, P25, P26 added; CHANGELOG entries for P23, P24, P26.
+
+**Branch map (2026-10-19):** `main` = `e5bb108`. `feat/p26-schedule-project-filter` from `e5bb108`,
+head `c4a0bfa` + this handoff, pushed (`c4a0bfa`), PR #181 OPEN, not stacked. Tag
+`pr-p26-screenshots` → `54b2daa` (parentless, images only). `feat/p23-share-roadmap` deleted
+(local and GitHub); local `feat/p24-schedule-focused-panel` deleted; **GitHub still has
+`feat/p24-schedule-focused-panel`** (merged as #180), to delete.
+
+**Verified (confirmed):** gates as in the header. Headless Edge (playwright-core in the scratchpad,
+system Edge), demo mode. P23: preview, toggles, PNG 2160×1860, Markdown, print iframe → 1-page PDF
+with selectable text, escaping. P24: This week 9 / All open 10 with tasks in Next and later
+milestones; footer, search, kept-in-view add, roadmap Schedule action. P26 at 1366×768: first task
+184 px from the panel top (was 271), 7 rows fully visible (were 3), counts match the list with
+scope, search and category; arrows/Space; popover Esc returns focus; drag to calendar, drop back,
+schedule next, open task while filtered; stale stored id → All; no plan → rows without bars; 7
+rows → 4 + "+3 more" (header 228 px); axe on `<main>` 0 violations.
+
+**Not verified:** Roman's real data for P23, P24, P26; P26's 8-rows target (7 fit, accepted by Roman); a real plan with
+more than 5 allocations; P23 real print dialog and phone share; light theme; Safari, Firefox; phone
+width.
 
 ---
 

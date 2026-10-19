@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-19 - Week allocation becomes a project filter on Schedule (P26)
+
+### Changed
+- Schedule: the "Week allocation" card is gone. Its hours and bars now sit in a project list at the top of Unscheduled tasks; click a project to see only its tasks, with counts that follow This week / All, search and categories. Your choice is remembered.
+- Unscheduled tasks is more compact: search opens from an icon, sort and categories moved into a Filters menu, and each task takes two short lines, so about twice as many tasks fit on screen.
+
+### Fixed
+- Schedule: the previous/next week buttons now have names for screen readers.
+
+---
+
 ## [Unreleased] - 2026-10-19 - Schedule shows this week's tasks (P24)
 
 ### Changed
