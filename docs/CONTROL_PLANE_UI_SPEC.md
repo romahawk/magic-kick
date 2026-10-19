@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -768,7 +768,7 @@ category field, so they keep a neutral edge (a category on time blocks would be 
 
 ### P23 — Share a project roadmap · S
 
-**Status:** open
+**Status:** done (2026-10-19, #179. Real print dialog, Share image on a phone, Safari/Firefox not checked)
 
 **Why:** a roadmap could only be seen inside Roman's account. Sharing it with a collaborator, a mentor
 or in a post meant screenshots of a dark side panel.
@@ -786,6 +786,44 @@ phones), Save as PDF (vector, via print), Copy as Markdown. One pure renderer in
    and confirms with "Copied".
 5. Each toggle removes its content from the preview and from all three outputs.
 6. Titles and text are escaped (no markup injection into the SVG or Markdown).
+
+### P24 — Schedule shows this week's tasks, not every open task · S
+
+**Status:** open
+
+**Why:** Schedule's Unscheduled tasks panel listed every open task without a time slot (73 on
+Roman's account, 2026-10-19), most of them project tasks for later milestones. Planning the week
+meant scrolling past work that belongs in the project roadmap. Roman chose the "focused list"
+option on 2026-10-19.
+
+**Shape.** UI only. The panel opens on **This week**: tasks in the Daily Focus lane, tasks due by the
+end of the shown week (overdue too), and tasks in their active project's Next milestone (first open
+milestone). **All open** shows the full list; search always covers all open tasks; a footer says
+how many more there are. Tasks added from the panel or unscheduled from the grid stay in view for
+the session. A roadmap task's menu gets **Schedule next free slot** (the panel's clock action), so
+any project task reaches the calendar on request. Pure rule `isPlanningFocus` in `lib/roadmap.ts`.
+No store, type or rules change.
+
+**Acceptance criteria:**
+1. The panel opens on This week with the three groups above; the collapsed rail counts the same.
+2. All open lists every open, unscheduled task of active projects and none; the footer's "Show all"
+   switches to it.
+3. Search finds any open task in either view.
+4. A task added from the panel, or dragged back from the grid, stays visible in This week.
+5. A roadmap task without a time slot offers Schedule next free slot; it lands in the calendar with
+   an Undo toast, and the action is gone once it has a slot.
+
+### P25 — Select several roadmap tasks at once · S
+
+**Status:** queued (after P24)
+
+**Why:** a project with many tasks (Job-Search: 23 under "No milestone", most done) can only be
+changed one task at a time. Roman asked for multi-select with delete, archive and "Move to
+milestone" on 2026-10-19; he chose "hide done tasks" over a new Archived state.
+
+**Shape (to confirm when opened).** In a project's roadmap: a Select mode with checkboxes, shift-click
+for ranges and a sticky action bar: Complete, Move to milestone, Delete (with Undo). Done tasks fold
+under "Done (n)" in each group, collapsed by default. No new task state, no data change.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

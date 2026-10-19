@@ -9,6 +9,7 @@ import { format, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { defaultTaskCategory } from "@/lib/categories"
 import { useCategories } from "@/hooks/use-categories"
+import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import {
   buildProjectRoadmap,
   resolveResources,
@@ -62,6 +63,7 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  CalendarClock,
   CalendarIcon,
   Check,
   ChevronRight,
@@ -413,6 +415,13 @@ function RoadmapTaskRow({
   const toggleTask = useAppStore((s) => s.toggleTask)
   const updateTask = useAppStore((s) => s.updateTask)
   const deleteTask = useAppStore((s) => s.deleteTask)
+  const planInNextSlot = usePlanInNextSlot()
+  // P24: project tasks reach the Schedule on request; a task that already has a time slot keeps it.
+  const hasTimeSlot = useAppStore(
+    (s) =>
+      s.timeBlocks.some((block) => !block.deleted && block.linkedTaskId === task.id) ||
+      s.schedule.some((item) => !item.deleted && item.linkedTaskId === task.id && item.hasExplicitTime)
+  )
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(task.title)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -485,6 +494,11 @@ function RoadmapTaskRow({
             <DropdownMenuItem onSelect={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" /> Rename
             </DropdownMenuItem>
+            {!task.completed && !hasTimeSlot ? (
+              <DropdownMenuItem onSelect={() => planInNextSlot(task)}>
+                <CalendarClock className="h-3.5 w-3.5" /> Schedule next free slot
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <CornerDownRight className="h-3.5 w-3.5" /> Move to

@@ -17,6 +17,12 @@ import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 import { CategoryBadge } from "@/components/category-badge"
 
 type TaskSort = "due" | "project" | "estimate"
+type TaskScope = "focus" | "all"
+
+const SCOPE_LABELS: Record<TaskScope, string> = {
+  focus: "This week",
+  all: "All open",
+}
 
 const SORT_LABELS: Record<TaskSort, string> = {
   due: "Due date",
@@ -30,6 +36,10 @@ export type UnscheduleDropState = null | "near" | "over"
 interface UnscheduledTasksPanelProps {
   /** Open, unscheduled tasks that belong to no project or to an active one (P16). */
   tasks: Task[]
+  /** P24: ids of `tasks` shown in the default "This week" view; the rest wait behind "All open" and search. */
+  focusTaskIds: ReadonlySet<string>
+  /** Called with the ids of tasks created from this panel, so they stay in view. */
+  onTasksAdded: (ids: string[]) => void
   /** Open, unscheduled tasks left out because their project is not active. */
   hiddenCount: number
   projects: Project[]
@@ -52,6 +62,8 @@ function dueValue(task: Task) {
 
 export function UnscheduledTasksPanel({
   tasks,
+  focusTaskIds,
+  onTasksAdded,
   hiddenCount,
   projects,
   todayISO,
@@ -70,24 +82,30 @@ export function UnscheduledTasksPanel({
   const [sort, setSort] = useState<TaskSort>("due")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [adding, setAdding] = useState(false)
+  const [scope, setScope] = useState<TaskScope>("focus")
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects])
 
-  // Only categories that have an unscheduled task, in the order of the shared list (P14).
+  const needle = query.trim().toLowerCase()
+  const focusTasks = useMemo(() => tasks.filter((task) => focusTaskIds.has(task.id)), [tasks, focusTaskIds])
+  // Search always looks through every open task, whatever the view.
+  const baseTasks = scope === "all" || needle ? tasks : focusTasks
+  const moreCount = tasks.length - focusTasks.length
+
+  // Only categories that have a task in view, in the order of the shared list (P14).
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const task of tasks) counts.set(task.category, (counts.get(task.category) ?? 0) + 1)
+    for (const task of baseTasks) counts.set(task.category, (counts.get(task.category) ?? 0) + 1)
     const ordered = allCategories.filter((c) => counts.has(c))
     for (const c of counts.keys()) if (!ordered.includes(c)) ordered.push(c)
     return ordered.map((name) => ({ name, count: counts.get(name) ?? 0 }))
-  }, [tasks, allCategories])
+  }, [baseTasks, allCategories])
 
   // A selected category that no longer has tasks stops filtering instead of hiding everything.
   const activeCategories = selectedCategories.filter((c) => categoryCounts.some((entry) => entry.name === c))
 
   const visibleTasks = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return tasks
+    return baseTasks
       .filter((task) => activeCategories.length === 0 || activeCategories.includes(task.category))
       .filter((task) => {
         if (!needle) return true
@@ -110,9 +128,14 @@ export function UnscheduledTasksPanel({
         if (byDue !== 0) return byDue
         return (a.order ?? 0) - (b.order ?? 0)
       })
-  }, [tasks, activeCategories, query, sort, projectById])
+  }, [baseTasks, activeCategories, needle, sort, projectById])
 
-  const isFiltered = activeCategories.length > 0 || query.trim() !== ""
+  const isFiltered = activeCategories.length > 0 || needle !== ""
+
+  function showAll() {
+    setScope("all")
+    setSelectedCategories([])
+  }
 
   function toggleCategory(name: string) {
     setSelectedCategories((current) => (current.includes(name) ? current.filter((c) => c !== name) : [...current, name]))
@@ -132,7 +155,7 @@ export function UnscheduledTasksPanel({
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold">Unscheduled tasks</p>
               <Badge variant="secondary" className="text-[10px] tabular-nums">
-                {isFiltered ? `${visibleTasks.length}/${tasks.length}` : tasks.length}
+                {isFiltered ? `${visibleTasks.length}/${baseTasks.length}` : baseTasks.length}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">Drag onto the calendar, or use the clock for the next free slot.</p>
@@ -163,7 +186,28 @@ export function UnscheduledTasksPanel({
           </div>
         </div>
 
-        {adding ? <AddTaskForm projects={projects} categories={allCategories} onDone={() => setAdding(false)} /> : null}
+        {adding ? (
+          <AddTaskForm projects={projects} categories={allCategories} onAdded={onTasksAdded} onDone={() => setAdding(false)} />
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5" role="group" aria-label="Which tasks to show">
+          {(Object.keys(SCOPE_LABELS) as TaskScope[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setScope(key)}
+              aria-pressed={scope === key}
+              title={key === "focus" ? "Overdue, due this week, Daily Focus, and each project's Next milestone" : "Every open task without a time slot"}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                scope === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {SCOPE_LABELS[key]}
+              <span className="tabular-nums text-muted-foreground">{key === "focus" ? focusTasks.length : tasks.length}</span>
+            </button>
+          ))}
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
@@ -258,6 +302,13 @@ export function UnscheduledTasksPanel({
           <div className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
             All open tasks already have an assigned time slot.
           </div>
+        ) : baseTasks.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
+            Nothing overdue, due this week, in Daily Focus or in a Next milestone.{" "}
+            <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={showAll}>
+              Show all open ({tasks.length})
+            </button>
+          </div>
         ) : visibleTasks.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
             No tasks match.{" "}
@@ -287,6 +338,15 @@ export function UnscheduledTasksPanel({
             />
           ))
         )}
+
+        {scope === "focus" && !needle && moreCount > 0 && focusTasks.length > 0 ? (
+          <p className="pt-1 text-[11px] text-muted-foreground">
+            {moreCount} more open {moreCount === 1 ? "task" : "tasks"} not due this week.{" "}
+            <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={showAll}>
+              Show all
+            </button>
+          </p>
+        ) : null}
 
         {hiddenCount > 0 ? (
           <p className="pt-1 text-[11px] text-muted-foreground">
@@ -396,7 +456,17 @@ function UnscheduledTaskCard({
 }
 
 /** Inline create form (P17). The task gets no date or time, so it lands in this list ready to place. */
-function AddTaskForm({ projects, categories, onDone }: { projects: Project[]; categories: string[]; onDone: () => void }) {
+function AddTaskForm({
+  projects,
+  categories,
+  onAdded,
+  onDone,
+}: {
+  projects: Project[]
+  categories: string[]
+  onAdded: (ids: string[]) => void
+  onDone: () => void
+}) {
   const addTask = useAppStore((s) => s.addTask)
   const [title, setTitle] = useState("")
   const [projectId, setProjectId] = useState(NO_PROJECT)
@@ -413,6 +483,7 @@ function AddTaskForm({ projects, categories, onDone }: { projects: Project[]; ca
     const trimmed = title.trim()
     if (!trimmed) return
     const minutes = Number(estimate)
+    const before = new Set(useAppStore.getState().tasks.map((task) => task.id))
     addTask({
       title: trimmed.slice(0, 300),
       category: categories.includes(category) ? category : defaultTaskCategory(categories),
@@ -421,6 +492,8 @@ function AddTaskForm({ projects, categories, onDone }: { projects: Project[]; ca
       ...(projectId !== NO_PROJECT ? { linkedProjectId: projectId, milestoneId: "" } : {}),
       estimateMin: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : undefined,
     })
+    // addTask returns nothing; the new id is the one that was not there before.
+    onAdded(useAppStore.getState().tasks.filter((task) => !before.has(task.id)).map((task) => task.id))
     // Stay open for rapid entry; project and category carry over.
     setTitle("")
     setEstimate("")

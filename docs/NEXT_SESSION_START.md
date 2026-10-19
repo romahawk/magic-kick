@@ -36,8 +36,8 @@
    tasks still use ("Self-performance" and others). Names like "Data-management" and
    "Career-&-Business" use hyphens where others use spaces. P22 now shows categories on Schedule,
    and Marketing/Health-like colour pairs are hard to tell apart.
-8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22.
+8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23.
    **P11:** `decision`. **P19:** `queued`, gated on its own ADR. **P10, P15:** `gated` on P7 in the
    spec; P7 is done, so their gates need re-checking.
 9. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN`,
