@@ -6,6 +6,7 @@
 import { useRef, useState } from "react"
 import { Search, SlidersHorizontal, X } from "lucide-react"
 import type { ProjectAllocation, ProjectFilter, ProjectRow } from "@/lib/unscheduled-filter"
+import type { ProjectFilter, ProjectRow } from "@/lib/unscheduled-filter"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -295,6 +296,8 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
         {shownRows.map((row, index) => {
           const selected = row.key === value
           const hoursText = row.allocation ? allocationHoursText(row.allocation) : null
+          const pct = row.allocation && row.allocation.allocatedHours > 0 ? Math.min(100, (row.allocation.plannedHours / row.allocation.allocatedHours) * 100) : 0
+          const hoursText = row.allocation ? `${hours(row.allocation.plannedHours)}/${hours(row.allocation.allocatedHours)}h` : null
           return (
             <button
               key={row.key}
@@ -306,6 +309,7 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
               role="radio"
               aria-checked={selected}
               aria-label={`${row.label}, ${row.count} ${row.count === 1 ? "task" : "tasks"}${row.allocation ? `, ${allocationHoursLabel(row.allocation)}` : ""}`}
+              aria-label={`${row.label}, ${row.count} ${row.count === 1 ? "task" : "tasks"}${row.allocation ? `, ${hours(row.allocation.plannedHours)} of ${hours(row.allocation.allocatedHours)} hours planned` : ""}`}
               tabIndex={row.key === tabRowKey ? 0 : -1}
               onClick={() => onChange(row.key)}
               onFocus={() => setFocusedRowKey(row.key)}
@@ -322,6 +326,9 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
               <span className="w-5 shrink-0 text-right tabular-nums">{row.count}</span>
               {row.allocation ? (
                 <AllocationBar allocation={row.allocation} color={row.color ?? "currentColor"} className="absolute inset-x-2 bottom-0.5 h-0.5" />
+                <span className="absolute inset-x-2 bottom-0.5 h-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                  <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: row.color }} />
+                </span>
               ) : null}
             </button>
           )

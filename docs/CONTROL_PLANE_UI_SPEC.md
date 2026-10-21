@@ -881,7 +881,7 @@ Markdown export reads the week's closed days. Firestore rules check only the syn
 
 ### P25 — Select several roadmap tasks at once · S
 
-**Status:** open (2026-10-21, `feat/p25-roadmap-multiselect`)
+**Status:** done (2026-10-21, #185. Real data, keyboard-only ranges, light theme, Safari/Firefox and touch not checked)
 
 **Why:** a project with many tasks (Job-Search: 23 under "No milestone", most done) can only be
 changed one task at a time. Roman asked for multi-select with delete, archive and "Move to
