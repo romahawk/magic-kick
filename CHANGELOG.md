@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-21 - Select several roadmap tasks at once (P25)
+
+### Added
+- Projects: a roadmap's Select button lets you tick several tasks (Shift-click for a range, or "Select shown") and then Complete, Move to a milestone or Delete them together. Each action can be undone from its notice.
+
+### Changed
+- Projects: done tasks fold under "Done (n)" in each milestone and under "No milestone", closed until you open them.
+
+### Fixed
+- The Undo button on a notice could not be clicked while a project was open, and clicking near it closed the project.
+
+---
+
 ## [Unreleased] - 2026-10-19 - Closed days in the Journal (P27)
 
 ### Changed

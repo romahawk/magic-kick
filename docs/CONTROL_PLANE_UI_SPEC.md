@@ -881,15 +881,26 @@ Markdown export reads the week's closed days. Firestore rules check only the syn
 
 ### P25 — Select several roadmap tasks at once · S
 
-**Status:** queued (next)
+**Status:** open (2026-10-21, `feat/p25-roadmap-multiselect`)
 
 **Why:** a project with many tasks (Job-Search: 23 under "No milestone", most done) can only be
 changed one task at a time. Roman asked for multi-select with delete, archive and "Move to
 milestone" on 2026-10-19; he chose "hide done tasks" over a new Archived state.
 
-**Shape (to confirm when opened).** In a project's roadmap: a Select mode with checkboxes, shift-click
+**Shape (opened 2026-10-21 as written).** In a project's roadmap: a Select mode with checkboxes, shift-click
 for ranges and a sticky action bar: Complete, Move to milestone, Delete (with Undo). Done tasks fold
 under "Done (n)" in each group, collapsed by default. No new task state, no data change.
+A range covers the rows shown between the last click and the shift-click (`lib/roadmap.ts`
+`selectTasks`); rows in collapsed milestones or folded Done groups are skipped. "Select shown"
+selects every shown row. Each action shows a toast with Undo, and the selection clears.
+
+**Acceptance criteria:**
+1. Each group (milestone or "No milestone") lists open tasks, then "Done (n)" collapsed.
+2. Select replaces the complete checkboxes with select checkboxes and hides row menus and Add task.
+3. Shift-click selects the shown range; a range never deselects.
+4. Complete, Move to and Delete act on every selected task, and Undo reverts each.
+5. Undo is clickable while the project sheet is open, and clicking it does not close the sheet.
+6. The action bar fits at 390 px with no horizontal page scroll.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

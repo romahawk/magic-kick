@@ -6,6 +6,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
+import { toast } from "sonner"
 import { useAppStore } from "@/lib/store"
 import { defaultTaskCategory } from "@/lib/categories"
 import { useCategories } from "@/hooks/use-categories"
@@ -13,6 +14,7 @@ import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import {
   buildProjectRoadmap,
   resolveResources,
+  selectTasks,
   toggleId,
   type MilestoneSchedule,
   type RoadmapMilestone,
@@ -70,6 +72,7 @@ import {
   CornerDownRight,
   ExternalLink,
   Flag,
+  ListChecks,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -405,12 +408,20 @@ function MilestoneDialog({
 
 // ─── task row ───────────────────────────────────────────────────────────────
 
+/** P25: in Select mode a row's checkbox and title select it instead of completing or renaming it. */
+interface RoadmapSelection {
+  selected: Set<string>
+  onSelect: (taskId: string, range: boolean) => void
+}
+
 function RoadmapTaskRow({
   task,
   milestones,
+  selection,
 }: {
   task: Task
   milestones: ProjectMilestone[]
+  selection: RoadmapSelection | null
 }) {
   const toggleTask = useAppStore((s) => s.toggleTask)
   const updateTask = useAppStore((s) => s.updateTask)
@@ -435,15 +446,47 @@ function RoadmapTaskRow({
     setEditing(false)
   }
 
+  const isSelected = selection?.selected.has(task.id) ?? false
+
   return (
-    <div className="group/task flex min-h-8 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-muted/50">
-      <Checkbox
-        checked={task.completed}
-        onCheckedChange={() => toggleTask(task.id)}
-        aria-label={`${task.completed ? "Reopen" : "Complete"} task: ${task.title}`}
-        className="shrink-0"
-      />
-      {editing ? (
+    <div
+      className={cn(
+        "group/task flex min-h-8 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-muted/50",
+        isSelected && "bg-primary/5 hover:bg-primary/10"
+      )}
+    >
+      {selection ? (
+        <Checkbox
+          checked={isSelected}
+          onClick={(e) => {
+            e.preventDefault()
+            selection.onSelect(task.id, e.shiftKey)
+          }}
+          aria-label={`Select task: ${task.title}`}
+          className="shrink-0"
+        />
+      ) : (
+        <Checkbox
+          checked={task.completed}
+          onCheckedChange={() => toggleTask(task.id)}
+          aria-label={`${task.completed ? "Reopen" : "Complete"} task: ${task.title}`}
+          className="shrink-0"
+        />
+      )}
+      {selection ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={(e) => selection.onSelect(task.id, e.shiftKey)}
+          className={cn(
+            "min-w-0 flex-1 select-none truncate text-left text-sm",
+            task.completed && "text-muted-foreground line-through decoration-muted-foreground/50"
+          )}
+          title={task.title}
+        >
+          {task.title}
+        </button>
+      ) : editing ? (
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -477,7 +520,7 @@ function RoadmapTaskRow({
           {format(parseISO(task.dueDate), "MMM d")}
         </span>
       ) : null}
-      {!editing ? (
+      {!editing && !selection ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -547,6 +590,53 @@ function RoadmapTaskRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+// ─── task group: open tasks, then done tasks folded (P25) ───────────────────
+
+function TaskGroup({
+  openTasks,
+  doneTasks,
+  milestones,
+  selection,
+  doneOpen,
+  onDoneOpenChange,
+  children,
+}: {
+  openTasks: Task[]
+  doneTasks: Task[]
+  milestones: ProjectMilestone[]
+  selection: RoadmapSelection | null
+  doneOpen: boolean
+  onDoneOpenChange: (open: boolean) => void
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col">
+      {openTasks.map((task) => (
+        <RoadmapTaskRow key={task.id} task={task} milestones={milestones} selection={selection} />
+      ))}
+      {doneTasks.length > 0 ? (
+        <Collapsible open={doneOpen} onOpenChange={onDoneOpenChange}>
+          <button
+            type="button"
+            onClick={() => onDoneOpenChange(!doneOpen)}
+            aria-expanded={doneOpen}
+            className="flex h-7 w-full items-center gap-1 rounded-md px-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          >
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", doneOpen && "rotate-90")} />
+            Done ({doneTasks.length})
+          </button>
+          <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
+            {doneTasks.map((task) => (
+              <RoadmapTaskRow key={task.id} task={task} milestones={milestones} selection={selection} />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+      {children}
     </div>
   )
 }
@@ -653,6 +743,9 @@ function MilestoneBlock({
   expanded,
   onExpandedChange,
   milestones,
+  selection,
+  doneOpen,
+  onDoneOpenChange,
 }: {
   project: Project
   entry: RoadmapMilestone
@@ -663,6 +756,9 @@ function MilestoneBlock({
   expanded: boolean
   onExpandedChange: (open: boolean) => void
   milestones: ProjectMilestone[]
+  selection: RoadmapSelection | null
+  doneOpen: boolean
+  onDoneOpenChange: (open: boolean) => void
 }) {
   const resources = useAppStore((s) => s.resources)
   const updateMilestone = useAppStore((s) => s.updateMilestone)
@@ -670,7 +766,7 @@ function MilestoneBlock({
   const deleteMilestone = useAppStore((s) => s.deleteMilestone)
   const [editOpen, setEditOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const { milestone, tasks, doneTasks, progress, schedule, daysToTarget } = entry
+  const { milestone, tasks, openTasks, doneTasks, progress, schedule, daysToTarget } = entry
   const linked = resolveResources(milestone.resourceIds, resources)
   const rel = relativeLabel(daysToTarget)
 
@@ -805,12 +901,16 @@ function MilestoneBlock({
                 </p>
               ) : null}
 
-              <div className="flex flex-col">
-                {tasks.map((task) => (
-                  <RoadmapTaskRow key={task.id} task={task} milestones={milestones} />
-                ))}
-                <AddTaskInline projectId={project.id} milestoneId={milestone.id} />
-              </div>
+              <TaskGroup
+                openTasks={openTasks}
+                doneTasks={doneTasks}
+                milestones={milestones}
+                selection={selection}
+                doneOpen={doneOpen}
+                onDoneOpenChange={onDoneOpenChange}
+              >
+                {selection ? null : <AddTaskInline projectId={project.id} milestoneId={milestone.id} />}
+              </TaskGroup>
 
               <div className="flex flex-wrap items-center gap-1.5">
                 {linked.map((resource) => (
@@ -896,6 +996,8 @@ function MilestoneBlock({
 
 // ─── roadmap section ────────────────────────────────────────────────────────
 
+const NO_MILESTONE = "__none__"
+
 export function ProjectRoadmap({ project }: { project: Project }) {
   const tasks = useAppStore((s) => s.tasks)
   const addMilestone = useAppStore((s) => s.addMilestone)
@@ -913,6 +1015,89 @@ export function ProjectRoadmap({ project }: { project: Project }) {
     (!entry.milestone.completed && (roadmap.nextMilestoneId === entry.milestone.id || entry.openTasks.length > 0))
   const { totals } = roadmap
   const isEmpty = totals.milestones === 0 && roadmap.unassigned.length === 0
+  const unassignedOpen = roadmap.unassigned.filter((task) => !task.completed)
+  const unassignedDone = roadmap.unassigned.filter((task) => task.completed)
+
+  // P25: done tasks fold under "Done (n)" per group, collapsed by default. Key: milestone id or NO_MILESTONE.
+  const [doneOpen, setDoneOpen] = useState<Record<string, boolean>>({})
+  const setGroupDoneOpen = (groupId: string) => (open: boolean) => setDoneOpen((o) => ({ ...o, [groupId]: open }))
+
+  // P25: Select mode. The selection keeps only tasks still on the project (one deleted elsewhere drops out).
+  const toggleTask = useAppStore((s) => s.toggleTask)
+  const updateTask = useAppStore((s) => s.updateTask)
+  const deleteTask = useAppStore((s) => s.deleteTask)
+  const restoreTask = useAppStore((s) => s.restoreTask)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [anchorId, setAnchorId] = useState<string | null>(null)
+  const taskById = new Map(
+    [...roadmap.milestones.flatMap((entry) => entry.tasks), ...roadmap.unassigned].map((task) => [task.id, task])
+  )
+  const selected = selectedIds.filter((id) => taskById.has(id))
+  const selectedOpen = selected.filter((id) => !taskById.get(id)?.completed)
+  // Rows in the order shown, for shift-click ranges: collapsed milestones and folded done tasks are skipped.
+  const shownOrder = [
+    ...roadmap.milestones.flatMap((entry) =>
+      isExpanded(entry) ? [...entry.openTasks, ...(doneOpen[entry.milestone.id] ? entry.doneTasks : [])] : []
+    ),
+    ...unassignedOpen,
+    ...(doneOpen[NO_MILESTONE] ? unassignedDone : []),
+  ].map((task) => task.id)
+  const selection: RoadmapSelection | null = selecting
+    ? {
+        selected: new Set(selected),
+        onSelect: (taskId, range) => {
+          setSelectedIds(selectTasks(shownOrder, selected, anchorId, taskId, range))
+          setAnchorId(taskId)
+        },
+      }
+    : null
+
+  function clearSelection() {
+    setSelectedIds([])
+    setAnchorId(null)
+  }
+
+  function stopSelecting() {
+    setSelecting(false)
+    clearSelection()
+  }
+
+  const countLabel = (n: number) => `${n} task${n === 1 ? "" : "s"}`
+
+  function completeSelected() {
+    const ids = selectedOpen
+    ids.forEach((id) => toggleTask(id))
+    clearSelection()
+    toast(`Completed ${countLabel(ids.length)}`, {
+      action: {
+        label: "Undo",
+        onClick: () =>
+          ids.forEach((id) => {
+            if (useAppStore.getState().tasks.find((task) => task.id === id)?.completed) toggleTask(id)
+          }),
+      },
+    })
+  }
+
+  function moveSelected(milestoneId: string) {
+    const moves = selected.map((id) => ({ id, from: taskById.get(id)?.milestoneId ?? "" }))
+    moves.forEach(({ id }) => updateTask(id, { milestoneId }))
+    clearSelection()
+    toast(`Moved ${countLabel(moves.length)}`, {
+      description: milestoneId ? milestones.find((milestone) => milestone.id === milestoneId)?.title : "No milestone",
+      action: { label: "Undo", onClick: () => moves.forEach(({ id, from }) => updateTask(id, { milestoneId: from })) },
+    })
+  }
+
+  function deleteSelected() {
+    const ids = selected
+    ids.forEach((id) => deleteTask(id))
+    clearSelection()
+    toast(`Deleted ${countLabel(ids.length)}`, {
+      action: { label: "Undo", onClick: () => ids.forEach((id) => restoreTask(id)) },
+    })
+  }
 
   function openCreate() {
     setCreateKey((k) => k + 1)
@@ -930,6 +1115,18 @@ export function ProjectRoadmap({ project }: { project: Project }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {totals.tasks > 0 ? (
+            <Button
+              type="button"
+              variant={selecting ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+              aria-pressed={selecting}
+            >
+              <ListChecks className="h-3.5 w-3.5" /> Select
+            </Button>
+          ) : null}
           {!isEmpty ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -997,6 +1194,9 @@ export function ProjectRoadmap({ project }: { project: Project }) {
               expanded={isExpanded(entry)}
               onExpandedChange={(open) => setOverrides((o) => ({ ...o, [entry.milestone.id]: open }))}
               milestones={milestones}
+              selection={selection}
+              doneOpen={doneOpen[entry.milestone.id] ?? false}
+              onDoneOpenChange={setGroupDoneOpen(entry.milestone.id)}
             />
           ))}
         </ol>
@@ -1009,12 +1209,82 @@ export function ProjectRoadmap({ project }: { project: Project }) {
             <span>No milestone</span>
             {roadmap.unassigned.length > 0 ? <span className="tabular-nums">{roadmap.unassigned.length}</span> : null}
           </p>
-          <div className="flex flex-col">
-            {roadmap.unassigned.map((task) => (
-              <RoadmapTaskRow key={task.id} task={task} milestones={milestones} />
-            ))}
-            <AddTaskInline projectId={project.id} />
-          </div>
+          <TaskGroup
+            openTasks={unassignedOpen}
+            doneTasks={unassignedDone}
+            milestones={milestones}
+            selection={selection}
+            doneOpen={doneOpen[NO_MILESTONE] ?? false}
+            onDoneOpenChange={setGroupDoneOpen(NO_MILESTONE)}
+          >
+            {selection ? null : <AddTaskInline projectId={project.id} />}
+          </TaskGroup>
+        </div>
+      ) : null}
+
+      {selecting ? (
+        <div
+          role="toolbar"
+          aria-label="Selected tasks"
+          className="sticky bottom-0 z-10 flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur"
+        >
+          <span className="px-1 text-xs tabular-nums" aria-live="polite">
+            {selected.length === 0 ? "Click tasks to select, Shift-click for a range" : `${selected.length} selected`}
+          </span>
+          <span className="flex-1" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            disabled={shownOrder.length === 0}
+            onClick={() => {
+              setSelectedIds(shownOrder)
+              setAnchorId(null)
+            }}
+          >
+            Select shown
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            disabled={selectedOpen.length === 0}
+            onClick={completeSelected}
+          >
+            <Check className="h-3 w-3" /> Complete
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" disabled={selected.length === 0}>
+                <CornerDownRight className="h-3 w-3" /> Move to
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {milestones.map((milestone) => (
+                <DropdownMenuItem key={milestone.id} onSelect={() => moveSelected(milestone.id)}>
+                  <Flag className="h-3.5 w-3.5" />
+                  <span className="truncate">{milestone.title}</span>
+                </DropdownMenuItem>
+              ))}
+              {milestones.length > 0 ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem onSelect={() => moveSelected("")}>No milestone</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-destructive hover:text-destructive"
+            disabled={selected.length === 0}
+            onClick={deleteSelected}
+          >
+            <Trash2 className="h-3 w-3" /> Delete
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={stopSelecting} aria-label="Stop selecting">
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </div>
       ) : null}
 
