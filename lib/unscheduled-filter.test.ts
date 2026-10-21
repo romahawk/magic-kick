@@ -79,7 +79,6 @@ describe("buildProjectRows", () => {
 
   it("keeps an allocated project at 0 and carries its allocation", () => {
     const rows = buildProjectRows(projects, [{ projectId: "p2", allocatedHours: 4, plannedHours: 1, doneHours: 0 }], new Map([["all", 0]]), "all", color)
-    const rows = buildProjectRows(projects, [{ projectId: "p2", allocatedHours: 4, plannedHours: 1 }], new Map([["all", 0]]), "all", color)
     expect(keys(rows)).toEqual(["all", "p2"])
     expect(rows[1].allocation?.allocatedHours).toBe(4)
   })

@@ -5,7 +5,6 @@ import { differenceInCalendarDays, endOfWeek, format, isSameMonth, isTomorrow, p
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS, selectDailyFocus } from "@/lib/execution-os"
 import { getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, localDateISO, orderDailyFocusTasks, selectAllocationProgress, selectTaskTimeSlots } from "@/lib/weekly-plan"
-import { getActiveWeeklyPlan, localDateISO, orderDailyFocusTasks, selectProjectHours, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
 import { buildProjectRows, countByProject, countCategories, filterByProject, resolveProjectFilter, type ProjectAllocation } from "@/lib/unscheduled-filter"
 import { categoryColor } from "@/lib/categories"
@@ -151,14 +150,6 @@ export function TodoModule() {
         dayISOList: getWeekDates(getCurrentWeekStartISO()).map((day) => day.iso),
       }).filter((a) => activeProjects.some((p) => p.id === a.projectId)),
     [activePlan, allTimeBlocks, tasks, taskTimeSlots, activeProjects]
-  // The week's allocations, as on Schedule; without a plan, every active project is listed.
-  const activePlan = getActiveWeeklyPlan(weeklyPlans)
-  const allocations: ProjectAllocation[] = useMemo(
-    () =>
-      selectProjectHours(activePlan, allTimeBlocks, [])
-        .filter((a) => activeProjects.some((p) => p.id === a.projectId))
-        .map((a) => ({ projectId: a.projectId, allocatedHours: a.allocatedHours, plannedHours: a.plannedHours })),
-    [activePlan, allTimeBlocks, activeProjects]
   )
   const listedProjects = useMemo(
     () => (allocations.length > 0 ? allocations.flatMap((a) => projectById.get(a.projectId) ?? []) : activeProjects),
