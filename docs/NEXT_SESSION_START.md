@@ -1,20 +1,22 @@
 # Next Session Start
 
-**Last updated:** 2026-10-21 (P27 `done` on `main` (#183); this note was not rebuilt after it merged. Nothing is `open`; next by rank: P25, then P19)
-**Resume on:** `main` (`6e4b2f2`). Start new work on a branch from `origin/main`.
-**Build status:** passing as of 2026-10-21 — `npm run build` exit 0 (on `6e4b2f2`'s tree, after stopping `next dev`; with it running: `spawn UNKNOWN`. Free commit memory ~2 GB: builds also died out of memory at times, step 12)
-**Typecheck status:** passing as of 2026-10-21 — `npm run typecheck` exit 0 (on `6e4b2f2`)
-**Lint status:** passing as of 2026-10-21 — `npm run lint` exit 0 (same tree)
-**Test status:** passing as of 2026-10-21 — `npm test` (typecheck + `vitest run`) exit 0, 95 tests in 11 files
-**Note:** P27 changed the `journal` data (a `close` entry type, tombstones), not the Firestore rules. **Do not stack PRs** (step 3).
+**Last updated:** 2026-10-21, afternoon (P27 and P25 `done` on `main` (#184, #185). Nothing is `open`; next by rank: P19, gated on its own ADR)
+**Resume on:** `main` (`408494e`). Start new work on a branch from `origin/main`.
+**Build status:** passing as of 2026-10-21 — `npm run build` exit 0 (on `6a04280`, whose tree #185 squash-merged; and the commit hook). `main` differs from it by #184's docs only
+**Typecheck status:** passing as of 2026-10-21 — `npm run typecheck` exit 0 (same run)
+**Lint status:** passing as of 2026-10-21 — `npm run lint` exit 0 (same run)
+**Test status:** passing as of 2026-10-21 — `npm test` (typecheck + `vitest run`) exit 0, 99 tests in 11 files
+**Note:** P25 is UI only (no store schema, Firestore rules or route change); it also changed the shared `ui/sonner.tsx` and `ui/sheet.tsx`. **Do not stack PRs** (step 3).
 
 ---
 
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **Nothing is `open`. Next: P25** (roadmap multi-select with done tasks folded; Roman's choices of
-   2026-10-19 are in the spec). P27 is `done` (#183): **Roman to check on the real account** that a
+2. **Nothing is `open`. Next by rank: P19** (AI Suggest from canon). It needs its own ADR first
+   (ADR-017 AI route freeze) and `ANTHROPIC_API_KEY` set in Vercel, so open it only with Roman's
+   go-ahead on both. P25 is `done` (#185): **Roman to check on real data** (Job-Search, 23 tasks):
+   Select, Shift-click ranges, Complete / Move to / Delete with Undo, done tasks folded. P27 is `done` (#183): **Roman to check on the real account** that a
    Close day commit adds one Journal card, that closing the same date again keeps one card, and the
    list of days closed earlier (demo mode can do neither). P23, P24, P26 are `done` (2026-10-19). Roman accepted 7 visible task
    rows at 1366×768 for P26 (the brief asked for 8); revisit only if 7 feels cramped on real data.
@@ -24,8 +26,7 @@
    Command Center (P20: one Today list, "past" rows, grouped attention row); Schedule block card in a
    dialog (P21); category edge colours (P22) with his own categories; "Move to" milestone (#177).
    **P11 is `decision`:** its next slice (strategy files through an OS PR) waits on Roman's scope
-   ruling and the write token's **Pull requests** permission. **P19 follows P25** (its own ADR
-   first, ADR-017 AI route freeze; `ANTHROPIC_API_KEY` must be set in Vercel). Magic Kick stays
+   ruling and the write token's **Pull requests** permission. Magic Kick stays
    `primary` until 2026-12-31 (OS `DEC-2026-10-19-001`).
 3. **Do not stack PRs.** Open each PR from `main`; if one depends on another, wait for the first to
    merge, then branch from `main`. Three stacked PRs merged into their old base on 2026-10-14
@@ -33,7 +34,8 @@
 4. **Roman to decide:** the dark-theme `--destructive` token fails AA (3.02 on dialog background,
    "Remove from schedule"); attention rows not sorted by severity (from P20); a category on plain
    time blocks (a data change, deferred from P22); UX options for the category picker (a "Category"
-   label on Schedule's New block, colour dots in options); a `--radius-xs: 4px` token would clear
+   label on Schedule's New block, colour dots in options); keyboard-only range selection in P25
+   (Shift+Space toggles one row today); a `--radius-xs: 4px` token would clear
    the one remaining Tailwind warning (`rounded-[4px]` in `project-roadmap.tsx`, kept on purpose).
 5. **Close day follow-ups (Roman to choose):** field labels follow Roman's canon text for the
    daily-close workflow (still to come). Feeding unticked items into tomorrow's P18 carry-over is a
@@ -45,7 +47,7 @@
    "Career-&-Business" use hyphens where others use spaces. P22 now shows categories on Schedule,
    and Marketing/Health-like colour pairs are hard to tell apart.
 8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24, P26, P27.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24, P26, P27, P25.
    **P11:** `decision`. **P19:** `queued`, gated on its own ADR. **P10, P15:** `gated` on P7 in the
    spec; P7 is done, so their gates need re-checking.
 9. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN`,
@@ -60,7 +62,44 @@
    browser shows old behaviour after an edit, hard-reload (Ctrl+Shift+R) or restart `next dev`.
    On 2026-10-19 `next build` died with "JavaScript heap out of memory" at a 14 MB heap (1.5 GB, later
    0.6 GB commit free) and with a TurbopackInternalError while `next dev` ran; stopping Magic Kick's
-   `next dev` (with Roman's OK) freed enough. Machine memory, not code.
+   `next dev` (with Roman's OK) freed enough. Machine memory, not code. **Cause found 2026-10-21:**
+   the page file is fixed at 2 GB (automatic management off), so the commit limit is 33.7 GB on
+   31.7 GB RAM; with ~11 GB RAM free, free commit fell to 0.05–1 GB (`vmmem` ~4 GB). `gh`, lint and the
+   hook's build all failed for that. **Roman to decide:** let Windows manage the page file, or set
+   ~16 GB (needs a reboot). `wsl --shutdown` frees ~4 GB meanwhile.
+
+---
+
+## Where we left off (2026-10-21) — P25 merged, P27 closed
+
+**Why:** `/session-start` found #183 (P27) merged with no session close. Roman asked to close that
+out and then do the next item, P25 (multi-select in a project roadmap, his choices of 2026-10-19).
+
+**What changed (all on `main`):**
+- **#184** (`bab08e0`): spec P27 → `done`; this note rebuilt for P27.
+- **#185 P25** (`408494e`): `lib/roadmap.ts` `selectTasks` (click toggles, Shift-click adds the
+  shown range, never deselects) + 4 tests; `project-roadmap.tsx` Select mode (select checkboxes,
+  row menus and Add task hidden), sticky action bar (Select shown, Complete, Move to, Delete, each
+  with an Undo toast), `TaskGroup` folds done tasks under "Done (n)" per group;
+  `components/ui/sonner.tsx` toasts `pointer-events-auto` and `components/ui/sheet.tsx` ignores
+  clicks on a toast as "outside". Before that fix, Undo could not be clicked while any Sheet was open
+  (Radix sets `pointer-events: none` on `<body>`), and clicking near it closed the sheet.
+- This branch: spec P25 → `done`; this note.
+
+**Branch map (2026-10-21):** everything is on `main` `408494e` (#184 merged first, then #185; not
+stacked). This note is on `docs/session-close-2026-10-21-p25` → PR into `main`. Merged branches still
+on GitHub and locally: `feat/p25-roadmap-multiselect`, `docs/session-close-2026-10-21-p27`,
+`feat/p27-close-day-journal`, `docs/session-close-2026-10-19-p26`: delete them.
+
+**Verified (confirmed):** gates as in the header; the hook ran lint, typecheck and build on each
+commit. Headless Edge (raw CDP, system Edge), demo mode with 8 seeded tasks, 1366×768 and 390 px:
+"Done (3)" folded and opens; Select hides row menus and Add task in the roadmap; click + Shift-click
+selects 3 in shown order; Move to + Undo, Complete + Undo, Select shown (6) + Delete + Undo each
+change the store and revert it; Undo hit-test fails before the toast fix and passes after, sheet
+stays open; toolbar fits (1335/1366, 374/390), no horizontal scroll; no page errors.
+
+**Not verified:** Roman's real data; keyboard-only ranges; light theme; Safari, Firefox; touch;
+screenshots not attached to #185; the toast fix in other sheets (same component, not opened).
 
 ---
 
@@ -91,105 +130,3 @@ typecheck, `npm test` and build re-run on `main`'s tree (header).
 
 **Not verified:** a real commit creating a card (demo cannot commit; covered by store tests); the
 earlier-closed-days list (needs sign-in); real account data; light theme; Safari, Firefox.
-
----
-
-## Where we left off (2026-10-19, late morning → afternoon) — P23, P24, P26 merged
-
-**Why:** P23 (share a roadmap) needed verifying and a PR. Roman then asked for a Schedule panel that
-does not list every open task (P24, "focused list"), for roadmap multi-select (P25, queued) and, by
-brief, for the Week allocation card to become a project filter in a compact panel (P26). He ranked
-P24 → P26 → P25 → P19.
-
-**What changed:**
-- **#179 P23** (merged): Share dialog on a project roadmap (PNG, PDF via print, Markdown), ADR-035.
-- **#180 P24** (merged): `lib/roadmap.ts` `isPlanningFocus` + `selectNextMilestoneByProject` (+ tests);
-  panel opens on This week (Daily Focus, due by week end, Next milestone), All open, search over all;
-  tasks added or unscheduled this session stay in view; roadmap task menu "Schedule next free slot".
-- **#181 P26** (merged as `5ee82a3`): `lib/unscheduled-filter.ts` (+ 9 tests); Week allocation card
-  removed; project radiogroup with allocation hours and bars, roving tabindex, "+N more" past 5
-  rows, persisted in `localStorage` key `magic-kick-schedule-project-filter`; header compacted
-  (inline search, Filters popover with sort and categories); two-line rows (46 px, were 80); week
-  chevrons labelled (axe `button-name`).
-- Docs: spec P23, P24 → `done`; P24, P25, P26 added; CHANGELOG entries for P23, P24, P26.
-
-**Branch map (2026-10-19):** everything is on `main` `5ee82a3` (#181 squash-merged the P26 change
-and its two handoff commits). This note's update is on `docs/session-close-2026-10-19-p26` → PR into
-`main`. `feat/p23-share-roadmap` and `feat/p24-schedule-focused-panel` deleted (local and GitHub);
-local `feat/p26-schedule-project-filter` deleted, **GitHub copy still there** (merged). Tag
-`pr-p26-screenshots` → `54b2daa` stays (images only).
-
-**Verified (confirmed):** gates as in the header. Headless Edge (playwright-core in the scratchpad,
-system Edge), demo mode. P23: preview, toggles, PNG 2160×1860, Markdown, print iframe → 1-page PDF
-with selectable text, escaping. P24: This week 9 / All open 10 with tasks in Next and later
-milestones; footer, search, kept-in-view add, roadmap Schedule action. P26 at 1366×768: first task
-184 px from the panel top (was 271), 7 rows fully visible (were 3), counts match the list with
-scope, search and category; arrows/Space; popover Esc returns focus; drag to calendar, drop back,
-schedule next, open task while filtered; stale stored id → All; no plan → rows without bars; 7
-rows → 4 + "+3 more" (header 228 px); axe on `<main>` 0 violations.
-
-**Not verified:** Roman's real data for P23, P24, P26; P26's 8-rows target (7 fit, accepted by Roman); a real plan with
-more than 5 allocations; P23 real print dialog and phone share; light theme; Safari, Firefox; phone
-width.
-
----
-
-## Where we left off (2026-10-18 → 10-19) — P20 landed, P21, P22, categories, "Move to"
-
-**Why:** #170 and #171 had merged into their base branches, so `main` had only CC-1. Roman then asked
-for the Schedule block card in a dialog (P21), category colours on blocks (P22), "General" as the
-default category with A–Z lists, and a working "Move to" milestone in project roadmaps.
-
-**What changed (all merged into `main`):**
-- **#172** — P20 CC-2 and CC-3 cherry-picked onto `main` (tree identical to the reviewed heads).
-- **#173 P21** `schedule-module.tsx`: EditPanel in `components/ui/dialog.tsx`; the side column no
-  longer expands; focus returns to the block; blocks focusable (Enter/Space); a >4 px move suppresses
-  the click; EditPanel labels linked.
-- **#176 P22** (reviewed as #174, which merged into its old base): fill = project tint or neutral,
-  left edge = task category colour, text in the foreground colour, category in the aria-label.
-- **#175** `lib/categories.ts`: new items default to "General" when the list has it; every category
-  list A–Z via `withUsedCategories`; "General" in the defaults; `lib/categories.test.ts`.
-- **#177** `components/ui/dropdown-menu.tsx`: `DropdownMenuSubContent` portalled (it was clipped
-  inside the parent menu's scroll container, so "Move to" showed nothing); 16 Tailwind classes
-  renamed to their canonical form (same CSS).
-- Docs: spec P21, P22 added; P20, P21, P22 → `done`; CHANGELOG entries for each.
-
-**Branch map (2026-10-19):** everything is on `main` `fc1d8f9`. This note is on
-`docs/session-close-2026-10-19` → PR into `main`. Merged or superseded branches deleted on GitHub
-and locally this session (see the PR body for the list). Screenshot tags `pr-p21-screenshots`,
-`pr-p22-screenshots` stay (assets only).
-
-**Verified (confirmed):** gates as in the header. Headless Edge, demo mode: P21 side column rects
-identical on open (collapsed rail stayed 44 px, was 320), Esc/overlay/Close return focus, Enter and
-Space open, selects above the dialog, drag and resize never open it; P22 axe colour-contrast on the
-grid 7 → 0; #175 New block defaults to General with an A–Z list; #177 submenu items on top, mouse
-and keyboard move tasks between milestones (also with 8 milestones). Roman confirmed "Move to" on
-his localhost with his data. #176 CI green.
-
-**Not verified:** Roman's real data for P20–P22 and #175; light theme; Safari, Firefox; touch
-devices; Delete/Done clicked inside the P21 dialog.
-
-**Found, not changed:** at 390 px with the tasks panel expanded the Schedule grid is 22 px wide; a
-block scrolled under the sticky day header paints over it (both `z-20`).
-
----
-
-## Where we left off (2026-10-17, evening) — P20 Command Center UX v2
-
-**Why:** Roman's audit of the Command Center on real data (17 Oct 13:44, local
-`Claude outputs/command-center-ux-v2.md`) found blocks listed twice, past blocks reading "planned",
-four attention rows with one cause, a static canon block in prime space, "Free" read as a bug, and
-semantics gaps. He made it P20 and ruled "flag only" for past blocks.
-
-**What changed (on `main`: #169, and #170 + #171 via #172):**
-- CC-1: `selectAttentionItems` groups 2+ missing outcomes into one row ("Open Plan").
-- CC-2: Week-tab Today column removed; Daily Focus "Also scheduled"; "past" label via
-  `lib/time-blocks.ts` `isPast`; canon in `<details>`; "Unallocated"; "Plan week".
-- CC-3: landmarks and list semantics, focus rings, `@container` rows, view transition,
-  reduced-motion CSS, Plan/Review labels linked.
-
-**Verified (confirmed):** gates on each head; headless Edge, demo mode, 360/768/1280 px; axe-core
-4.10.2 on `<main>`: 0 violations on Week, Plan and Review.
-
-**Not verified:** real account data; canon disclosure in a browser; the visual cross-fade; Safari
-and Firefox; light theme; axe outside `<main>`.
