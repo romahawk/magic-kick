@@ -3,15 +3,13 @@
 // project when there is no plan), "other" (an active project that is not listed) or "none".
 
 import type { Task } from "./types"
+import type { AllocationProgress } from "./weekly-plan"
 
 /** "all", a listed project id, "other" or "none". */
 export type ProjectFilter = string
 
-export interface ProjectAllocation {
-  projectId: string
-  allocatedHours: number
-  plannedHours: number
-}
+/** A project's week allocation with its planned and done hours (`selectAllocationProgress`). */
+export type ProjectAllocation = AllocationProgress
 
 type Ids = ReadonlySet<string>
 

@@ -925,6 +925,15 @@ task has its colour on the left edge; XP moves to the task sheet. The filter con
 panel move to `components/modules/task-filters.tsx` and are used by both tabs; `buildProjectRows`
 and `countCategories` join `lib/unscheduled-filter.ts`. No store, type or rules change.
 
+**Allocation bar, aligned (added 2026-10-21, Roman's ruling: planned + done).** Schedule's project rows
+showed planned/allocated from the calendar; the Command Center's "Committed this week" showed
+logged/allocated from execution logs, in a different bar. One helper, `selectAllocationProgress`
+(`lib/weekly-plan.ts`), now gives the week's planned and done hours per allocated project: the blocks
+Schedule draws (saved blocks, recurring-task occurrences), done = their actual hours (what the
+execution logs add up). One `AllocationBar` draws it on Schedule, ToDo and the Command Center: the
+track is the allocation, a light fill the planned hours, a solid fill the done hours, in the project's
+colour; the text reads "4/6h", then "✓1.5 · 4/6h". The Review tab keeps reading execution logs.
+
 **Acceptance criteria:**
 1. No summary cards or toolbar; each lane header is one line with its count (Daily Focus n/limit).
 2. ToDo opens on This week; All and Done are one click away; search finds any open task.
@@ -935,6 +944,8 @@ and `countCategories` join `lib/unscheduled-filter.ts`. No store, type or rules 
 5. Schedule's Unscheduled panel looks and works as before (P24, P26).
 6. No horizontal page scroll at 1366 and 390 px; axe adds no violation beyond the dark
    `--destructive` contrast and the demo banner already open.
+7. For the same week, Schedule, ToDo and the Command Center show the same planned and done hours
+   per allocated project, with the same bar.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { differenceInCalendarDays, endOfWeek, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
 import { TASK_LANE_LABELS, selectDailyFocus } from "@/lib/execution-os"
-import { getActiveWeeklyPlan, localDateISO, orderDailyFocusTasks, selectProjectHours, selectTaskTimeSlots } from "@/lib/weekly-plan"
+import { getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, localDateISO, orderDailyFocusTasks, selectAllocationProgress, selectTaskTimeSlots } from "@/lib/weekly-plan"
 import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
 import { buildProjectRows, countByProject, countCategories, filterByProject, resolveProjectFilter, type ProjectAllocation } from "@/lib/unscheduled-filter"
 import { categoryColor } from "@/lib/categories"
@@ -138,14 +138,18 @@ export function TodoModule() {
     }
   }, [collapsed])
 
-  // The week's allocations, as on Schedule; without a plan, every active project is listed.
+  // This week's allocations, with the same hours as Schedule; without a plan, every active project is listed.
   const activePlan = getActiveWeeklyPlan(weeklyPlans)
   const allocations: ProjectAllocation[] = useMemo(
     () =>
-      selectProjectHours(activePlan, allTimeBlocks, [])
-        .filter((a) => activeProjects.some((p) => p.id === a.projectId))
-        .map((a) => ({ projectId: a.projectId, allocatedHours: a.allocatedHours, plannedHours: a.plannedHours })),
-    [activePlan, allTimeBlocks, activeProjects]
+      selectAllocationProgress({
+        plan: activePlan,
+        timeBlocks: allTimeBlocks,
+        tasks,
+        taskTimeSlots,
+        dayISOList: getWeekDates(getCurrentWeekStartISO()).map((day) => day.iso),
+      }).filter((a) => activeProjects.some((p) => p.id === a.projectId)),
+    [activePlan, allTimeBlocks, tasks, taskTimeSlots, activeProjects]
   )
   const listedProjects = useMemo(
     () => (allocations.length > 0 ? allocations.flatMap((a) => projectById.get(a.projectId) ?? []) : activeProjects),
