@@ -15,6 +15,7 @@ import {
   getWeeklyReviewForPlan,
   localDateISO,
   selectDayAgenda,
+  selectAllocationProgress,
   selectProjectHours,
   selectTaskTimeSlots,
   selectWeekAwaitingReview,
@@ -34,10 +35,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { AllocationBar, allocationHoursLabel, allocationHoursText } from "@/components/modules/task-filters"
+import { normalizeProjectColor } from "@/lib/project-colors"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { AlertTriangle, CheckCircle2, Plus, Target, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -84,13 +86,16 @@ export function CommandCenter() {
   const weekDays = getWeekDates(weekStartISO)
   const todayISO = localDateISO()
   // Same list as the Schedule calendar for today (time blocks of any week plan, recurring tasks).
-  const todayBlocks = selectDayAgenda({
+  const taskTimeSlots = selectTaskTimeSlots(scheduleItems, timeBlocks)
+  const todayBlocks = selectDayAgenda({ timeBlocks, tasks, taskTimeSlots, dateISO: todayISO })
+  // P28: the same planned and done hours as Schedule and ToDo, drawn with the same bar.
+  const allocationProgress = selectAllocationProgress({
+    plan: activePlan,
     timeBlocks,
     tasks,
-    taskTimeSlots: selectTaskTimeSlots(scheduleItems, timeBlocks),
-    dateISO: todayISO,
+    taskTimeSlots,
+    dayISOList: weekDays.map((day) => day.iso),
   })
-  const projectHours = selectProjectHours(activePlan, timeBlocks, executionLogs)
   const activePlanValidation = activePlan
     ? validateWeeklyPlan(activePlan, activeProjects)
     : { isValid: false, errors: [], allocatedHours: 0, remainingHours: 0, isOverCapacity: false }
@@ -264,7 +269,7 @@ export function CommandCenter() {
               <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 Committed this week
               </h3>
-              {projectHours.length === 0 ? (
+              {allocationProgress.length === 0 ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
                   No projects committed this week.
                   <Button size="sm" onClick={() => setTab("plan")}>
@@ -272,23 +277,20 @@ export function CommandCenter() {
                   </Button>
                 </div>
               ) : null}
-              {projectHours.map((item) => {
+              {allocationProgress.map((item) => {
                 const project = projects.find((p) => p.id === item.projectId)
-                const deliveredPct =
-                  item.allocatedHours > 0 ? Math.min(100, (item.actualHours / item.allocatedHours) * 100) : 0
+                const allocation = activePlan.allocations.find((a) => a.projectId === item.projectId)
                 return (
                   <div key={item.projectId} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5">
-                    <PriorityDot priority={item.priority} />
+                    <PriorityDot priority={allocation?.priority ?? "P2"} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium leading-tight">{project?.title ?? "Unknown"}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.weeklyOutcome}</p>
+                      <p className="truncate text-xs text-muted-foreground">{allocation?.weeklyOutcome}</p>
                     </div>
-                    <div className="w-36 shrink-0">
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>{item.actualHours}h / {item.allocatedHours}h</span>
-                        <span>{Math.round(deliveredPct)}%</span>
-                      </div>
-                      <Progress value={deliveredPct} className="h-1" />
+                    <div className="w-36 shrink-0" title={allocationHoursLabel(item)}>
+                      <p className="mb-1 text-right text-[11px] tabular-nums text-muted-foreground" aria-hidden="true">{allocationHoursText(item)}</p>
+                      <span className="sr-only">{allocationHoursLabel(item)}</span>
+                      <AllocationBar allocation={item} color={normalizeProjectColor(project?.color)} className="h-1" />
                     </div>
                   </div>
                 )

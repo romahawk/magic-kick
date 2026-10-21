@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
-import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, externalBlockDateParts, selectTaskTimeSlots, selectTimeBlocksForDates, taskDurationMin } from "@/lib/weekly-plan"
+import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, getWeekDates, externalBlockDateParts, recurringOccurrenceHours, selectAllocationProgress, selectTaskTimeSlots, selectTimeBlocksForDates, taskDurationMin } from "@/lib/weekly-plan"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
-import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, isTaskOccurrenceComplete, taskRepeatsOnDate } from "@/lib/task-recurrence"
+import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,7 +29,6 @@ import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { CategoryBadge } from "@/components/category-badge"
 import { normalizeProjectColor } from "@/lib/project-colors"
 import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
-import type { ProjectAllocation } from "@/lib/unscheduled-filter"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 
@@ -371,22 +370,23 @@ export function ScheduleModule() {
 
       return weekDays
         .filter((day) => taskRepeatsOnDate(task, day.iso))
-        .map((day): DisplayBlock => ({
-          id: `recurring-${task.id}-${day.iso}`,
-          sourceType: "recurring-task" as const,
-          linkedTaskId: task.id,
-          projectId: task.linkedProjectId,
-          dateISO: day.iso,
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          taskDescription: task.title,
-          plannedHours: slot.plannedHours || calculateTimeBlockHours(slot.startTime, slot.endTime),
-          actualHours: isTaskOccurrenceComplete(task, day.iso)
-            ? slot.actualHours ?? slot.plannedHours ?? calculateTimeBlockHours(slot.startTime, slot.endTime)
-            : undefined,
-          status: isTaskOccurrenceComplete(task, day.iso) ? "done" : "planned",
-          repeat: task.repeat ?? "none",
-        }))
+        .map((day): DisplayBlock => {
+          const occurrence = recurringOccurrenceHours(task, slot, day.iso)
+          return {
+            id: `recurring-${task.id}-${day.iso}`,
+            sourceType: "recurring-task" as const,
+            linkedTaskId: task.id,
+            projectId: task.linkedProjectId,
+            dateISO: day.iso,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            taskDescription: task.title,
+            plannedHours: occurrence.plannedHours,
+            actualHours: occurrence.actualHours,
+            status: occurrence.done ? "done" : "planned",
+            repeat: task.repeat ?? "none",
+          }
+        })
     })
 
     const externalBlocks: DisplayBlock[] = displayExternalBlocks
@@ -422,14 +422,14 @@ export function ScheduleModule() {
   const editBlock = displayBlocks.find((block) => block.id === editId) ?? null
   const editTask = editBlock?.linkedTaskId ? tasks.find((task) => task.id === editBlock.linkedTaskId) : undefined
 
-  // P26: the week's allocations feed the Unscheduled tasks panel's project filter.
-  const projectAllocations: ProjectAllocation[] = (activePlan?.allocations ?? []).map((allocation) => ({
-    projectId: allocation.projectId,
-    allocatedHours: allocation.hoursAllocated,
-    plannedHours: displayBlocks
-      .filter((block) => block.projectId === allocation.projectId)
-      .reduce((total, block) => total + block.plannedHours, 0),
-  }))
+  // P26: the week's allocations feed the Unscheduled tasks panel's project filter (hours as in P28).
+  const projectAllocations = selectAllocationProgress({
+    plan: activePlan,
+    timeBlocks,
+    tasks,
+    taskTimeSlots,
+    dayISOList: weekDays.map((day) => day.iso),
+  })
 
   // P16: tasks of paused, parked, completed or deleted projects stay off the planning list.
   const activeProjectIds = new Set(activeProjects.map((p) => p.id))

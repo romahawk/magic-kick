@@ -5,7 +5,7 @@
 
 import { useRef, useState } from "react"
 import { Search, SlidersHorizontal, X } from "lucide-react"
-import type { ProjectFilter, ProjectRow } from "@/lib/unscheduled-filter"
+import type { ProjectAllocation, ProjectFilter, ProjectRow } from "@/lib/unscheduled-filter"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,30 @@ const PROJECT_ROWS_MAX = 5
 
 function hours(value: number) {
   return Math.round(value * 10) / 10
+}
+
+/** "4/6h" while nothing is done, then "✓1.5 · 4/6h": done, planned and allocated hours. */
+export function allocationHoursText(allocation: ProjectAllocation) {
+  const planned = `${hours(allocation.plannedHours)}/${hours(allocation.allocatedHours)}h`
+  return allocation.doneHours > 0 ? `✓${hours(allocation.doneHours)} · ${planned}` : planned
+}
+
+export function allocationHoursLabel(allocation: ProjectAllocation) {
+  return `${hours(allocation.plannedHours)} of ${hours(allocation.allocatedHours)} hours planned, ${hours(allocation.doneHours)} done`
+}
+
+/**
+ * P28: the week-allocation bar, the same on Schedule, ToDo and the Command Center. The track is the
+ * allocation, the light fill the planned hours, the solid fill the hours done; both stop at 100%.
+ */
+export function AllocationBar({ allocation, color, className }: { allocation: ProjectAllocation; color: string; className?: string }) {
+  const pct = (value: number) => (allocation.allocatedHours > 0 ? Math.min(100, (value / allocation.allocatedHours) * 100) : 0)
+  return (
+    <span className={cn("relative block overflow-hidden rounded-full bg-muted", className)} aria-hidden="true">
+      <span className="absolute inset-y-0 left-0 rounded-full opacity-35" style={{ width: `${pct(allocation.plannedHours)}%`, backgroundColor: color }} />
+      <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct(allocation.doneHours)}%`, backgroundColor: color }} />
+    </span>
+  )
 }
 
 /** The project filter, kept in localStorage under `storageKey`. */
@@ -270,8 +294,7 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
       <div role="radiogroup" aria-label="Filter by project" className="space-y-px">
         {shownRows.map((row, index) => {
           const selected = row.key === value
-          const pct = row.allocation && row.allocation.allocatedHours > 0 ? Math.min(100, (row.allocation.plannedHours / row.allocation.allocatedHours) * 100) : 0
-          const hoursText = row.allocation ? `${hours(row.allocation.plannedHours)}/${hours(row.allocation.allocatedHours)}h` : null
+          const hoursText = row.allocation ? allocationHoursText(row.allocation) : null
           return (
             <button
               key={row.key}
@@ -282,7 +305,7 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
               type="button"
               role="radio"
               aria-checked={selected}
-              aria-label={`${row.label}, ${row.count} ${row.count === 1 ? "task" : "tasks"}${row.allocation ? `, ${hours(row.allocation.plannedHours)} of ${hours(row.allocation.allocatedHours)} hours planned` : ""}`}
+              aria-label={`${row.label}, ${row.count} ${row.count === 1 ? "task" : "tasks"}${row.allocation ? `, ${allocationHoursLabel(row.allocation)}` : ""}`}
               tabIndex={row.key === tabRowKey ? 0 : -1}
               onClick={() => onChange(row.key)}
               onFocus={() => setFocusedRowKey(row.key)}
@@ -298,9 +321,7 @@ export function ProjectFilterList({ rows, value, onChange }: { rows: ProjectRow[
               {hoursText ? <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{hoursText}</span> : null}
               <span className="w-5 shrink-0 text-right tabular-nums">{row.count}</span>
               {row.allocation ? (
-                <span className="absolute inset-x-2 bottom-0.5 h-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                  <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: row.color }} />
-                </span>
+                <AllocationBar allocation={row.allocation} color={row.color ?? "currentColor"} className="absolute inset-x-2 bottom-0.5 h-0.5" />
               ) : null}
             </button>
           )

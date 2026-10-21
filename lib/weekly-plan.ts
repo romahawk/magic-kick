@@ -367,6 +367,66 @@ export function selectProjectHours(plan: WeeklyPlan | undefined, timeBlocks: Tim
   })
 }
 
+/** One occurrence of a recurring task, with the hours Schedule draws for it. */
+export function recurringOccurrenceHours(task: Pick<Task, "recurrenceCompletedDates">, slot: TaskTimeSlot, dateISO: string) {
+  const done = isTaskOccurrenceComplete(task, dateISO)
+  return {
+    done,
+    plannedHours: slot.plannedHours || calculateTimeBlockHours(slot.startTime, slot.endTime),
+    actualHours: done ? slot.actualHours ?? slot.plannedHours ?? calculateTimeBlockHours(slot.startTime, slot.endTime) : undefined,
+  }
+}
+
+export interface AllocationProgress {
+  projectId: string
+  allocatedHours: number
+  /** Hours on the week's calendar for the project. */
+  plannedHours: number
+  /** Actual hours of those blocks. */
+  doneHours: number
+}
+
+/**
+ * P28: hours per allocated project for one week, the same on Schedule, ToDo and the Command Center.
+ * The blocks are the ones Schedule draws for the week: saved time blocks (except those of recurring
+ * tasks) and each occurrence of a recurring task with a time slot. Done is their actual hours, which
+ * is also what the week's execution logs add up.
+ */
+export function selectAllocationProgress(input: {
+  plan?: WeeklyPlan
+  timeBlocks: TimeBlock[]
+  tasks: Task[]
+  taskTimeSlots: Record<string, TaskTimeSlot>
+  dayISOList: string[]
+}): AllocationProgress[] {
+  if (!input.plan) return []
+  const live = input.tasks.filter((task) => !task.deleted)
+  const recurringIds = new Set(live.filter((task) => isRecurringTask(task)).map((task) => task.id))
+  const hours: Array<{ projectId?: string; planned: number; done: number }> = []
+  for (const block of selectTimeBlocksForDates(input.timeBlocks, input.dayISOList)) {
+    if (block.linkedTaskId && recurringIds.has(block.linkedTaskId)) continue
+    hours.push({ projectId: block.projectId, planned: block.plannedHours, done: block.actualHours ?? 0 })
+  }
+  for (const task of live) {
+    const slot = input.taskTimeSlots[task.id]
+    if (task.completed || !task.linkedProjectId || !slot || !recurringIds.has(task.id)) continue
+    for (const dateISO of input.dayISOList) {
+      if (!taskRepeatsOnDate(task, dateISO)) continue
+      const occurrence = recurringOccurrenceHours(task, slot, dateISO)
+      hours.push({ projectId: task.linkedProjectId, planned: occurrence.plannedHours, done: occurrence.actualHours ?? 0 })
+    }
+  }
+  return input.plan.allocations.map((allocation) => {
+    const own = hours.filter((entry) => entry.projectId === allocation.projectId)
+    return {
+      projectId: allocation.projectId,
+      allocatedHours: allocation.hoursAllocated,
+      plannedHours: own.reduce((total, entry) => total + entry.planned, 0),
+      doneHours: own.reduce((total, entry) => total + entry.done, 0),
+    }
+  })
+}
+
 export function buildExecutionLogId(weekPlanId: string, projectId: string | undefined, dateISO: string) {
   return `${weekPlanId}:${projectId ?? ""}:${dateISO}`
 }
