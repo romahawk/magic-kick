@@ -193,6 +193,26 @@ export function toggleId(ids: string[] | undefined, id: string): string[] {
   return list.includes(id) ? list.filter((entry) => entry !== id) : [...list, id]
 }
 
+/**
+ * P25: a click toggles one task; a shift-click adds every task between the last clicked one and
+ * this one, in the order shown. A range never deselects. Without a shown anchor it is a plain toggle.
+ */
+export function selectTasks(
+  order: string[],
+  selected: string[],
+  anchorId: string | null,
+  targetId: string,
+  range: boolean
+): string[] {
+  const from = range && anchorId ? order.indexOf(anchorId) : -1
+  const to = order.indexOf(targetId)
+  if (from === -1 || to === -1) return toggleId(selected, targetId)
+  const [start, end] = from < to ? [from, to] : [to, from]
+  const next = new Set(selected)
+  for (const id of order.slice(start, end + 1)) next.add(id)
+  return [...next]
+}
+
 export interface ResourceBacklink {
   projectId: string
   projectTitle: string

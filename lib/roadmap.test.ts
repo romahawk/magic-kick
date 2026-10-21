@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isPlanningFocus, selectNextMilestoneByProject } from "./roadmap"
+import { isPlanningFocus, selectNextMilestoneByProject, selectTasks } from "./roadmap"
 import type { ProjectMilestone } from "./types"
 
 function milestone(id: string, order: number, completed = false): ProjectMilestone {
@@ -43,5 +43,28 @@ describe("isPlanningFocus", () => {
     expect(isPlanningFocus({}, weekEnd, next)).toBe(false)
     expect(isPlanningFocus({ lane: "backlog" }, weekEnd, next)).toBe(false)
     expect(isPlanningFocus({ lane: "parking-lot" }, weekEnd, next)).toBe(false)
+  })
+})
+
+describe("selectTasks", () => {
+  const order = ["a", "b", "c", "d", "e"]
+
+  it("toggles one task on a plain click", () => {
+    expect(selectTasks(order, [], null, "b", false)).toEqual(["b"])
+    expect(selectTasks(order, ["b", "c"], "c", "b", false)).toEqual(["c"])
+  })
+
+  it("adds the shown range between the anchor and the target, in either direction", () => {
+    expect(selectTasks(order, ["b"], "b", "d", true).sort()).toEqual(["b", "c", "d"])
+    expect(selectTasks(order, ["d"], "d", "a", true).sort()).toEqual(["a", "b", "c", "d"])
+  })
+
+  it("never deselects with a range", () => {
+    expect(selectTasks(order, ["a", "c", "e"], "c", "d", true).sort()).toEqual(["a", "c", "d", "e"])
+  })
+
+  it("falls back to a toggle when the anchor is not shown", () => {
+    expect(selectTasks(order, ["x"], "x", "c", true).sort()).toEqual(["c", "x"])
+    expect(selectTasks(order, [], null, "c", true)).toEqual(["c"])
   })
 })
