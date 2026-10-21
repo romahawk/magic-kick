@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { countByProject, filterByProject, resolveProjectFilter } from "./unscheduled-filter"
+import { buildProjectRows, countByProject, countCategories, filterByProject, resolveProjectFilter } from "./unscheduled-filter"
 
 const listed = new Set(["p1", "p2"])
 const active = new Set(["p1", "p2", "p3"])
@@ -61,5 +61,40 @@ describe("resolveProjectFilter", () => {
     expect(resolveProjectFilter("p3", listed)).toBe("all")
     expect(resolveProjectFilter(null, listed)).toBe("all")
     expect(resolveProjectFilter(undefined, listed)).toBe("all")
+  })
+})
+
+describe("buildProjectRows", () => {
+  const projects = [
+    { id: "p1", title: "One", color: "#111111" },
+    { id: "p2", title: "Two" },
+  ]
+  const color = (c: string | undefined) => c ?? "#000000"
+  const keys = (rows: { key: string }[]) => rows.map((r) => r.key)
+
+  it("lists all, projects with tasks, then other and none when they have tasks", () => {
+    const counts = new Map([["all", 4], ["p1", 2], ["none", 2]])
+    expect(keys(buildProjectRows(projects, [], counts, "all", color))).toEqual(["all", "p1", "none"])
+  })
+
+  it("keeps an allocated project at 0 and carries its allocation", () => {
+    const rows = buildProjectRows(projects, [{ projectId: "p2", allocatedHours: 4, plannedHours: 1 }], new Map([["all", 0]]), "all", color)
+    expect(keys(rows)).toEqual(["all", "p2"])
+    expect(rows[1].allocation?.allocatedHours).toBe(4)
+  })
+
+  it("keeps the selected row even at 0", () => {
+    expect(keys(buildProjectRows(projects, [], new Map([["all", 0]]), "other", color))).toEqual(["all", "other"])
+  })
+})
+
+describe("countCategories", () => {
+  it("follows the shared order and appends unknown categories", () => {
+    const tasks = [{ category: "B" }, { category: "Z" }, { category: "A" }, { category: "B" }]
+    expect(countCategories(tasks, ["A", "B", "C"])).toEqual([
+      { name: "A", count: 1 },
+      { name: "B", count: 2 },
+      { name: "Z", count: 1 },
+    ])
   })
 })
