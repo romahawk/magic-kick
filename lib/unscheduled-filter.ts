@@ -1,4 +1,4 @@
-// P26: the Schedule panel's project filter. Pure functions, no store access.
+// P26: the Schedule panel's project filter, shared with ToDo (P28). Pure functions, no store access.
 // A task falls in one bucket: a listed project's id (the week's allocations, or every active
 // project when there is no plan), "other" (an active project that is not listed) or "none".
 
@@ -45,4 +45,46 @@ export function countByProject(tasks: Pick<Task, "linkedProjectId">[], listedIds
 export function resolveProjectFilter(stored: string | null | undefined, listedIds: Ids): ProjectFilter {
   if (stored === "other" || stored === "none") return stored
   return stored && listedIds.has(stored) ? stored : "all"
+}
+
+/** One row of the project filter (P26, shared with ToDo in P28). */
+export interface ProjectRow {
+  key: string
+  label: string
+  count: number
+  color?: string
+  allocation?: ProjectAllocation
+}
+
+/**
+ * All projects, then the listed projects (allocated ones stay at 0, since their hours still matter;
+ * without a plan, only projects with tasks), then Other projects and No project when they have tasks.
+ * The selected row always stays, so the filter never points at a hidden row.
+ */
+export function buildProjectRows(
+  listedProjects: { id: string; title: string; color?: string }[],
+  allocations: ProjectAllocation[],
+  counts: ReadonlyMap<string, number>,
+  selected: ProjectFilter,
+  colorOf: (color: string | undefined) => string
+): ProjectRow[] {
+  const allocationById = new Map(allocations.map((a) => [a.projectId, a]))
+  return [
+    { key: "all", label: "All projects", count: counts.get("all") ?? 0 },
+    ...listedProjects
+      .map((p) => ({ key: p.id, label: p.title, count: counts.get(p.id) ?? 0, color: colorOf(p.color), allocation: allocationById.get(p.id) }))
+      .filter((row) => row.allocation || row.count > 0 || row.key === selected),
+    ...(["other", "none"] as const)
+      .map((key) => ({ key, label: key === "other" ? "Other projects" : "No project", count: counts.get(key) ?? 0 }))
+      .filter((row) => row.count > 0 || row.key === selected),
+  ]
+}
+
+/** Categories that have a task, in the shared list's order (P14); unknown ones follow. */
+export function countCategories(tasks: Pick<Task, "category">[], ordered: string[]): { name: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const task of tasks) counts.set(task.category, (counts.get(task.category) ?? 0) + 1)
+  const names = ordered.filter((c) => counts.has(c))
+  for (const c of counts.keys()) if (!names.includes(c)) names.push(c)
+  return names.map((name) => ({ name, count: counts.get(name) ?? 0 }))
 }

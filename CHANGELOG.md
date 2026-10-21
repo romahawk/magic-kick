@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-21 - ToDo with a filter sidebar (P28)
+
+### Changed
+- ToDo: a sidebar on the right, the same as Schedule's, holds search, sort, category filters, This week / All / Done and a project filter with the week's allocation bars. It can be folded to a thin rail and remembers your project and whether it is folded.
+- ToDo: opens on This week (Daily Focus, overdue, due this week, and each project's next milestone). Each lane says how many more tasks wait under All.
+- ToDo: tasks are compact two-line rows with a category dot, date, time, estimate and project, so about twice as many fit on screen. Date and time can still be changed by clicking them; XP is shown in the task's sheet.
+- ToDo: the three summary cards and the toolbar are gone; each lane shows its name and count in one line.
+
+---
+
 ## [Unreleased] - 2026-10-21 - Select several roadmap tasks at once (P25)
 
 ### Added

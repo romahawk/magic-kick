@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -901,6 +901,40 @@ selects every shown row. Each action shows a toast with Undo, and the selection 
 4. Complete, Move to and Delete act on every selected task, and Undo reverts each.
 5. Undo is clickable while the project sheet is open, and clicking it does not close the sheet.
 6. The action bar fits at 390 px with no horizontal page scroll.
+
+### P28 — ToDo with Schedule's filter sidebar · S
+
+**Status:** open (2026-10-21, `feat/p28-todo-sidebar`)
+
+**Why:** ToDo said everything twice (three summary cards repeated each lane's name, description and
+count above the lanes), had a full-width toolbar with no project filter, and showed every open task
+as an 80 px card, so a 92-task Backlog showed four or five tasks a screen. Roman asked on 2026-10-21
+for ToDo to use the logic of Schedule's side panel (filters, categories, projects) with minimal
+cognitive load, and chose: open on This week, share the code with Schedule, two-line rows.
+
+**Shape.** UI only. The summary cards, toolbar and subtitle are gone; lane headers are one line
+("Backlog 24", "Daily Focus 1/3"), the description in a tooltip. A right sidebar (`w-72`, above the
+board below `xl`, collapsible to a rail, kept in `localStorage`) holds: "Tasks · n", search, a
+Filters popover (sort, category chips), a This week / All / Done switch and the project filter with
+the week's allocation bars (P26). This week uses P24's `isPlanningFocus` (Daily Focus, due by Sunday
+or overdue, the project's Next milestone); search covers every open task; each lane says how many
+more wait in All. Done replaces the board, as the old Done button did. Tasks of paused or parked
+projects count under Other projects. Rows are two lines: title (up to two lines), then a category
+dot, due date and time (both still click-to-edit), estimate, repeat, source and project; a project
+task has its colour on the left edge; XP moves to the task sheet. The filter controls of Schedule's
+panel move to `components/modules/task-filters.tsx` and are used by both tabs; `buildProjectRows`
+and `countCategories` join `lib/unscheduled-filter.ts`. No store, type or rules change.
+
+**Acceptance criteria:**
+1. No summary cards or toolbar; each lane header is one line with its count (Daily Focus n/limit).
+2. ToDo opens on This week; All and Done are one click away; search finds any open task.
+3. Clicking a project shows only its tasks; the counts match the board with scope, search and
+   categories; the choice survives a reload.
+4. Drag between lanes, the Daily Focus limit, Suggested "Add", complete, and the inline date and
+   time edits work as before; Enter on a task title opens the task sheet.
+5. Schedule's Unscheduled panel looks and works as before (P24, P26).
+6. No horizontal page scroll at 1366 and 390 px; axe adds no violation beyond the dark
+   `--destructive` contrast and the demo banner already open.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

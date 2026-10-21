@@ -1,21 +1,20 @@
 "use client"
 
-import { useId, useMemo, useRef, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { format, parseISO } from "date-fns"
-import { CalendarClock, ListTodo, PanelRightClose, Plus, Search, SlidersHorizontal, Undo2, X } from "lucide-react"
+import { CalendarClock, ListTodo, PanelRightClose, Plus, Undo2 } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { categoryColor, defaultTaskCategory } from "@/lib/categories"
 import { normalizeProjectColor } from "@/lib/project-colors"
-import { countByProject, filterByProject, resolveProjectFilter, type ProjectAllocation } from "@/lib/unscheduled-filter"
+import { buildProjectRows, countByProject, countCategories, filterByProject, resolveProjectFilter, type ProjectAllocation } from "@/lib/unscheduled-filter"
 import { useCategories } from "@/hooks/use-categories"
 import type { Project, Task } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
+import { FiltersPopover, InlineSearch, ProjectFilterList, ScopeSwitch, useStoredProjectFilter } from "@/components/modules/task-filters"
 
 type TaskSort = "due" | "project" | "estimate"
 type TaskScope = "focus" | "all"
@@ -33,8 +32,6 @@ const SCOPE_LABELS: Record<TaskScope, string> = {
 
 const HELP_TEXT = "Drag a task onto the calendar, or use its clock for the next free slot."
 const PROJECT_FILTER_KEY = "magic-kick-schedule-project-filter"
-/** A project list longer than this shows its first rows and "+N more", so the header stays short. */
-const PROJECT_ROWS_MAX = 5
 
 /** Where a calendar block is being dragged relative to this panel: not at all, elsewhere, or over it. */
 export type UnscheduleDropState = null | "near" | "over"
@@ -62,31 +59,10 @@ interface UnscheduledTasksPanelProps {
   onCollapse: () => void
 }
 
-interface ProjectRow {
-  key: string
-  label: string
-  count: number
-  color?: string
-  allocation?: ProjectAllocation
-}
-
 const NO_PROJECT = "none"
 
 function dueValue(task: Task) {
   return task.dueDate ? new Date(`${task.dueDate}T00:00:00`).getTime() : Number.POSITIVE_INFINITY
-}
-
-function hours(value: number) {
-  return Math.round(value * 10) / 10
-}
-
-function readStoredProjectFilter(): string | null {
-  if (typeof window === "undefined") return null
-  try {
-    return window.localStorage.getItem(PROJECT_FILTER_KEY)
-  } catch {
-    return null
-  }
 }
 
 export function UnscheduledTasksPanel({
@@ -109,16 +85,11 @@ export function UnscheduledTasksPanel({
   const allCategories = useCategories()
   const categoryColors = useAppStore((s) => s.profile.taskCategoryColors)
   const [query, setQuery] = useState("")
-  const [searchOpen, setSearchOpen] = useState(false)
   const [sort, setSort] = useState<TaskSort>("due")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [adding, setAdding] = useState(false)
   const [scope, setScope] = useState<TaskScope>("focus")
-  const [storedProjectFilter, setStoredProjectFilter] = useState(readStoredProjectFilter)
-  const [projectListExpanded, setProjectListExpanded] = useState(false)
-  const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null)
-  const searchButtonRef = useRef<HTMLButtonElement>(null)
-  const rowRefs = useRef(new Map<string, HTMLButtonElement>())
+  const [storedProjectFilter, chooseProject] = useStoredProjectFilter(PROJECT_FILTER_KEY)
   const helpId = useId()
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects])
@@ -144,17 +115,10 @@ export function UnscheduledTasksPanel({
   const moreCount = tasks.length - focusTasks.length
 
   // Only categories that have a task in view, in the order of the shared list (P14).
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const task of baseTasks) counts.set(task.category, (counts.get(task.category) ?? 0) + 1)
-    const ordered = allCategories.filter((c) => counts.has(c))
-    for (const c of counts.keys()) if (!ordered.includes(c)) ordered.push(c)
-    return ordered.map((name) => ({ name, count: counts.get(name) ?? 0 }))
-  }, [baseTasks, allCategories])
+  const categoryCounts = useMemo(() => countCategories(baseTasks, allCategories), [baseTasks, allCategories])
 
   // A selected category that no longer has tasks stops filtering instead of hiding everything.
   const activeCategories = selectedCategories.filter((c) => categoryCounts.some((entry) => entry.name === c))
-  const filterCount = activeCategories.length + (sort !== "due" ? 1 : 0)
 
   // Scope, search and categories; the project filter comes last, so its counts match the list.
   const filteredTasks = useMemo(
@@ -189,47 +153,7 @@ export function UnscheduledTasksPanel({
     })
   }, [filteredTasks, projectFilter, listedIds, activeProjectIds, sort, projectById])
 
-  const allocationById = new Map(allocations.map((a) => [a.projectId, a]))
-  const projectRows: ProjectRow[] = [
-    { key: "all", label: "All projects", count: projectCounts.get("all") ?? 0 },
-    // Allocated projects stay listed at 0 (their hours still matter); without a plan, only projects with tasks.
-    ...listedProjects
-      .map((p) => ({ key: p.id, label: p.title, count: projectCounts.get(p.id) ?? 0, color: normalizeProjectColor(p.color), allocation: allocationById.get(p.id) }))
-      .filter((row) => row.allocation || row.count > 0 || row.key === projectFilter),
-    ...(["other", "none"] as const)
-      .map((key) => ({ key, label: key === "other" ? "Other projects" : "No project", count: projectCounts.get(key) ?? 0 }))
-      .filter((row) => row.count > 0 || row.key === projectFilter),
-  ]
-  const collapseRows = projectRows.length > PROJECT_ROWS_MAX && !projectListExpanded
-  const shownRows = collapseRows
-    ? projectRows.filter((row, index) => index < PROJECT_ROWS_MAX - 1 || row.key === projectFilter)
-    : projectRows
-  const tabRowKey = shownRows.some((row) => row.key === focusedRowKey) ? focusedRowKey : projectFilter
-
-  function chooseProject(key: string) {
-    setStoredProjectFilter(key)
-    try {
-      window.localStorage.setItem(PROJECT_FILTER_KEY, key)
-    } catch {
-      // Private mode or blocked storage: the filter still works for this visit.
-    }
-  }
-
-  // Roving tabindex (WAI-ARIA radio group): arrows move focus, Space/Enter selects.
-  function onRowKeyDown(e: React.KeyboardEvent, index: number) {
-    const last = shownRows.length - 1
-    const next =
-      e.key === "ArrowDown" || e.key === "ArrowRight" ? Math.min(last, index + 1)
-      : e.key === "ArrowUp" || e.key === "ArrowLeft" ? Math.max(0, index - 1)
-      : e.key === "Home" ? 0
-      : e.key === "End" ? last
-      : null
-    if (next === null) return
-    e.preventDefault()
-    const key = shownRows[next].key
-    setFocusedRowKey(key)
-    rowRefs.current.get(key)?.focus()
-  }
+  const projectRows = buildProjectRows(listedProjects, allocations, projectCounts, projectFilter, normalizeProjectColor)
 
   function showAll() {
     setScope("all")
@@ -293,194 +217,33 @@ export function UnscheduledTasksPanel({
         ) : null}
 
         <div className="flex items-center gap-1">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-0.5 rounded-lg bg-muted p-0.5" role="group" aria-label="Which tasks to show">
-            {(Object.keys(SCOPE_LABELS) as TaskScope[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setScope(key)}
-                aria-pressed={scope === key}
-                title={key === "focus" ? "Overdue, due this week, Daily Focus, and each project's Next milestone" : "Every open task without a time slot"}
-                className={cn(
-                  "flex min-w-0 items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors",
-                  scope === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className="truncate">{SCOPE_LABELS[key]}</span>
-                <span className="tabular-nums text-muted-foreground">{key === "focus" ? focusTasks.length : tasks.length}</span>
-              </button>
-            ))}
-          </div>
-          {searchOpen || query ? (
-            <div className="relative w-28 shrink-0">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onBlur={() => !query && setSearchOpen(false)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Escape") return
-                  if (query) return setQuery("")
-                  setSearchOpen(false)
-                  requestAnimationFrame(() => searchButtonRef.current?.focus())
-                }}
-                placeholder="Search"
-                aria-label="Search unscheduled tasks"
-                className="h-7 pl-7 pr-6 text-xs"
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <Button
-              ref={searchButtonRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search unscheduled tasks"
-              title="Search"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-          )}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="relative h-7 w-7 shrink-0 text-muted-foreground"
-                aria-label={filterCount > 0 ? `Filters, ${filterCount} active` : "Filters"}
-                title="Sort and filter"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                {filterCount > 0 ? (
-                  <Badge className="absolute -right-1 -top-1 h-4 min-w-4 rounded-full px-1 text-[9px] tabular-nums">{filterCount}</Badge>
-                ) : null}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 space-y-3 p-3">
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">Sort</p>
-                <Select value={sort} onValueChange={(v) => setSort(v as TaskSort)}>
-                  <SelectTrigger size="sm" className="h-8 w-full text-xs" aria-label="Sort unscheduled tasks">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(SORT_LABELS) as TaskSort[]).map((key) => (
-                      <SelectItem key={key} value={key} className="text-xs">
-                        {SORT_LABELS[key]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {categoryCounts.length > 0 ? (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium">Category</p>
-                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by category">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCategories([])}
-                      aria-pressed={activeCategories.length === 0}
-                      className={cn(
-                        "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                        activeCategories.length === 0
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-                      )}
-                    >
-                      All
-                    </button>
-                    {categoryCounts.map(({ name, count }) => {
-                      const selected = activeCategories.includes(name)
-                      const color = categoryColor(name, categoryColors)
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => toggleCategory(name)}
-                          aria-pressed={selected}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                            selected ? "border-transparent text-white" : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-                          )}
-                          style={selected ? { backgroundColor: color } : undefined}
-                        >
-                          {!selected ? <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} /> : null}
-                          {name}
-                          <span className={cn("tabular-nums", selected ? "text-white/80" : "text-muted-foreground/70")}>{count}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : null}
-            </PopoverContent>
-          </Popover>
+          <ScopeSwitch
+            label="Which tasks to show"
+            value={scope}
+            onChange={setScope}
+            options={(Object.keys(SCOPE_LABELS) as TaskScope[]).map((key) => ({
+              key,
+              label: SCOPE_LABELS[key],
+              count: key === "focus" ? focusTasks.length : tasks.length,
+              title: key === "focus" ? "Overdue, due this week, Daily Focus, and each project's Next milestone" : "Every open task without a time slot",
+            }))}
+          />
+          <InlineSearch query={query} onQueryChange={setQuery} label="Search unscheduled tasks" />
+          <FiltersPopover
+            sort={sort}
+            sortLabels={SORT_LABELS}
+            defaultSort="due"
+            onSortChange={setSort}
+            sortLabel="Sort unscheduled tasks"
+            categories={categoryCounts}
+            selectedCategories={activeCategories}
+            onToggleCategory={toggleCategory}
+            onClearCategories={() => setSelectedCategories([])}
+            colorOf={(name) => categoryColor(name, categoryColors)}
+          />
         </div>
 
-        <div>
-          <div role="radiogroup" aria-label="Filter by project" className="space-y-px">
-            {shownRows.map((row, index) => {
-              const selected = row.key === projectFilter
-              const pct = row.allocation && row.allocation.allocatedHours > 0 ? Math.min(100, (row.allocation.plannedHours / row.allocation.allocatedHours) * 100) : 0
-              const hoursText = row.allocation ? `${hours(row.allocation.plannedHours)}/${hours(row.allocation.allocatedHours)}h` : null
-              return (
-                <button
-                  key={row.key}
-                  ref={(el) => {
-                    if (el) rowRefs.current.set(row.key, el)
-                    else rowRefs.current.delete(row.key)
-                  }}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${row.label}, ${row.count} ${row.count === 1 ? "task" : "tasks"}${row.allocation ? `, ${hours(row.allocation.plannedHours)} of ${hours(row.allocation.allocatedHours)} hours planned` : ""}`}
-                  tabIndex={row.key === tabRowKey ? 0 : -1}
-                  onClick={() => chooseProject(row.key)}
-                  onFocus={() => setFocusedRowKey(row.key)}
-                  onKeyDown={(e) => onRowKeyDown(e, index)}
-                  className={cn(
-                    "relative flex h-7 w-full items-center gap-2 overflow-hidden rounded-md px-2 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    selected ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    row.count === 0 && !selected && "opacity-60"
-                  )}
-                >
-                  {row.color ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} aria-hidden="true" /> : null}
-                  <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                  {hoursText ? <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{hoursText}</span> : null}
-                  <span className="w-5 shrink-0 text-right tabular-nums">{row.count}</span>
-                  {row.allocation ? (
-                    <span className="absolute inset-x-2 bottom-0.5 h-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                      <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: row.color }} />
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-          {collapseRows ? (
-            <button
-              type="button"
-              onClick={() => setProjectListExpanded(true)}
-              className="flex h-6 w-full items-center rounded-md px-2 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              +{projectRows.length - shownRows.length} more
-            </button>
-          ) : null}
-        </div>
+        <ProjectFilterList rows={projectRows} value={projectFilter} onChange={chooseProject} />
       </div>
 
       <div className="space-y-1 p-2.5 pt-2" aria-describedby={helpId}>
