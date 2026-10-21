@@ -850,7 +850,7 @@ an approval step); a "fill the allocation gap" suggestion per project (overlaps 
 
 ### P27 — Close day writes a card to the Journal · S
 
-**Status:** open (2026-10-19, `feat/p27-close-day-journal`)
+**Status:** done (2026-10-19, #183. A real commit creating a card and the earlier-closed-days list not checked: demo mode cannot commit or sign in; real data not checked)
 
 **Why:** Close day (P11) commits the day's review to the OS but leaves no trace in Magic Kick, and the
 Journal held manual mood/highlights entries unrelated to it. Roman asked on 2026-10-19 that each

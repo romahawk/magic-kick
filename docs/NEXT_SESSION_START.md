@@ -1,12 +1,12 @@
 # Next Session Start
 
-**Last updated:** 2026-10-19, afternoon (P23, P24, P26 `done` on `main` (#179, #180, #181). Nothing is `open`; next by rank: P25, then P19)
-**Resume on:** `main` (`5ee82a3`). Start new work on a branch from `origin/main`.
-**Build status:** passing as of 2026-10-19 — `npm run build` exit 0 (on `c4a0bfa`, whose tree #181 squash-merged; and the commit hook)
-**Typecheck status:** passing as of 2026-10-19 — `npm run typecheck` exit 0 (same run)
-**Lint status:** passing as of 2026-10-19 — `npm run lint` exit 0 (same run)
-**Test status:** passing as of 2026-10-19 — `npm test` (typecheck + `vitest run`) exit 0, 89 tests in 11 files
-**Note:** all work today was UI only (no store schema, Firestore rules or route change). **Do not stack PRs** (step 3).
+**Last updated:** 2026-10-21 (P27 `done` on `main` (#183); this note was not rebuilt after it merged. Nothing is `open`; next by rank: P25, then P19)
+**Resume on:** `main` (`6e4b2f2`). Start new work on a branch from `origin/main`.
+**Build status:** passing as of 2026-10-21 — `npm run build` exit 0 (on `6e4b2f2`'s tree, after stopping `next dev`; with it running: `spawn UNKNOWN`. Free commit memory ~2 GB: builds also died out of memory at times, step 12)
+**Typecheck status:** passing as of 2026-10-21 — `npm run typecheck` exit 0 (on `6e4b2f2`)
+**Lint status:** passing as of 2026-10-21 — `npm run lint` exit 0 (same tree)
+**Test status:** passing as of 2026-10-21 — `npm test` (typecheck + `vitest run`) exit 0, 95 tests in 11 files
+**Note:** P27 changed the `journal` data (a `close` entry type, tombstones), not the Firestore rules. **Do not stack PRs** (step 3).
 
 ---
 
@@ -14,7 +14,9 @@
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
 2. **Nothing is `open`. Next: P25** (roadmap multi-select with done tasks folded; Roman's choices of
-   2026-10-19 are in the spec). P23, P24, P26 are `done` (2026-10-19). Roman accepted 7 visible task
+   2026-10-19 are in the spec). P27 is `done` (#183): **Roman to check on the real account** that a
+   Close day commit adds one Journal card, that closing the same date again keeps one card, and the
+   list of days closed earlier (demo mode can do neither). P23, P24, P26 are `done` (2026-10-19). Roman accepted 7 visible task
    rows at 1366×768 for P26 (the brief asked for 8); revisit only if 7 feels cramped on real data.
    **Roman to check on real data:** P24 (how many of his 73 tasks stay in This week) and P26 (his
    allocations as filter rows); P23's real print dialog, Share image on a phone and
@@ -42,8 +44,8 @@
    tasks still use ("Self-performance" and others). Names like "Data-management" and
    "Career-&-Business" use hyphens where others use spaces. P22 now shows categories on Schedule,
    and Marketing/Health-like colour pairs are hard to tell apart.
-8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
-   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24, P26.
+8. **Working order:** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+   Done: P1, P12, P13, P2, P3, P14, P16, P17, P18, P7, P8, P6, P9, P4, P5, P20, P21, P22, P23, P24, P26, P27.
    **P11:** `decision`. **P19:** `queued`, gated on its own ADR. **P10, P15:** `gated` on P7 in the
    spec; P7 is done, so their gates need re-checking.
 9. **Vercel variables (names checked 2026-10-17, values never read):** `AIOS_GITHUB_TOKEN`,
@@ -59,6 +61,36 @@
    On 2026-10-19 `next build` died with "JavaScript heap out of memory" at a 14 MB heap (1.5 GB, later
    0.6 GB commit free) and with a TurbopackInternalError while `next dev` ran; stopping Magic Kick's
    `next dev` (with Roman's OK) freed enough. Machine memory, not code.
+
+---
+
+## Where we left off (2026-10-19, evening → 2026-10-21) — P27 merged
+
+**Why:** Roman asked on 2026-10-19 for each closed day to appear as a card in the Journal, and for
+the Journal to follow (P27, ranked before P25). #183 merged without a session close, so the spec
+still said `open` and this note still described P26. The 2026-10-21 session closed that gap.
+
+**What changed:**
+- **#183 P27** (merged as `6e4b2f2`): `lib/types.ts` journal type `close`; `lib/close-day.ts`
+  `closeDayJournalEntry`, `selectClosedDayEntries`, `selectLegacyJournalEntries`; `lib/store.ts`
+  `saveCloseDayJournalEntry` (one card per date), `clearLegacyJournalEntries` (tombstones);
+  `close-day-dialog.tsx` saves the card when the OS commit succeeds; `journal-module.tsx` shows the
+  cards, a Close day button, days closed earlier as OS links and "Clear old entries" (New Entry,
+  mood, streak, AI Draft removed); Quick Add's Journal tab removed; 6 new tests.
+- 2026-10-21 (this branch): spec P27 → `done`; this note rebuilt.
+
+**Branch map (2026-10-21):** everything is on `main` `6e4b2f2`. This note's update is on
+`docs/session-close-2026-10-21-p27` → PR into `main`. Local `feat/p27-close-day-journal` holds the
+pre-squash commit `641b4df` (tree identical to `main`): delete it, and its GitHub copy if still there.
+
+**Verified (confirmed, from #183's commit message):** lint exit 0; `npm test` exit 0, 95 tests;
+build exit 0. Headless Edge, demo mode, 1366×768 and 390 px: 2 cards, no overflow, no page errors;
+injected old entries show the notice, clearing asks first and tombstones them, cards untouched;
+Close day button opens the dialog; Quick Add shows Task and Goal only. On 2026-10-21: lint,
+typecheck, `npm test` and build re-run on `main`'s tree (header).
+
+**Not verified:** a real commit creating a card (demo cannot commit; covered by store tests); the
+earlier-closed-days list (needs sign-in); real account data; light theme; Safari, Firefox.
 
 ---
 
