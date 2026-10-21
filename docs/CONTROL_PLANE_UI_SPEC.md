@@ -966,7 +966,7 @@ proposes at most 3 Daily Focus candidates, each with a time block today (Europe/
 1. **Gate: its own ADR first.** The route is frozen by ADR-017 and ADR-024 §6; an ADR unfreezes
    it for this change only, records that tasks still come from the client (ADR-017 point 5) and
    that writes happen client-side on accept only, and states which default of the AI flag holds
-   (`isAiEnabled()` is on unless `AI_FEATURES_ENABLED=false`; ADR-017 says default off).
+   (since 2026-10-21 `isAiEnabled()` is off unless `NEXT_PUBLIC_AI_FEATURES_ENABLED=true`, as ADR-017 says).
 2. **Canon as context.** With canon `ok` (or stale), the input carries it and the response says
    `canonUsed: true`. Not configured, missing or error: the route runs as today without canon and
    returns `canonUsed: false`.

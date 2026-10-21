@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-10-21 - AI features parked by default (ADR-017)
+
+### Changed
+- Command Center: the daily coaching banner and the "AI insights" list (weekly summary, heads-up warnings, suggestions) no longer appear, and Schedule's AI Suggest button is hidden. These Claude-based features were meant to be switched off (ADR-017) but were on by default. They come back only when `NEXT_PUBLIC_AI_FEATURES_ENABLED=true` is set.
+
+---
+
 ## [Unreleased] - 2026-10-21 - ToDo with a filter sidebar (P28)
 
 ### Changed

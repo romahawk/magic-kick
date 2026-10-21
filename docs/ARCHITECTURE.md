@@ -198,7 +198,7 @@ The AI layer sits on top of the Execution OS selectors and never writes directly
 ```text
 lib/ai/
   client.ts   — Anthropic SDK singleton (reads ANTHROPIC_API_KEY)
-  flags.ts    — isAiEnabled() gate (reads AI_FEATURES_ENABLED)
+  flags.ts    — isAiEnabled() gate (reads NEXT_PUBLIC_AI_FEATURES_ENABLED; off unless "true", ADR-017)
   auth.ts     — verifyFirebaseToken() helper for API routes
   service.ts  — callClaude(systemPrompt, messages, options)
 
@@ -239,7 +239,7 @@ In development, cache hit/miss counts are logged to the console:
 | Variable | Required | Notes |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Server-side only. Never use `NEXT_PUBLIC_` prefix. |
-| `AI_FEATURES_ENABLED` | No | Defaults to `true`. Set to `"false"` to disable all `/api/ai/*` routes without a deploy. |
+| `NEXT_PUBLIC_AI_FEATURES_ENABLED` | No | ADR-017: off unless exactly `"true"`. Gates every `/api/ai/*` route and the AI surfaces (Command Center coaching and insights, Schedule's AI Suggest). Inlined at build time, so a change needs a redeploy. Holds no secret. |
 
 ### Error handling
 

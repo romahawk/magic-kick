@@ -368,6 +368,12 @@ Scope drift is a recurring failure mode on this project. The corrective pattern 
 
 - The Freeze List in `docs/ROADMAP.md` and `CLAUDE.md` §6 regain accuracy.
 - AI features are unavailable by default until deliberately re-enabled.
+- **2026-10-21, implementation note:** the flag had drifted to *default on* (`isAiEnabled()` was true
+  unless `AI_FEATURES_ENABLED` was `"false"`, and the browser never saw that variable, so the UI always
+  treated AI as on). The Command Center showed Claude-written coaching and "AI insights" built from
+  unfiltered execution logs and bare project ids. `isAiEnabled()` now reads
+  `NEXT_PUBLIC_AI_FEATURES_ENABLED` and is on only for `"true"`; unset means parked. This restores the
+  decision above; it does not unfreeze anything.
 - Track 2 gains one issue: server-side state validation for existing AI routes.
 
 ---
