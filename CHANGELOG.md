@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-02 - Resources as a scannable list (P29)
+
+### Changed
+- Resources: cards are closed by default and show the title, a link count and a one-line description. Click a card to see its links (they open in a new tab), full description, tags and the projects that link to it; "Expand all" opens every card.
+- Resources: card colours are now soft gradients with a tinted border that read on both the light and dark themes (titles were unreadable on light before). Your saved colours carry over.
+- Resources: edit and delete are in one "..." menu on each row instead of faint hover icons. Rows are compact, two across on wide screens, with the description cut to one line.
+- Resources: search, categories and tags sit together and use one chip style. The header shows how many resources you have.
+- Resources: the Add and Edit dialogs offer 13 card colours, a custom colour and "Match category"; categories are picked from your task categories (with their colours) or a new one; tags are picked from chips (your existing tags plus a few starters like docs, course, tool) or typed.
+- Resources: the order of a resource's links is changed in its Edit dialog (dragging inside the expanded card is gone).
+
+---
+
 ## [Unreleased] - 2026-10-21 - AI features parked by default (ADR-017)
 
 ### Changed
