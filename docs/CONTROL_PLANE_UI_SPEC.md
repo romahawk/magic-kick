@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -946,6 +946,38 @@ colour; the text reads "4/6h", then "✓1.5 · 4/6h". The Review tab keeps readi
    `--destructive` contrast and the demo banner already open.
 7. For the same week, Schedule, ToDo and the Command Center show the same planned and done hours
    per allocated project, with the same bar.
+
+### P29 — Resources as a scannable list · S
+
+**Status:** open (2026-11-02, `feat/p29-resources-ui`)
+
+**Why:** Resources hid what it exists for. A card showed only a title until expanded, so the links
+sat two clicks away; edit and delete were faint hover icons; and the category and tag filters used
+two different chip styles. Roman asked on 2026-11-02 to restyle the Reference tabs, starting with
+Resources, to the app's design system. After the first pass he asked for cards closed by default and
+for colours that read on both themes (the saved dark fills hid titles in the light theme).
+Goals, Journal and Achievements follow as their own items.
+
+**Shape.** UI only; no store, type or rules change. Each resource is a compact row (two across from
+`lg`): grip, title with a link count, one-line description; closed by default. Expanding shows the
+links (buttons that open in a new tab), the full description, tags and "Linked from"; "Expand all /
+Collapse all" sits in the filter row. A card colour is drawn as a soft gradient of an accent into
+the card colour with a tinted border, so text keeps the theme's foreground in light and dark; the
+stored values are unchanged (a map turns each old fill into its accent). The dialogs pick the colour
+from 13 accents, a custom colour or "Match category"; the category from the task categories
+(`withUsedCategories`, with their colours) or a new one; tags from chips (existing tags and a short
+starter list) or typed. Tasks have no tags, so tags stay resource-only. Edit and Delete
+move into one row menu. Search, categories and tags sit in one filter block with one chip style;
+the header counts resources. Card colours stay as the row tint. Link order is changed in the Edit
+dialog only (the drag inside the expanded card is gone).
+
+**Acceptance criteria:**
+1. Cards are closed by default; one click on a card opens its links, one on "Expand all" opens all.
+2. Expanding shows description, tags and backlinks; the row menu edits and deletes (delete still asks).
+3. Search, category and tag filters work as before and share one chip style.
+4. Drag between rows still reorders; the Add and Edit dialogs are unchanged.
+5. Titles and links are readable on every card colour in the light and the dark theme.
+6. No horizontal page scroll at 1366 and 390 px.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 
