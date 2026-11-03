@@ -123,6 +123,15 @@ export function selectTimeBlocksForWeek(timeBlocks: TimeBlock[], weekPlanId?: st
   return timeBlocks.filter((block) => !block.deleted && block.weekPlanId === weekPlanId)
 }
 
+/**
+ * A calendar block whose task no longer exists (deleted on another device, or before deleting a task
+ * took its blocks with it). It is hidden everywhere and counts for no hours. Blocks without a task are
+ * the user's own and are never orphans. `liveTaskIds` must come from the full task list.
+ */
+export function isOrphanedBlock(block: Pick<TimeBlock, "linkedTaskId">, liveTaskIds: ReadonlySet<string>): boolean {
+  return Boolean(block.linkedTaskId) && !liveTaskIds.has(block.linkedTaskId as string)
+}
+
 export function selectTimeBlocksForDates(timeBlocks: TimeBlock[], dayISOList: string[]) {
   const dates = new Set(dayISOList)
   return timeBlocks.filter((block) => !block.deleted && dates.has(block.dateISO))
@@ -200,9 +209,10 @@ export function selectDayAgenda(input: {
 }): DayAgendaEntry[] {
   const taskById = new Map(input.tasks.filter((task) => !task.deleted).map((task) => [task.id, task]))
   const entries: DayAgendaEntry[] = []
+  const liveIds = new Set(taskById.keys())
 
   for (const block of input.timeBlocks) {
-    if (block.deleted || block.dateISO !== input.dateISO) continue
+    if (block.deleted || block.dateISO !== input.dateISO || isOrphanedBlock(block, liveIds)) continue
     const task = block.linkedTaskId ? taskById.get(block.linkedTaskId) : undefined
     if (task && isRecurringTask(task)) continue
     entries.push({
@@ -403,7 +413,9 @@ export function selectAllocationProgress(input: {
   const live = input.tasks.filter((task) => !task.deleted)
   const recurringIds = new Set(live.filter((task) => isRecurringTask(task)).map((task) => task.id))
   const hours: Array<{ projectId?: string; planned: number; done: number }> = []
+  const liveIds = new Set(live.map((task) => task.id))
   for (const block of selectTimeBlocksForDates(input.timeBlocks, input.dayISOList)) {
+    if (isOrphanedBlock(block, liveIds)) continue
     if (block.linkedTaskId && recurringIds.has(block.linkedTaskId)) continue
     hours.push({ projectId: block.projectId, planned: block.plannedHours, done: block.actualHours ?? 0 })
   }
