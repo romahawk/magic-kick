@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, ADR-036, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P30 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -978,6 +978,34 @@ dialog only (the drag inside the expanded card is gone).
 4. Drag between rows still reorders; the Add and Edit dialogs are unchanged.
 5. Titles and links are readable on every card colour in the light and the dark theme.
 6. No horizontal page scroll at 1366 and 390 px.
+
+### P30 — Schedule reads dated commitments from AIOS · S
+
+**Status:** open (2026-11-03, `feat/p30-dated-commitments`)
+
+**Why:** Calls and deadlines the team already knows about (OS `01_CONTEXT/dated-commitments.md`,
+kept by Vincent) had to be typed into Schedule by hand. Roman asked on 2026-11-03 for Magic Kick to
+show them without entry. See ADR-036.
+
+**Shape.** Read-only; the file is the only source and Magic Kick never writes it. `lib/commitments.ts`
+parses the table `date | start | end | title | link | lane` (bad rows skipped with a warning).
+`fetchDatedCommitments()` reads it like P7's canon (same `AIOS_GITHUB_TOKEN`, 5-minute cache) behind
+`GET /api/os/commitments`; `useOsCommitments` fetches once per app load. No store, Firestore, token or
+calendar change. Schedule draws timed rows as fixed "from AIOS" blocks (time, title, link, new tab),
+all-day rows as a chip under the date; tasks cannot be dropped over them. Daily Focus's "Also
+scheduled" lists today's rows as `HH:MM title` with the link. Missing or failing file: nothing shown.
+
+**Acceptance criteria:**
+1. With `2026-11-04 | 11:00 | 12:00 | Isis call, Lucas Peiffer | <link> | Medintegro` on OS `main`,
+   Schedule shows a fixed block on 4 Nov 11:00-12:00 and Daily Focus's "Also scheduled" lists it on
+   4 Nov; neither shows it on any other day.
+2. The block's link opens in a new tab; the block cannot be dragged, resized, opened or edited.
+3. Dropping a task, or moving or resizing a block, over a timed row is refused with a notice.
+4. An all-day row shows under its date and blocks no time. A row with no end counts as 30 minutes.
+5. A bad row is skipped with a warning; an empty table, a missing file, a missing token or a GitHub
+   failure shows nothing and does not crash.
+6. Parser tests cover valid, all-day, missing end, bad date, empty table and missing file; `npm test`,
+   lint and build pass.
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

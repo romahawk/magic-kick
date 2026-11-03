@@ -1,6 +1,8 @@
 import "server-only"
 import { parseCurrentFocus, parseFrontMatterGenerated } from "@/lib/os-feed/canon-parser"
 import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
+import { buildCommitmentsResult } from "@/lib/commitments"
+import type { CommitmentsFeedResult } from "@/lib/commitments"
 
 /**
  * P7: reads current focus from AI-Business-OS canon through the GitHub API (ADR-024 §5, ADR-031).
@@ -10,6 +12,7 @@ export const OS_REPO_OWNER = "romahawk"
 export const OS_REPO_NAME = "AI-Business-OS"
 const CURRENT_FOCUS_PATH = "01_CONTEXT/current-focus.md"
 const CONTEXT_PACK_PATH = "00_HOME/context-pack.md"
+const DATED_COMMITMENTS_PATH = "01_CONTEXT/dated-commitments.md"
 
 type GoodFetch = Omit<CanonFeedResult, "ok" | "status" | "stale">
 type FileResult = { status: "ok"; text: string } | { status: "missing" } | { status: "error" }
@@ -83,4 +86,23 @@ export async function fetchCanonFocus(): Promise<CanonFeedResult> {
     warnings,
   }
   return { ok: true, status: "ok", ...lastGood, stale: false }
+}
+
+// P30: last good commitments, per server instance, kept the way `lastGood` keeps the canon.
+let lastGoodCommitments: Parameters<typeof buildCommitmentsResult>[1] = null
+
+/**
+ * P30: dated commitments from `01_CONTEXT/dated-commitments.md` on OS `main` (ADR-036). Same read-only
+ * token, same 5-minute cache as the canon. A missing or failing file shows nothing and never throws.
+ */
+export async function fetchDatedCommitments(): Promise<CommitmentsFeedResult> {
+  const token = process.env.AIOS_GITHUB_TOKEN
+  if (!token) {
+    return { ok: false, status: "not-configured", fetchedAt: null, commitments: [], warnings: [], stale: false }
+  }
+  const file = await getFile(DATED_COMMITMENTS_PATH, token)
+  const built = buildCommitmentsResult(file, lastGoodCommitments)
+  lastGoodCommitments = built.lastGood
+  for (const warning of built.result.warnings) console.warn(`[os-feed] dated-commitments: ${warning}`)
+  return built.result
 }
