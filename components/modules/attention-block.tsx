@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { format, isToday, parseISO } from "date-fns"
-import { CalendarPlus, ChevronRight, GripVertical, MoonStar, Plus } from "lucide-react"
+import { CalendarPlus, ChevronRight, ExternalLink, GripVertical, MoonStar, Plus } from "lucide-react"
 import { CloseDayDialog } from "@/components/close-day-dialog"
 import { useAppStore } from "@/lib/store"
 import { isOverdue } from "@/lib/game-utils"
@@ -19,6 +19,8 @@ import { isPast } from "@/lib/time-blocks"
 import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { useOsCanon } from "@/hooks/use-os-canon"
+import { useOsCommitments } from "@/hooks/use-os-commitments"
+import { commitmentsForDate, type DatedCommitment } from "@/lib/commitments"
 import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -177,6 +179,7 @@ function DailyFocusCard({
   const setActiveModule = useAppStore((s) => s.setActiveModule)
   const planInNextSlot = usePlanInNextSlot()
   const canon = useOsCanon()
+  const commitments = useOsCommitments()
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const now = useMinuteClock()
 
@@ -296,7 +299,13 @@ function DailyFocusCard({
         className={chosen.length > 0 ? "mt-4" : undefined}
       />
 
-      <ScheduledToday blocks={otherBlocks} todayISO={todayISO} now={now} className={focus.length > 0 ? "mt-4" : undefined} />
+      <ScheduledToday
+        blocks={otherBlocks}
+        commitments={commitmentsForDate(commitments, todayISO)}
+        todayISO={todayISO}
+        now={now}
+        className={focus.length > 0 ? "mt-4" : undefined}
+      />
 
       <CanonFocus canon={canon} className="mt-4 border-t border-border pt-3" />
     </div>
@@ -427,21 +436,57 @@ function PastLabel() {
  */
 function ScheduledToday({
   blocks,
+  commitments,
   todayISO,
   now,
   className,
 }: {
   blocks: DayAgendaEntry[]
+  /** P30: today's fixed rows from AI-Business-OS, listed with the blocks by start time. */
+  commitments: DatedCommitment[]
   todayISO: string
   now: Date
   className?: string
 }) {
-  if (blocks.length === 0) return null
+  if (blocks.length === 0 && commitments.length === 0) return null
+  const rows = [
+    ...commitments.map((entry) => ({ sort: entry.start ?? "00:00", commitment: entry })),
+    ...blocks.map((block) => ({ sort: block.startTime, block })),
+  ].sort((a, b) => a.sort.localeCompare(b.sort))
   return (
     <div className={className}>
       <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Also scheduled</p>
       <ul role="list" className="flex flex-col gap-1.5">
-        {blocks.map((block) => {
+        {rows.map((row) => {
+          if ("commitment" in row) {
+            const entry = row.commitment
+            const past = entry.end ? isPast(entry.end, todayISO, now) : false
+            return (
+              <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{entry.allDay ? "All day" : entry.start}</span>
+                <span className={cn("min-w-0 flex-1 basis-32 leading-snug", past && "text-muted-foreground")}>
+                  {entry.title}
+                  <span className="ml-1.5 rounded-sm bg-violet-500/10 px-1 py-px text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                    from AIOS
+                  </span>
+                </span>
+                {entry.link ? (
+                  <a
+                    href={entry.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-xs text-primary underline underline-offset-2"
+                  >
+                    Open link
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                ) : null}
+                {past ? <PastLabel /> : null}
+              </li>
+            )
+          }
+          const block = row.block
           const past = isPast(block.endTime, todayISO, now)
           return (
             <li key={block.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">

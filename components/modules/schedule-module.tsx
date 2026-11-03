@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight, X, CheckCircle2, Focus, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, CheckCircle2, ExternalLink, Focus, Trash2, Sparkles, PanelRightOpen } from "lucide-react"
 import { toast } from "sonner"
 import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -31,6 +31,8 @@ import { normalizeProjectColor } from "@/lib/project-colors"
 import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
+import { useOsCommitments } from "@/hooks/use-os-commitments"
+import { commitmentRange, commitmentsForDate, overlapsCommitment, type DatedCommitment } from "@/lib/commitments"
 
 
 const HOUR_PX = 64
@@ -141,6 +143,26 @@ function externalBlockToBusyBlock(block: ExternalCalendarBlock, weekDays: Array<
   })
 }
 
+/** P30: a timed OS commitment as a busy block, so suggestions never land on it. All-day rows block nothing. */
+function commitmentToBusyBlock(entry: DatedCommitment): TimeBlock[] {
+  const range = commitmentRange(entry)
+  if (!range || !entry.start) return []
+  const endMin = Math.min(range.endMin, 24 * 60 - 1)
+  return [
+    {
+      id: entry.id,
+      weekPlanId: "aios-commitments",
+      dateISO: entry.date,
+      startTime: entry.start,
+      endTime: toTime(endMin),
+      taskDescription: entry.title,
+      plannedHours: (range.endMin - range.startMin) / 60,
+      status: "planned" as const,
+      deleted: false,
+    },
+  ]
+}
+
 interface DragState {
   blockId: string
   linkedTaskId?: string
@@ -187,6 +209,73 @@ interface DisplayBlock {
   notes?: string
 }
 
+const FROM_AIOS_TITLE = "Fixed event from AI-Business-OS. Read-only: it is changed in 01_CONTEXT/dated-commitments.md."
+
+function CommitmentLink({ entry, className }: { entry: DatedCommitment; className?: string }) {
+  if (!entry.link) return null
+  return (
+    <a
+      href={entry.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn("inline-flex items-center gap-0.5 underline underline-offset-2", className)}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      Open link
+      <ExternalLink className="h-2.5 w-2.5" aria-hidden="true" />
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  )
+}
+
+/** P30: a timed OS row as a fixed block above the task blocks. Not draggable, resizable or editable. */
+function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
+  const range = commitmentRange(entry)
+  if (!range || !entry.start) return null
+  const end = entry.end ?? toTime(Math.min(DAY_END * 60, range.endMin))
+  return (
+    <div
+      title={FROM_AIOS_TITLE}
+      aria-label={`${entry.title}, ${entry.start}${entry.end ? `–${entry.end}` : ""}, fixed event from AIOS`}
+      className="absolute inset-x-1 z-30 overflow-hidden rounded-md border border-l-[3px] border-violet-500/70 px-2 py-1 text-xs text-foreground"
+      style={{
+        top: toY(entry.start),
+        height: blockH(entry.start, end),
+        cursor: "default",
+        backgroundColor: "rgba(139, 92, 246, 0.14)",
+        backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgba(139, 92, 246, 0.10) 6px 8px)",
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">from AIOS</p>
+      <p className="truncate font-medium leading-tight">{entry.title}</p>
+      <p className="truncate opacity-75">
+        {entry.start}
+        {entry.end ? `–${entry.end}` : ""}
+      </p>
+      <CommitmentLink entry={entry} className="mt-0.5 text-[10px]" />
+    </div>
+  )
+}
+
+/** P30: an all-day OS row, shown under the day's date. It blocks no time. */
+function CommitmentChip({ entry }: { entry: DatedCommitment }) {
+  return (
+    <div
+      title={FROM_AIOS_TITLE}
+      className="mt-1 flex w-full max-w-full flex-wrap items-center justify-center gap-x-1 rounded border border-violet-500/60 bg-violet-500/10 px-1.5 py-0.5 text-[10px] leading-tight"
+    >
+      <span className="font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">AIOS</span>
+      <span className="truncate">{entry.title}</span>
+      <CommitmentLink entry={entry} />
+    </div>
+  )
+}
+
 export function ScheduleModule() {
   const categories = useCategories()
   const categoryColors = useAppStore((s) => s.profile.taskCategoryColors)
@@ -211,6 +300,8 @@ export function ScheduleModule() {
   const setGoogleCalendarMetadata = useAppStore((s) => s.setGoogleCalendarMetadata)
   const ensureWeeklyPlan = useAppStore((s) => s.ensureWeeklyPlan)
   const setActiveModule = useAppStore((s) => s.setActiveModule)
+  // P30: fixed, read-only rows from AI-Business-OS. Not in the store; tasks cannot be placed over them.
+  const commitments = useOsCommitments()
 
   const [selectedDateISO, setSelectedDateISO] = useState(todayISO)
   const [view, setView] = useState<"week" | "day">("week")
@@ -267,8 +358,9 @@ export function ScheduleModule() {
     () => [
       ...timeBlocks,
       ...externalCalendarBlocks.flatMap((block) => externalBlockToBusyBlock(block, weekDays)),
+      ...commitments.flatMap(commitmentToBusyBlock),
     ],
-    [externalCalendarBlocks, timeBlocks, weekDays]
+    [commitments, externalCalendarBlocks, timeBlocks, weekDays]
   )
 
   useEffect(() => {
@@ -540,6 +632,10 @@ export function ScheduleModule() {
     const task = tasks.find((entry) => entry.id === taskId)
     if (!task) return
     const slot = taskDropSlot(task, dayISO, clientY, containerTop)
+    if (overlapsCommitment(commitments, slot.dateISO, slot.startTime, slot.endTime)) {
+      toast.error("That time is taken by a fixed event from AIOS.")
+      return
+    }
     updateTask(taskId, { dueDate: dayISO }, { startHHmm: slot.startTime, endHHmm: slot.endTime })
   }
 
@@ -649,6 +745,8 @@ export function ScheduleModule() {
       const drag = dragRef.current
       if (drag?.linkedTaskId && drag.mode === "move" && unscheduleDrop && isOverTasksPanel(e.clientX, e.clientY)) {
         unscheduleTaskBlockRef.current(drag.linkedTaskId)
+      } else if (drag && preview && overlapsCommitment(commitments, preview.dateISO, preview.startTime, preview.endTime)) {
+        toast.error("That time is taken by a fixed event from AIOS.")
       } else if (drag && preview) {
         const block = displayBlocks.find((entry) => entry.id === drag.blockId)
         if (block?.linkedTaskId) {
@@ -676,7 +774,7 @@ export function ScheduleModule() {
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
-  }, [displayBlocks, preview, unscheduleDrop, updateTask, updateTimeBlock])
+  }, [commitments, displayBlocks, preview, unscheduleDrop, updateTask, updateTimeBlock])
 
   return (
     <div className="flex h-full flex-col gap-0">
@@ -796,6 +894,11 @@ export function ScheduleModule() {
                       >
                         {day.dayNumber}
                       </span>
+                      {commitmentsForDate(commitments, day.iso)
+                        .filter((entry) => entry.allDay)
+                        .map((entry) => (
+                          <CommitmentChip key={entry.id} entry={entry} />
+                        ))}
                     </div>
                   )
                 })}
@@ -1003,6 +1106,12 @@ export function ScheduleModule() {
                             </div>
                           )
                         })}
+
+                        {commitmentsForDate(commitments, day.iso)
+                          .filter((entry) => !entry.allDay)
+                          .map((entry) => (
+                            <CommitmentBlock key={entry.id} entry={entry} />
+                          ))}
 
                         {preview && preview.dateISO === day.iso && !dayBlocks.find((block) => block.id === preview.blockId) && (() => {
                           const block = displayBlocks.find((entry) => entry.id === preview.blockId)

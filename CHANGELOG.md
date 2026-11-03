@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-03 - Dated commitments from AIOS (P30)
+
+### Added
+- Schedule: calls and deadlines listed in AI-Business-OS (`01_CONTEXT/dated-commitments.md`) now appear on their day as fixed "from AIOS" blocks with time, title and a link that opens in a new tab. All-day items show under the date. You cannot drag or resize them, and a task dropped or moved over one is refused with a notice. You do not enter them; Magic Kick only reads the file and never changes it.
+- Command Center: today's items from that file are listed under "Also scheduled" as time and title with the link.
+
+---
+
 ## [Unreleased] - 2026-11-02 - Resources as a scannable list (P29)
 
 ### Changed

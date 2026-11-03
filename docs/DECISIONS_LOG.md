@@ -1301,3 +1301,67 @@ Firestore data and has no public surface.
 - **Rollback:** revert the PR. No data, store, rules or route change.
 
 **Revisit trigger:** recipients ask for a live link, or roadmaps regularly exceed one screen.
+
+---
+
+## ADR-036: Schedule reads dated commitments from AIOS (read-only) (P30)
+
+**Date:** 2026-11-03
+**Status:** Proposed (Roman reviews it with the PR)
+**Relates to:** ADR-031 (P7 reads tracked canon, read-only `AIOS_GITHUB_TOKEN`), ADR-024 §5 (server-side
+routes only, 9-module ceiling), ADR-032 (the only write path stays Close day).
+
+### Context
+
+Calls, interviews and deadlines the team already knows about reach Roman by message, and he types them
+into Schedule by hand. OS `01_CONTEXT/dated-commitments.md` is a tracked file kept by Vincent as "the
+only source of dated commitments". Magic Kick can show it without Roman entering anything.
+
+### Decision
+
+1. **One source, read-only.** `01_CONTEXT/dated-commitments.md` on OS `main`, read through the same
+   GitHub contents call and the same read-only `AIOS_GITHUB_TOKEN` as P7. No new token, no write path,
+   no calendar integration. Magic Kick never writes the file; nothing in the app edits a row.
+2. **Format.** A markdown table `date | start | end | title | link | lane`. `start` is `HH:MM`
+   (Europe/Berlin) or `all-day`; `end`, `link` and `lane` may be empty. The header, the separator row
+   and text outside the table are ignored. A bad row (wrong column count, impossible date, bad time,
+   end not after start, no title) is skipped with a warning in the server log and in the route's body.
+   A link that is not `http(s)` is dropped and the row stays.
+3. **Route and cache.** `GET /api/os/commitments` (Firebase-token checked, no POST), cached 5 minutes
+   like canon. The browser fetches once per app load and shares the answer between Schedule and Daily
+   Focus; it refetches on return to the tab after 5 minutes. Rows live in component state only: never
+   in the store, Firestore or sync.
+4. **Failure shows nothing, never an error.** A missing file, a missing token or an unreachable
+   GitHub gives an empty list. After an earlier good fetch, a GitHub failure keeps showing that
+   fetch (the route marks it `stale`).
+5. **Schedule.** Timed rows for the visible day are fixed blocks above task blocks, with time, title,
+   an "Open link" link (new tab) and a "from AIOS" label, in a violet hatched style that no project or
+   category uses. All-day rows are a chip under the day's date and block no time. A row with no end
+   counts as 30 minutes. A task or block cannot be dropped over a timed row: the drop is refused with a
+   notice. The blocks cannot be dragged, resized or opened. Timed rows also count as busy time for AI
+   Suggest's conflict check (which stays parked, ADR-017).
+6. **Daily Focus.** Today's rows join the "Also scheduled" list (P20, CC-2) as `HH:MM title` with a
+   link and the same "from AIOS" label, in start-time order with the day's blocks.
+7. **Times are shown as written** (wall clock, no conversion), the way every Schedule block is. They
+   are right when the device is on Berlin time.
+
+### Alternatives rejected
+
+- **Google Calendar sync of the same events.** Already exists for Roman's own calendar, but the team
+  does not keep a shared calendar; a calendar path adds OAuth surface and a second source of truth.
+- **Importing rows into the task or time-block store.** Makes them editable and syncable, so a copy
+  can drift from the file and be written to Firestore. Read-only display avoids both.
+- **A new top-level "Commitments" module.** Breaks the 9-module ceiling.
+
+### Consequences
+
+- Rows reach the screen at most about 5 minutes after Vincent's commit lands on `main`, plus the
+  browser's refetch rule. An open tab picks up a change when it is shown again after 5 minutes.
+- "Next free slot" (P16) does not yet avoid the blocks: it reads the store only. A task planned that way
+  can land on a commitment until a later slice teaches it. Drag and drop are guarded.
+- Two events at the same time stack on top of each other in the day column, as external calendar
+  events already do.
+- **Rollback:** revert the P30 PR. No data, store, rules or token change.
+
+**Revisit trigger:** the file's columns change, commitments need a reminder or status, or "Next free
+slot" lands on one in practice.
