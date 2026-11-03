@@ -437,8 +437,9 @@ export function ScheduleModule() {
     const persistedBlocks: DisplayBlock[] = weekBlocks
       .filter((block) => {
         if (!block.linkedTaskId) return true
+        // A block whose task is gone is an orphan: not drawn (see isOrphanedBlock).
         const linkedTask = tasks.find((task) => task.id === block.linkedTaskId)
-        return !linkedTask || !isRecurringTask(linkedTask)
+        return Boolean(linkedTask) && !isRecurringTask(linkedTask!)
       })
       .map((block): DisplayBlock => ({
         id: block.id,

@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-03 - Deleted tasks no longer leave blocks on Schedule
+
+### Fixed
+- Schedule: deleting a task now also removes its calendar block, and Undo brings both back. Before, the block stayed on Schedule under the deleted task's title.
+- Schedule, Command Center ("Also scheduled"), Close day and the week's allocation hours: a block whose task is already gone (deleted earlier) is no longer shown or counted, so existing leftover blocks disappear without any clean-up.
+
+---
+
 ## [Unreleased] - 2026-11-03 - Dated commitments from AIOS (P30)
 
 ### Added

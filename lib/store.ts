@@ -1401,6 +1401,10 @@ export const useAppStore = create<AppState>()(
           schedule: s.schedule.map((item) =>
             item.linkedTaskId === id ? { ...item, deleted: true, clientUpdatedAt: ts } : item
           ),
+          // The task's calendar blocks go with it; without this they stay on Schedule as orphans.
+          timeBlocks: s.timeBlocks.map((block) =>
+            block.linkedTaskId === id && !block.deleted ? { ...block, deleted: true, clientUpdatedAt: ts } : block
+          ),
           sync: {
             ...s.sync,
             pending: {
@@ -1412,6 +1416,10 @@ export const useAppStore = create<AppState>()(
                 }
                 return acc
               }, { ...s.sync.pending.schedule }),
+              timeBlocks: s.timeBlocks.reduce<Record<string, number>>((acc, block) => {
+                if (block.linkedTaskId === id && !block.deleted) acc[block.id] = ts
+                return acc
+              }, { ...s.sync.pending.timeBlocks }),
             },
           },
         }))
@@ -1425,11 +1433,17 @@ export const useAppStore = create<AppState>()(
         const restoredItemIds = get().schedule
           .filter((item) => item.linkedTaskId === id && item.deleted && item.clientUpdatedAt === deletedAt)
           .map((item) => item.id)
+        const restoredBlockIds = get().timeBlocks
+          .filter((block) => block.linkedTaskId === id && block.deleted && block.clientUpdatedAt === deletedAt)
+          .map((block) => block.id)
         const ts = now()
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, deleted: false, clientUpdatedAt: ts } : t)),
           schedule: s.schedule.map((item) =>
             restoredItemIds.includes(item.id) ? { ...item, deleted: false, clientUpdatedAt: ts } : item
+          ),
+          timeBlocks: s.timeBlocks.map((block) =>
+            restoredBlockIds.includes(block.id) ? { ...block, deleted: false, clientUpdatedAt: ts } : block
           ),
           sync: {
             ...s.sync,
@@ -1439,6 +1453,10 @@ export const useAppStore = create<AppState>()(
               schedule: restoredItemIds.reduce<Record<string, number>>(
                 (acc, itemId) => ({ ...acc, [itemId]: ts }),
                 { ...s.sync.pending.schedule }
+              ),
+              timeBlocks: restoredBlockIds.reduce<Record<string, number>>(
+                (acc, blockId) => ({ ...acc, [blockId]: ts }),
+                { ...s.sync.pending.timeBlocks }
               ),
             },
           },
