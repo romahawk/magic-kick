@@ -7,6 +7,7 @@ import { calculateTimeBlockHours, getActiveWeeklyPlan, getCurrentWeekStartISO, g
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { TASK_REPEAT_OPTIONS, WEEK_DAYS, formatRecurrenceDays, isRecurringTask, taskRepeatsOnDate } from "@/lib/task-recurrence"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -262,17 +263,36 @@ function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
   )
 }
 
-/** P30: an all-day OS row, shown under the day's date. It blocks no time. */
-function CommitmentChip({ entry }: { entry: DatedCommitment }) {
+/** P33: a day's all-day OS rows in the fixed-height lane: one truncated chip, "+N" for the rest, the full list in a popover. */
+function AllDayCell({ entries }: { entries: DatedCommitment[] }) {
+  if (entries.length === 0) return null
+  const [first, ...rest] = entries
   return (
-    <div
-      title={FROM_AIOS_TITLE}
-      className="mt-1 flex w-full max-w-full flex-wrap items-center justify-center gap-x-1 rounded border border-violet-500/60 bg-violet-500/10 px-1.5 py-0.5 text-[10px] leading-tight"
-    >
-      <span className="font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">AIOS</span>
-      <span className="truncate">{entry.title}</span>
-      <CommitmentLink entry={entry} />
-    </div>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={FROM_AIOS_TITLE}
+          aria-label={`${entries.length} all-day ${entries.length === 1 ? "item" : "items"} from AIOS: ${first.title}`}
+          className="flex h-5 w-full min-w-0 items-center gap-1 rounded border border-violet-500/60 bg-violet-500/10 px-1 text-[10px] leading-none hover:bg-violet-500/20"
+        >
+          <span className="shrink-0 font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">AIOS</span>
+          <span className="min-w-0 flex-1 truncate text-left">{first.title}</span>
+          {rest.length > 0 ? <span className="shrink-0 font-semibold">+{rest.length}</span> : null}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 text-xs" align="start">
+        <ul className="flex flex-col gap-2">
+          {entries.map((entry) => (
+            <li key={entry.id} className="flex flex-col gap-0.5">
+              <span className="font-medium">{entry.title}</span>
+              <CommitmentLink entry={entry} />
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 border-t pt-2 text-muted-foreground">Change in AIOS: dated-commitments.md</p>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -877,32 +897,41 @@ export function ScheduleModule() {
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
           <div ref={gridScrollRef} tabIndex={-1} className="flex flex-1 overflow-y-auto outline-none [scrollbar-gutter:stable]">
             <div className="flex min-h-full min-w-full flex-col">
-              <div className="sticky top-0 z-20 flex border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85">
-                <div className="w-14 shrink-0 border-r" />
-                {visibleDays.map((day) => {
-                  const isToday = day.iso === nowDayISO
-                  return (
-                    <div
-                      key={day.iso}
-                      className={cn("flex flex-1 flex-col items-center py-2 text-center", view === "week" && "border-r last:border-r-0")}
-                    >
-                      <span className="text-xs text-muted-foreground">{day.label}</span>
-                      <span
-                        className={cn(
-                          "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
-                          isToday && "bg-primary text-primary-foreground"
-                        )}
+              <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/85">
+                {/* One column template for the header, the all-day lane and (by equal flex columns) the body. */}
+                <div className="grid" style={{ gridTemplateColumns: `3.5rem repeat(${visibleDays.length}, minmax(0, 1fr))` }}>
+                  <div className="border-r" />
+                  {visibleDays.map((day) => {
+                    const isToday = day.iso === nowDayISO
+                    return (
+                      <div
+                        key={day.iso}
+                        className={cn("flex min-w-0 flex-col items-center py-2 text-center", view === "week" && "border-r last:border-r-0")}
                       >
-                        {day.dayNumber}
-                      </span>
-                      {commitmentsForDate(commitments, day.iso)
-                        .filter((entry) => entry.allDay)
-                        .map((entry) => (
-                          <CommitmentChip key={entry.id} entry={entry} />
-                        ))}
+                        <span className="text-xs text-muted-foreground">{day.label}</span>
+                        <span
+                          className={cn(
+                            "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                            isToday && "bg-primary text-primary-foreground"
+                          )}
+                        >
+                          {day.dayNumber}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div
+                  className="grid h-7 items-center border-t"
+                  style={{ gridTemplateColumns: `3.5rem repeat(${visibleDays.length}, minmax(0, 1fr))` }}
+                >
+                  <div className="border-r pr-2 text-right text-[10px] leading-none text-muted-foreground">All-day</div>
+                  {visibleDays.map((day) => (
+                    <div key={day.iso} className={cn("min-w-0 px-1", view === "week" && "border-r last:border-r-0")}>
+                      <AllDayCell entries={commitmentsForDate(commitments, day.iso).filter((entry) => entry.allDay)} />
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
               </div>
 
               <div className="flex flex-1">
@@ -920,7 +949,7 @@ export function ScheduleModule() {
                   </div>
                 </div>
 
-                <div className="flex flex-1">
+                <div className="flex min-w-0 flex-1">
                   {visibleDays.map((day) => {
                     const dayBlocks = displayBlocks
                       .filter((block) => block.dateISO === day.iso)
@@ -931,7 +960,7 @@ export function ScheduleModule() {
                       <div
                         key={day.iso}
                         data-day={day.iso}
-                        className={cn("relative flex-1 cursor-crosshair select-none", view === "week" && "border-r last:border-r-0")}
+                        className={cn("relative min-w-0 flex-1 cursor-crosshair select-none", view === "week" && "border-r last:border-r-0")}
                         style={{ height: GRID_HEIGHT }}
                         onMouseDown={gridMouseDown}
                         onMouseMove={(e) => gridMouseMove(e, day.iso)}
