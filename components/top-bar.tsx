@@ -1,33 +1,33 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { signOut } from "firebase/auth"
 import { useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { levelFromXP } from "@/lib/game-utils"
 import { auth } from "@/lib/firebase/client"
 import { useAuth } from "@/hooks/use-auth"
-import { syncNow } from "@/lib/sync/engine"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { QuickAddDialog } from "./quick-add-dialog"
-import { CalendarDays, Zap, Flame, Moon, Sun, Menu, RefreshCcw, LogOut } from "lucide-react"
+import { SyncStatusButton, ThemeToggleButton, ThemeMenuGroup } from "./top-bar-status"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { CalendarDays, Zap, Flame, Menu, LogOut } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { MobileNav } from "./mobile-nav"
 import { CalendarMetadataDialog } from "./calendar-metadata-dialog"
 
-// §4 — Top bar stripped to: workspace mark · sync · avatar menu · Quick Add
-// XP, streak, email, theme toggle, logout moved into avatar dropdown
+// P31 (ADR-037), left to right: workspace mark · sync status · theme toggle · avatar menu · Quick Add.
+// Sync is a status (icon when saved, text while syncing, red Retry on error); the toggle shows the
+// rendered scheme. Avatar menu: email · Level/XP/streak · Calendar settings · Theme (System/Light/Dark) · Log out.
 export function TopBar() {
-  const { theme, setTheme } = useTheme()
   const { user } = useAuth()
-  const syncStatus = useAppStore((s) => s.sync.status)
   const profile = useAppStore((s) => s.profile)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false)
 
   return (
+    <TooltipProvider>
     <header className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 md:flex-nowrap md:gap-3 md:px-6 md:py-0">
       {/* Mobile nav sheet */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -51,22 +51,10 @@ export function TopBar() {
 
       <div className="hidden flex-1 md:block" />
 
-      {/* Sync indicator */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 gap-1.5 px-2 text-xs sm:px-3"
-        onClick={() => {
-          if (!user?.uid) return
-          void syncNow(user.uid)
-        }}
-        aria-label={`Sync status: ${syncStatus}`}
-      >
-        <RefreshCcw className={syncStatus === "syncing" ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-        <span className="hidden sm:inline">{syncStatus}</span>
-      </Button>
+      <SyncStatusButton />
+      <ThemeToggleButton />
 
-      {/* Avatar dropdown — contains email, XP/streak, theme toggle, logout */}
+      {/* Avatar dropdown — email, XP/streak, Calendar settings, Theme, logout */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" aria-label="User menu">
@@ -77,12 +65,12 @@ export function TopBar() {
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-60">
           {user?.email ? (
             <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{user.email}</div>
           ) : null}
           <DropdownMenuSeparator />
-          <div className="flex items-center gap-4 px-2 py-2">
+          <div className="flex items-center gap-4 whitespace-nowrap px-2 py-2">
             <div className="text-xs">Level {levelFromXP(profile.xpTotal).level}</div>
             <div className="flex items-center gap-1 text-xs">
               <Zap className="h-3 w-3 text-primary" />
@@ -100,16 +88,9 @@ export function TopBar() {
             }}
           >
             <CalendarDays className="mr-2 h-4 w-4" />
-            Calendar metadata
+            Calendar settings
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? (
-              <Sun className="mr-2 h-4 w-4" />
-            ) : (
-              <Moon className="mr-2 h-4 w-4" />
-            )}
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </DropdownMenuItem>
+          <ThemeMenuGroup />
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
@@ -129,5 +110,6 @@ export function TopBar() {
       {/* Quick add */}
       <QuickAddDialog />
     </header>
+    </TooltipProvider>
   )
 }
