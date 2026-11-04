@@ -2,23 +2,35 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useAppStore } from "@/lib/store"
-import { findCategoryConflict, firstCategory } from "@/lib/categories"
+import { findCategoryConflict, firstCategory, sortCategories, withUsedCategories } from "@/lib/categories"
+import { isValidUrl, normalizeUrl } from "@/lib/url"
+import { toast } from "sonner"
 import { useCategories } from "@/hooks/use-categories"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Pencil, Plus, Settings2, Trash2 } from "lucide-react"
+import { ChevronDown, Pencil, Plus, Settings2, Trash2 } from "lucide-react"
 import type { TaskCategory, TaskRepeat } from "@/lib/types"
 import { TASK_REPEAT_OPTIONS } from "@/lib/task-recurrence"
 
 
+type QuickAddTab = "task" | "goal" | "resource"
+
+/** P31: Quick Add as a split button. The main button opens the Task tab, the chevron picks the tab. */
 export function QuickAddDialog() {
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<QuickAddTab>("task")
+  const returnFocusTo = useRef<HTMLElement | null>(null)
   const addTask = useAppStore((s) => s.addTask)
   const addGoal = useAppStore((s) => s.addGoal)
+  const addResource = useAppStore((s) => s.addResource)
+  const profileCategories = useAppStore((s) => s.profile.taskCategories)
+  const tasks = useAppStore((s) => s.tasks)
+  const resources = useAppStore((s) => s.resources)
   const addCategory = useAppStore((s) => s.addCategory)
   const renameCategory = useAppStore((s) => s.renameCategory)
   const deleteCategory = useAppStore((s) => s.deleteCategory)
@@ -32,6 +44,10 @@ export function QuickAddDialog() {
   const [taskTime, setTaskTime] = useState("")
   const [taskRepeat, setTaskRepeat] = useState<TaskRepeat>("none")
   const [goalTitle, setGoalTitle] = useState("")
+  const [resTitle, setResTitle] = useState("")
+  const [resUrl, setResUrl] = useState("")
+  const [resCategory, setResCategory] = useState("")
+  const [resUrlError, setResUrlError] = useState(false)
 
   const [managingCats, setManagingCats] = useState(false)
   const [newCatName, setNewCatName] = useState("")
@@ -44,6 +60,40 @@ export function QuickAddDialog() {
     [categories, taskCategory]
   )
   const activeGoalCategory = firstCategory(categories)
+  // The Resources module's own category list; "General" when there is none.
+  const resourceCategories = useMemo(() => {
+    const list = sortCategories(withUsedCategories(profileCategories, [...tasks, ...resources]))
+    return list.length > 0 ? list : ["General"]
+  }, [profileCategories, tasks, resources])
+  const activeResCategory = resourceCategories.includes(resCategory) ? resCategory : resourceCategories[0]
+
+  function openWith(next: QuickAddTab, from: HTMLElement | null) {
+    returnFocusTo.current = from
+    setTab(next)
+    setOpen(true)
+  }
+
+  function handleAddResource() {
+    if (!resTitle.trim()) return
+    const url = normalizeUrl(resUrl)
+    if (url && !isValidUrl(url)) {
+      setResUrlError(true)
+      return
+    }
+    addResource({
+      category: activeResCategory,
+      title: resTitle.trim(),
+      url: url || undefined,
+      links: url ? [{ label: "Link", url }] : undefined,
+      description: "",
+      tags: [],
+    })
+    toast.success("Resource added")
+    setResTitle("")
+    setResUrl("")
+    setResUrlError(false)
+    setOpen(false)
+  }
 
   function handleAddTask() {
     if (!taskTitle.trim()) return
@@ -93,21 +143,51 @@ export function QuickAddDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
+    <>
+      <div className="inline-flex">
+        <Button
+          size="sm"
+          className="gap-1.5 rounded-r-none"
+          aria-label="Quick add task"
+          onClick={(e) => openWith("task", e.currentTarget)}
+        >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Quick Add</span>
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              className="rounded-l-none border-l border-primary-foreground/30 px-1.5"
+              aria-label="Choose what to add"
+              onClick={(e) => (returnFocusTo.current = e.currentTarget)}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+            <DropdownMenuItem onSelect={() => openWith("task", returnFocusTo.current)}>Task</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openWith("goal", returnFocusTo.current)}>Goal</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openWith("resource", returnFocusTo.current)}>Resource</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        className="sm:max-w-md"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault()
+          returnFocusTo.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Quick Add</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="task" className="w-full">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as QuickAddTab)} className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="task" className="flex-1">Task</TabsTrigger>
             <TabsTrigger value="goal" className="flex-1">Goal</TabsTrigger>
+            <TabsTrigger value="resource" className="flex-1">Resource</TabsTrigger>
           </TabsList>
 
           <TabsContent value="task" className="mt-4 flex flex-col gap-3">
@@ -241,8 +321,42 @@ export function QuickAddDialog() {
             </div>
             <Button onClick={handleAddGoal}>Add Goal</Button>
           </TabsContent>
+
+          <TabsContent value="resource" className="mt-4 flex flex-col gap-3">
+            <div>
+              <Label htmlFor="resource-title">Resource title</Label>
+              <Input id="resource-title" placeholder="What is it called?" value={resTitle} onChange={(e) => setResTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddResource()} />
+            </div>
+            <div>
+              <Label htmlFor="resource-url">URL (optional)</Label>
+              <Input
+                id="resource-url"
+                type="url"
+                placeholder="example.com/page"
+                value={resUrl}
+                aria-invalid={resUrlError}
+                aria-describedby={resUrlError ? "resource-url-error" : undefined}
+                onChange={(e) => { setResUrl(e.target.value); setResUrlError(false) }}
+                onKeyDown={(e) => e.key === "Enter" && handleAddResource()}
+              />
+              {resUrlError ? <p id="resource-url-error" className="mt-1 text-xs text-destructive">Enter a valid link, for example example.com/page.</p> : null}
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select value={activeResCategory} onValueChange={setResCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {resourceCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleAddResource}>Add Resource</Button>
+          </TabsContent>
         </Tabs>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

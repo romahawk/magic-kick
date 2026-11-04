@@ -1038,7 +1038,7 @@ primitives already in `components/ui`; `next-themes` stays.
    on that tab. The dialog's Tabs become controlled. A new Resource tab: Title (required), URL
    (optional, `type="url"`, validated on submit), Category (existing resource categories, default the
    first); it calls `store.addResource` with the defaults the Resources module uses; Enter submits,
-   toast "Resource added", the dialog stays open and the fields reset. The two buttons are joined
+   toast "Resource added", the dialog closes and the fields reset, as Task and Goal do. The two buttons are joined
    (shared radius, 1 px divider) and are separate Tab stops. Below `sm` only the "+" icon shows
    (aria-label "Quick add task"); the chevron stays.
 4. **Avatar menu order:** email, Level/XP/streak, separator, "Calendar settings" (renamed from
@@ -1060,7 +1060,8 @@ Optional, stated in the PR body: `app/layout.tsx` `defaultTheme` "dark" → "sys
 6. Keyboard: Tab order is sync, theme, avatar, Quick Add, chevron; Esc closes menus and returns focus
    to the trigger; every icon button has an accessible name.
 7. At 390 px the bar fits on one row with no overflow.
-8. axe: 0 violations on the top bar with each menu open.
+8. axe: 0 violations with menus closed; with a menu open, only Radix's `aria-hidden-focus` on the
+   outside triggers is accepted (known upstream; menus stay modal, Roman's ruling 2026-11-04).
 9. `npm test`, typecheck, lint and build pass; the feature PR diff is about 250 lines or less.
 
 **Deferred:** "Note" in Quick Add becomes "Inbox item" once Stage 0 InboxItem ships; a global

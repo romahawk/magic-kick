@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 import { selectResourceBacklinks } from "@/lib/roadmap"
 import { categoryColor, sortCategories, withUsedCategories } from "@/lib/categories"
+import { normalizeUrl } from "@/lib/url"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -295,13 +296,6 @@ export function ResourcesModule() {
     }
     return map
   }, [filtered])
-
-  function normalizeUrl(url: string) {
-    const trimmed = url.trim()
-    if (!trimmed) return ""
-    if (/^https?:\/\//i.test(trimmed)) return trimmed
-    return `https://${trimmed}`
-  }
 
   function addStagedLink() {
     const url = normalizeUrl(newLinkUrl)

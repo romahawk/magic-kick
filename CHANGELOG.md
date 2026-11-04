@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - Quick Add is a split button, with Resources (P31)
+
+### Added
+- Quick Add: a small arrow next to the button opens a menu (Task, Goal, Resource) and opens Quick Add on that tab. The main button still opens Task.
+- Quick Add: a Resource tab with title, an optional link (a bare address like `example.com` gets `https://`) and a category from the ones Resources uses. It adds to Resources straight away, shows "Resource added" and closes, like Task and Goal.
+
+---
+
 ## [Unreleased] - 2026-11-04 - Top bar: theme toggle and sync status (P31)
 
 ### Changed
