@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - ToDo shows dated AIOS items for the week (P33, part 2)
+
+### Added
+- ToDo: a "Dated · from AIOS" box above the board lists the commitments from `dated-commitments.md` for today through Sunday: an "AIOS" badge, the day and time, the title and an "Open link" when there is one. It is read-only (no checkbox) and hidden when there is nothing in range and in the Done view.
+
+---
+
 ## [Unreleased] - 2026-11-04 - Page title and subtitle moved into the top bar (P32)
 
 ### Changed
