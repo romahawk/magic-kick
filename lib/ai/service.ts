@@ -9,6 +9,9 @@ const DEFAULT_TIMEOUT_MS = 30_000
 export interface CallClaudeOptions {
   model?: string
   maxTokens?: number
+  /** Thinking depth for models that take it (ADR-038: "low" for Haiku 5.5). */
+  effort?: "low" | "medium" | "high"
+  timeoutMs?: number
 }
 
 export async function callClaude(
@@ -19,7 +22,7 @@ export async function callClaude(
   if (!anthropic) throw new Error("Anthropic client not initialised — check ANTHROPIC_API_KEY")
   if (messages.length === 0) throw new Error("messages must not be empty")
 
-  const { model = DEFAULT_MODEL, maxTokens = DEFAULT_MAX_TOKENS } = options
+  const { model = DEFAULT_MODEL, maxTokens = DEFAULT_MAX_TOKENS, effort, timeoutMs = DEFAULT_TIMEOUT_MS } = options
 
   const makeRequest = () =>
     anthropic!.messages.create(
@@ -28,8 +31,9 @@ export async function callClaude(
         max_tokens: maxTokens,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages,
+        ...(effort ? { output_config: { effort } } : {}),
       },
-      { timeout: DEFAULT_TIMEOUT_MS }
+      { timeout: timeoutMs }
     )
 
   let response: Awaited<ReturnType<typeof makeRequest>>
