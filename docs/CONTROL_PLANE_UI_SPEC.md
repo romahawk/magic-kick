@@ -1076,47 +1076,49 @@ the top bar (only if it starts changing daily behaviour).
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 
-**Status:** open (2026-11-04; ADR draft first, no feature code until Roman approves it; branch `feat/p19-ai-suggest-canon` after that)
+**Status:** open (2026-11-04; ADR-038 accepted; branch `feat/p19-ai-suggest-canon`)
 
 **Why:** Schedule's "AI Suggest" ranks tasks without knowing what the OS says matters, and it sends
 every task, including tasks of paused, parked or completed projects (open item since 2026-10-06).
 With P7, canon's primary outcomes and lanes are readable on the server, so suggestions can say
 which outcome or lane they serve.
 
-**Shape.** `POST /api/ai/schedule-suggest` calls `fetchCanonFocus()` on the server (not through
-the client, not through `/api/os/canon`) and adds the primary outcomes, the `primary` and
-`protected` lanes, `packGenerated`, `reconciledWithGit` and `stale` to the model input. It
-proposes at most 3 Daily Focus candidates, each with a time block today (Europe/Berlin).
+**Shape (ADR-038, accepted 2026-11-04).** A new route, `POST /api/ai/daily-focus`, calls
+`fetchCanonFocus()` on the server (not through the client, not through `/api/os/canon`) and ranks open
+tasks against the canon's primary outcomes. `schedule-suggest` is untouched; calendar placement stays
+with it. The surface is the Command Center's Suggested list ("Rank with AI"), not a new list.
 
 **Acceptance criteria**
 
-1. **Gate: its own ADR first.** The route is frozen by ADR-017 and ADR-024 §6; an ADR unfreezes
-   it for this change only, records that tasks still come from the client (ADR-017 point 5) and
-   that writes happen client-side on accept only, and states which default of the AI flag holds
-   (since 2026-10-21 `isAiEnabled()` is off unless `NEXT_PUBLIC_AI_FEATURES_ENABLED=true`, as ADR-017 says).
-2. **Canon as context.** With canon `ok` (or stale), the input carries it and the response says
-   `canonUsed: true`. Not configured, missing or error: the route runs as today without canon and
-   returns `canonUsed: false`.
-3. **Inactive projects filtered.** Tasks of projects that are not active (paused, parked,
-   completed) are not sent, the same filter Schedule's unscheduled panel uses (P16).
-4. **At most 3 suggestions,** each a Daily Focus candidate with a time block today that does not
-   overlap `existingBlocks`, a reason of one short line naming the outcome or lane it serves, and
-   no more than `dailyFocusLimit` minus the tasks already in the lane. Existing task ids are
-   preferred; a suggestion for a new task (no `taskId`, a `newTaskTitle`) is allowed and shown as
-   "new task". The shape stays compatible with `ScheduleSuggestion`, adding optional `outcomeRef`
-   and `newTaskTitle`.
-5. **Validated output.** The model's JSON is checked with zod; invalid items (bad times, overlaps,
-   over 3, over the focus limit) are dropped, not repaired.
-6. **Per-item accept and reject, nothing on fetch.** The panel shows "Using canon as of
-   <packGenerated>" or "Canon unavailable". Accept puts the task (created first if new) in the
-   Daily Focus lane and creates the time block through the existing store actions. No accept-all.
-7. **Tests (vitest):** the prompt-input builder with and without canon; the zod filter (bad times,
-   overlaps, more than 3 items, focus limit).
+1. **Gate: ADR-038**, accepted. It unfreezes only this route and fixes the flag, the key, the limits and
+   what is sent to Anthropic.
+2. **Gated on the server.** Flag off or `ANTHROPIC_API_KEY` missing: 404. No token: 401. The action is
+   hidden unless `GET /api/ai/daily-focus` answers `{ available: true }`; nothing errors when hidden.
+3. **Canon required.** `ok` runs; `stale` (the last known copy) runs and says "Based on canon from
+   <fetchedAt>"; `missing`, `not-configured`, `error` without a stale copy, or no outcomes show "Canon
+   unavailable" and make no model call.
+4. **Inputs minimised.** Canon outcomes and, per task, id, title (120 chars), project name, due date and
+   lane only; at most 60 candidates (not completed, active project or none, not already in Daily Focus;
+   overdue first, then due date, then lane). No notes, descriptions, calendar or email. Only the count is
+   logged.
+5. **At most the free Daily Focus slots** (and 3), each an existing task id with a one-line reason tied
+   to a canon outcome. No time blocks, no new tasks.
+6. **Validated output.** zod; an unknown task id, unknown outcome id, duplicate, empty or over-long reason,
+   or over-limit item is dropped, never repaired or shown. Nothing valid left: "No suggestion right now".
+7. **Per-item accept, nothing on fetch.** The list is labelled "AI · from canon" and replaces the
+   rule-based list while it shows; each row has a reason and Accept, which calls
+   `moveTaskToLane(id, "daily-focus")`; "Back to default" restores the rule-based list. No accept-all.
+8. **Limits.** `AI_DAILY_FOCUS_MODEL` (verified `claude-haiku-5-5`), `max_tokens` 600, timeout 15 s, one
+   request in flight per user, a soft cap of 20 calls a day (in memory, resets on a cold start; the
+   Anthropic console spend limit is the hard cap); on the client one request at a time and the action
+   disabled for 30 s after a result.
+9. **Tests (vitest):** the zod parse drops unknown ids; the input builder; the stale-canon path and the
+   unavailable states; the route answers 404 when gated and 401 without a token.
 
 **Out of scope:** other AI routes; server-side loading of tasks from Firestore (ADR-017 point 5
 stays open); writing to the OS (P11).
 
-**Depends on:** P7 `done` (canon read path checked on the deployed app); the ADR in criterion 1.
+**Depends on:** P7 `done` (canon read path checked on the deployed app); ADR-038 (accepted).
 
 ---
 
