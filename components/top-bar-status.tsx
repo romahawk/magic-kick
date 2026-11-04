@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react"
 import { useTheme } from "next-themes"
-import { formatDistanceToNowStrict } from "date-fns"
 import { CloudAlert, CloudCheck, Moon, RefreshCcw, Sun } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { useAuth } from "@/hooks/use-auth"
 import { syncNow } from "@/lib/sync/engine"
 import { cn } from "@/lib/utils"
+import { nextAnnouncement, syncStatusView } from "@/lib/sync-status-view"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -38,25 +38,16 @@ export function SyncStatusButton() {
   useEffect(() => {
     let hadError = useAppStore.getState().sync.status === "error"
     return useAppStore.subscribe((state, prev) => {
-      const next = state.sync.status
-      if (next === prev.sync.status) return
-      if (next === "error") {
-        hadError = true
-        setAnnouncement("Sync failed. Retry available.")
-      } else if (next === "idle" && hadError) {
-        hadError = false
-        setAnnouncement("All changes saved.")
-      }
+      const r = nextAnnouncement(prev.sync.status, state.sync.status, hadError)
+      hadError = r.hadError
+      if (r.message) setAnnouncement(r.message)
     })
   }, [])
 
-  const label =
-    !mounted ? "Sync status"
-    : status === "syncing" ? "Syncing…"
-    : status === "error" ? "Sync failed · Click to retry"
-    : lastSyncedAt
-      ? `All changes saved · ${formatDistanceToNowStrict(lastSyncedAt, { addSuffix: true })} · Click to sync now`
-      : "Not synced yet · Click to sync"
+  // Date.now() is read each render on purpose: the label is refreshed by the tooltip's 60 s tick.
+  // eslint-disable-next-line react-hooks/purity
+  const view = syncStatusView(status, lastSyncedAt, Date.now())
+  const label = mounted ? view.label : "Sync status"
 
   return (
     <>
@@ -65,21 +56,20 @@ export function SyncStatusButton() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-8 gap-1.5 text-xs", status === "idle" ? "w-8" : "w-auto px-2", status === "error" && "text-destructive hover:text-destructive")}
+            className={cn("h-8 gap-1.5 text-xs", view.text ? "w-auto px-2" : "w-8", view.tone === "destructive" && "text-destructive hover:text-destructive")}
             onClick={() => {
               if (user?.uid) void syncNow(user.uid)
             }}
             aria-label={label}
           >
-            {status === "syncing" ? (
+            {view.icon === "syncing" ? (
               <RefreshCcw className="h-4 w-4 motion-safe:animate-spin" />
-            ) : status === "error" ? (
+            ) : view.icon === "error" ? (
               <CloudAlert className="h-4 w-4" />
             ) : (
               <CloudCheck className="h-4 w-4" />
             )}
-            {status === "syncing" ? <span className="hidden sm:inline">Syncing…</span> : null}
-            {status === "error" ? <span>Retry</span> : null}
+            {view.text ? <span className={view.icon === "syncing" ? "hidden sm:inline" : undefined}>{view.text}</span> : null}
           </Button>
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
