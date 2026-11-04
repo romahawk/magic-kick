@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - Schedule: day header lines up with the grid, AIOS all-day items in their own row (P33, part 1)
+
+### Fixed
+- Schedule: the day names and dates at the top now line up exactly with the hour columns below. A long all-day item used to widen its day (Friday) past the columns underneath.
+
+### Changed
+- Schedule: all-day items from AI-Business-OS sit in a thin "All-day" row under the day names instead of inside the header. Each day shows one short item and "+N" for more; click it to see the full list and a link to the source file (read-only).
+
+---
+
 ## [Unreleased] - 2026-11-04 - Quick Add is a split button, with Resources (P31)
 
 ### Added
