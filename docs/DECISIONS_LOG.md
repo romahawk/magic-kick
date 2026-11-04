@@ -1396,3 +1396,99 @@ OS `DEC-2026-09-24-001` (WIP = 1).
 - **Rollback:** revert the P31 PR. No data impact.
 
 **Revisit trigger:** a global Quick Add shortcut is wanted, or Inbox items ship.
+
+---
+
+## ADR-038: AI proposes Daily Focus from canon, per-item accept, server-side only (P19)
+
+**Date:** 2026-11-04
+**Status:** Proposed (draft for Roman; not in force until he approves it)
+**Amends:** ADR-017 (AI routes parked and frozen), ADR-024 §6 (freeze list). Relates to ADR-017 point 5
+(client-supplied state), P7 (canon read path), P19 in `docs/CONTROL_PLANE_UI_SPEC.md`.
+
+(Numbered 038: ADR-017 is the existing "drifted AI routes" decision.)
+
+### Context
+
+The AI routes are parked behind `isAiEnabled()` (default off) and frozen. P19 wants one narrow, useful
+case: given what the OS canon says matters this week, propose which open tasks belong in Daily Focus.
+The OS canon (primary outcomes) is readable on the server since P7. `ANTHROPIC_API_KEY` is set by Roman
+in Vercel (Production and Preview) and in `.env.local`; it is never read or printed by an agent.
+
+### Decision
+
+1. **Unfreeze for this one change only.** One route, `POST /api/ai/daily-focus` (plus a `GET` on the
+   same path, point 2), authorised by this ADR. The existing `schedule-suggest` route and every other
+   AI route stay as they are. (Alternative in "Open questions": extend `schedule-suggest`.)
+2. **Flag, off by default.** The feature runs only when `isAiEnabled()` is on **and** `ANTHROPIC_API_KEY`
+   is present on the server. If either is missing the button is hidden and nothing errors. The browser
+   cannot see the key, so an authenticated `GET /api/ai/daily-focus` answers `{ available: boolean }`
+   (flag on and key present; never the key); the button shows only when it says `true`.
+3. **Human approval, per item.** The model proposes at most `min(dailyFocusLimit − tasks already in the
+   Daily Focus lane, dailyFocusLimit)` tasks, each with a one-line reason tied to a canon outcome.
+   Nothing is written on fetch. Each suggestion has Accept and Reject; no accept-all. **Accept calls the
+   existing `moveTaskToLane(taskId, "daily-focus")`; there is no new write path** and the server writes
+   nothing (to Firestore or to the OS).
+4. **Inputs, minimised.** Sent to the model: the canon outcome titles and ids, and for open tasks of
+   active projects only: `id`, `title` (cut to 120 characters), project name, `dueDate`, `lane`; at most
+   100 tasks. **Not sent:** task notes or descriptions, subtasks, calendar events or busy blocks, email,
+   journal, goals, anything from Gmail, Calendar or Drive. Tasks of paused, parked or completed projects
+   and tasks already done are not sent.
+5. **Canon is required.** If canon is not `ok` or stale, there is nothing to tie a reason to: no model call
+   is made and the panel says "Canon unavailable". A stale canon is used and labelled "Using canon as of
+   <packGenerated>".
+6. **Server side only.** The route reads the key from `process.env`; it never appears in client bundles
+   (`lib/ai/client.ts` stays server-only). Requests are authenticated with a Firebase ID token through
+   `verifyFirebaseToken`, as the existing routes do.
+7. **Output, validated.** The model answers JSON, checked with zod:
+   `{ suggestions: [{ taskId, outcomeId, reason }] }`. Dropped, never shown: a `taskId` not in the
+   request's input set, an `outcomeId` not in the canon outcomes, a task already in Daily Focus, a
+   duplicate, a reason over 120 characters or empty, anything beyond the count limit. No repair.
+8. **Limits.** Model: one constant in the route (proposal: `claude-haiku-5-5`, a narrow structured task;
+   alternative `claude-sonnet-5-5`; the existing service default is `claude-sonnet-4-6`). `max_tokens` 600.
+   Timeout 15 s. One in-flight request per user. A daily cap of 20 calls per user.
+9. **Failure.** Timeout, an API error or no valid suggestion left shows "No suggestion right now"; nothing
+   changes. Prompts and task text are not logged; only model, counts and outcome.
+10. **No-trust note (ADR-017 point 5).** Tasks still come from the client; the route cannot verify them
+    against Firestore. This is acceptable here because the route only ranks ids it was given, validates its
+    output against that same set, and writes nothing; Accept runs on the client against the store, which
+    ignores an unknown id.
+
+### Open questions (Roman to rule before approval)
+
+- **Q1. New route or extend `schedule-suggest`?** Proposed: new route. `schedule-suggest` returns time slots
+  (`dayOfWeek`, `startTime`); Daily Focus candidates have none (point 4 sends no calendar content), so
+  extending it would change its contract.
+- **Q2. Daily cap storage.** Proposed: an in-memory counter per server instance (a soft cap) plus a spend
+  limit set in the Anthropic console (the hard cap). A durable cap needs a new Firestore collection and
+  rules, which is more than this item. In-memory counters reset on a cold start and are per instance.
+- **Q3. Where does the button live?** Proposed: the Daily Focus lane's "Suggested" area in ToDo (the
+  suggestion is a lane move, with no time block), not Schedule's toolbar.
+- **Q4. Model.** Point 8's proposal.
+
+### Spec changes on approval (P19 acceptance criteria)
+
+- Criterion 2: canon becomes required (point 5), not optional.
+- Criterion 4: no time block, no `newTaskTitle` suggestions (ids must exist), at most the remaining
+  Daily Focus slots.
+- Criterion 6: Accept is `moveTaskToLane`, with no time block created.
+- Criterion 1 is met by this ADR; criterion 3 (inactive projects filtered) is point 4.
+
+### Rejected alternatives
+
+- **Auto-applying suggestions:** removes the human decision; the lane limit and review habit exist for it.
+- **Client-side model calls:** puts the key in the browser bundle.
+- **Sending full task notes, calendar or email:** not needed to rank by outcome; data minimisation.
+- **Repairing invalid model output:** hides model errors and can attach a reason to the wrong task.
+- **A durable per-user cap in Firestore now:** a new collection and rules for a single-user prototype.
+
+### Consequences
+
+- AI stays off by default; production behaviour is unchanged until the flag is turned on and a key exists.
+- One new route and one new client surface; no schema, store, rules or sync change; no new dependency
+  (`zod` and `@anthropic-ai/sdk` are already in `package.json`).
+- **Rollback:** turn the flag off (a redeploy, since `NEXT_PUBLIC_*` is inlined at build) or remove the
+  key; or revert the PR. No data migration, no data impact.
+
+**Revisit trigger:** a second AI surface is wanted, tasks should load server-side (ADR-017 point 5), or
+real usage hits the cap.
