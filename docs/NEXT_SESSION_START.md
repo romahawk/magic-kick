@@ -14,11 +14,13 @@
 ## Start here
 
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
-2. **P19 (AI Suggest proposes Daily Focus from canon) is `open`** and is the only open item. **No feature
-   code until Roman approves its ADR** (a draft PR adds it to `docs/DECISIONS_LOG.md` as "Proposed"). After
-   approval: branch `feat/p19-ai-suggest-canon` from `origin/main`. `ANTHROPIC_API_KEY` is set by Roman in
-   Vercel (Production + Preview) and in `.env.local` (presence in `.env.local` confirmed 2026-11-04; Vercel
-   not checked; the value is never read or printed).
+2. **P19 (AI ranks Daily Focus from canon) is `open`** and is the only open item. **ADR-038 is accepted**
+   (Roman, 2026-11-04): new route `POST /api/ai/daily-focus` (404 when the flag is off or the key is
+   missing, 401 without a token), surface = "Rank with AI" in the Command Center Suggested list, Accept =
+   `moveTaskToLane`, model from `AI_DAILY_FOCUS_MODEL` (verified `claude-haiku-5-5`). Branch
+   `feat/p19-ai-suggest-canon` from `origin/main`; split route+lib and UI into two PRs if over ~250 lines.
+   `ANTHROPIC_API_KEY` is set by Roman in Vercel (Production + Preview) and `.env.local` (presence in
+   `.env.local` confirmed 2026-11-04; Vercel not checked; the value is never read or printed).
 3. **Done on 2026-11-04:** the Schedule header BUG (#196), P32 page header in the top bar (#197), P33 all-day
    lane (#196) and ToDo "Dated · from AIOS" group (#198). **P32 gap:** modules that keep an action row
    (Goals, Journal, Projects, Resources, Schedule) gain less than the 60 px criterion; moving their buttons
