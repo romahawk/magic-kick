@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useState, useMemo } from "react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -448,15 +449,14 @@ export function ResourcesModule() {
     })
   }
 
+  usePageHeader({
+    title: "Resources",
+    subtitle: `${resources.length} ${resources.length === 1 ? "resource" : "resources"} · links open in a new tab`,
+  })
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight">Resources</h1>
-          <p className="text-sm text-muted-foreground">
-            {resources.length} {resources.length === 1 ? "resource" : "resources"} · links open in a new tab
-          </p>
-        </div>
+      <div className="flex items-start justify-end">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">

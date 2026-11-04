@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - Page title and subtitle moved into the top bar (P32)
+
+### Changed
+- Every module's title (and subtitle) now shows in the top bar instead of a header row inside the page. The browser tab names the module ("Schedule · Magic Kick"). On a phone the title replaces the "Magic Kick" mark and the subtitle is hidden.
+- Schedule: the subtitle reads "Nov 2 – 8, 2026 · Week 45"; the "Click a slot to add · drag to move · drag edge to resize" hint is behind a (?) icon next to the title. The toolbar stays as one row.
+- Goals, Journal, Projects and Resources keep their action buttons (right-aligned) where the header row was.
+
+---
+
 ## [Unreleased] - 2026-11-04 - Schedule: day header lines up with the grid, AIOS all-day items in their own row (P33, part 1)
 
 ### Fixed

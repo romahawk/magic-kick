@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useEffect, useMemo, useState } from "react"
 import { differenceInCalendarDays, endOfWeek, format, isSameMonth, isTomorrow, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
@@ -343,10 +344,10 @@ export function TodoModule() {
     </aside>
   )
 
+  usePageHeader({ title: "ToDo" })
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-serif text-2xl font-bold tracking-tight">ToDo</h1>
-
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="order-2 min-w-0 flex-1 xl:order-1">
           {scope === "done" ? (

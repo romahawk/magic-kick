@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useMemo, useState } from "react"
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns"
 import { useAppStore } from "@/lib/store"
@@ -220,11 +221,12 @@ export function ProjectsModule() {
     setOpen(false)
   }
 
+  usePageHeader({ title: "Projects" })
+
   return (
     <div className="flex flex-col gap-4">
       {/* §1 — Header: title + CTA on one line */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl font-bold tracking-tight">Projects</h1>
+      <div className="flex items-center justify-end">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5" onClick={openCreateDialog}>

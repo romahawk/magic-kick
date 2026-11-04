@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useEffect, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { useAuth } from "@/hooks/use-auth"
@@ -103,13 +104,11 @@ export function JournalModule() {
     })
   }
 
+  usePageHeader({ title: "Journal", subtitle: "Your closed days, as committed to the OS." })
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight">Journal</h1>
-          <p className="text-sm text-muted-foreground">Your closed days, as committed to the OS.</p>
-        </div>
+      <div className="flex items-start justify-end gap-3">
         <Button size="sm" className="gap-1.5" onClick={() => setClosingDay(true)}>
           <MoonStar className="h-4 w-4" /> Close day
         </Button>
