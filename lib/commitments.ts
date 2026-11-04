@@ -232,3 +232,20 @@ export function overlapsCommitment(
     return range !== null && startMin < range.endMin && endMin > range.startMin
   })
 }
+
+/** Rows from `fromISO` through `toISO` inclusive, by date, then all-day first, then start time. */
+export function commitmentsInRange(
+  commitments: readonly DatedCommitment[],
+  fromISO: string,
+  toISO: string
+): DatedCommitment[] {
+  return commitments
+    .filter((entry) => entry.date >= fromISO && entry.date <= toISO)
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        Number(b.allDay) - Number(a.allDay) ||
+        (a.start ?? "").localeCompare(b.start ?? "") ||
+        a.title.localeCompare(b.title)
+    )
+}

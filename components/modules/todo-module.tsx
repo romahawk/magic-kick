@@ -14,13 +14,15 @@ import { sourceLabel } from "@/lib/provenance"
 import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
 import { useCategories } from "@/hooks/use-categories"
+import { useOsCommitments } from "@/hooks/use-os-commitments"
+import { commitmentsInRange, type DatedCommitment } from "@/lib/commitments"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 import { SuggestedFocusList } from "@/components/modules/attention-block"
 import { FiltersPopover, InlineSearch, ProjectFilterList, ScopeSwitch, useStoredProjectFilter } from "@/components/modules/task-filters"
-import { ChevronDown, PanelRightClose, PanelRightOpen } from "lucide-react"
+import { ChevronDown, ExternalLink, PanelRightClose, PanelRightOpen } from "lucide-react"
 import type { Project, Task, TaskLane } from "@/lib/types"
 
 const TASK_LANES: Array<{ id: TaskLane; title: string; description: string }> = [
@@ -290,6 +292,12 @@ export function TodoModule() {
   const showProject = projectFilter === "all" || projectFilter === "other"
   const filtersActive = Boolean(needle) || activeCategories.length > 0 || projectFilter !== "all"
   const todayISO = localDateISO()
+  // P33: today through the end of the week, from AI-Business-OS. Read-only, never stored.
+  const commitments = useOsCommitments()
+  const datedFromAios = useMemo(
+    () => commitmentsInRange(commitments, todayISO, localDateISO(endOfWeek(new Date(), { weekStartsOn: 1 }))),
+    [commitments, todayISO]
+  )
 
   const sidebar = (
     <aside className="rounded-xl border bg-card xl:sticky xl:top-4" aria-label="Task filters">
@@ -350,6 +358,7 @@ export function TodoModule() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="order-2 min-w-0 flex-1 xl:order-1">
+          {scope !== "done" ? <DatedFromAios entries={datedFromAios} todayISO={todayISO} /> : null}
           {scope === "done" ? (
             <DoneView
               groups={doneGroups}
@@ -425,6 +434,37 @@ export function TodoModule() {
         onClose={() => setSelectedTaskId(null)}
       />
     </div>
+  )
+}
+
+// ── Dated · from AIOS (P33): read-only, no checkbox, changed in dated-commitments.md ──
+
+function DatedFromAios({ entries, todayISO }: { entries: DatedCommitment[]; todayISO: string }) {
+  if (entries.length === 0) return null
+  return (
+    <section aria-label="Dated, from AIOS" className="mb-4 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
+      <h2 className="mb-2 text-sm font-semibold">Dated · from AIOS</h2>
+      <ul className="flex flex-col gap-1.5">
+        {entries.map((entry) => (
+          <li key={entry.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <Badge variant="outline" className="border-violet-500/60 px-1.5 text-[10px] font-semibold uppercase text-violet-700 dark:text-violet-300">AIOS</Badge>
+            <span className="shrink-0 whitespace-nowrap text-xs tabular-nums sm:w-40 text-muted-foreground">
+              {entry.date === todayISO ? "Today" : format(parseISO(`${entry.date}T12:00:00`), "EEE, MMM d")}
+              {entry.start ? ` · ${entry.start}` : ""}
+            </span>
+            <span className="min-w-0 basis-full sm:flex-1 sm:basis-0 sm:truncate" title={entry.title}>{entry.title}</span>
+            {entry.link ? (
+              <a href={entry.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-xs underline underline-offset-2">
+                Open link
+                <ExternalLink className="h-2.5 w-2.5" aria-hidden="true" />
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">Change in AIOS: dated-commitments.md</p>
+    </section>
   )
 }
 

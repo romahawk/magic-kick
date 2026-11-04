@@ -3,6 +3,7 @@ import {
   buildCommitmentsResult,
   commitmentRange,
   commitmentsForDate,
+  commitmentsInRange,
   overlapsCommitment,
   parseDatedCommitments,
 } from "./commitments"
@@ -126,5 +127,27 @@ describe("commitmentsForDate and overlapsCommitment", () => {
     expect(overlapsCommitment(commitments, "2026-11-04", "15:15", "16:00")).toBe(true)
     expect(overlapsCommitment(commitments, "2026-11-04", "15:30", "16:00")).toBe(false)
     expect(overlapsCommitment(commitments, "2026-11-06", "11:00", "12:00")).toBe(false)
+  })
+})
+
+describe("commitmentsInRange", () => {
+  const row = (date: string, start: string | null, title: string) => ({
+    id: `${date}${start}${title}`, date, start, end: null, allDay: start === null, title, link: null, lane: "",
+  })
+  const rows = [
+    row("2026-11-03", "09:00", "past"),
+    row("2026-11-06", "10:00", "timed"),
+    row("2026-11-06", null, "all day"),
+    row("2026-11-04", "08:00", "today"),
+    row("2026-11-08", "18:00", "last day"),
+    row("2026-11-09", "09:00", "next week"),
+  ]
+  it("keeps today through the end of the week, inclusive, and sorts", () => {
+    expect(commitmentsInRange(rows, "2026-11-04", "2026-11-08").map((r) => r.title)).toEqual([
+      "today", "all day", "timed", "last day",
+    ])
+  })
+  it("is empty when nothing falls in range", () => {
+    expect(commitmentsInRange(rows, "2026-12-01", "2026-12-07")).toEqual([])
   })
 })
