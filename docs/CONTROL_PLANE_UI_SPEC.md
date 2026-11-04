@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, ADR-036, ADR-037, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P30 → P31 → P19 → BUG (Schedule header) → P32 → P33 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, ADR-036, ADR-037, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P30 → P31 → BUG (Schedule header) → P32 → P33 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -56,8 +56,8 @@ landing PR (#172) and his real-data check: an exception to WIP = 1 he approved f
 P22 was added on 2026-10-18 by Roman, straight after P21 and stacked on it (same file).
 P27 was added on 2026-10-19 by Roman and opened straight away, ranked before P25 (nothing was `open`).
 P31 was added on 2026-11-04 by Roman, ranked ahead of P19 on purpose (ADR-037): P19 stays next after it.
-The Schedule header BUG, P32 and P33 were queued on 2026-11-04 by Roman, in that order, after P19
-(his ruling kept P19 next after P31). None starts before Roman opens it.
+The Schedule header BUG, P32 and P33 were queued on 2026-11-04 by Roman and he opened them the same day,
+ahead of P19, in that order. All three are `done`; P19 was opened afterwards (2026-11-04), gated on its ADR.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -1076,7 +1076,7 @@ the top bar (only if it starts changing daily behaviour).
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 
-**Status:** queued
+**Status:** open (2026-11-04; ADR draft first, no feature code until Roman approves it; branch `feat/p19-ai-suggest-canon` after that)
 
 **Why:** Schedule's "AI Suggest" ranks tasks without knowing what the OS says matters, and it sends
 every task, including tasks of paused, parked or completed projects (open item since 2026-10-06).
@@ -1139,7 +1139,7 @@ and without chips.
 
 ### P32 — Page header in the top bar (all modules) · M
 
-**Status:** open (2026-11-04, `feat/p32-page-header-top-bar`; Roman opened it ahead of P19)
+**Status:** done (2026-11-04, #197; the Goals, Journal, Projects, Resources and Schedule action rows stay, so those modules gain less than the 60 px criterion)
 
 **Shape.**
 - A PageHeader context (title, subtitle, optional help text) set by each module through
@@ -1160,7 +1160,7 @@ space; no layout shift on module switch.
 
 ### P33 — AIOS commitments: all-day lane and a ToDo group · S
 
-**Status:** queued (the Schedule all-day lane shipped in #196; the ToDo "Dated · from AIOS" group remains)
+**Status:** done (2026-11-04, #196 the Schedule all-day lane, #198 the ToDo "Dated · from AIOS" group)
 
 **Shape.**
 - Schedule: all-day commitments move out of the day header into one fixed-height (28 px) "All-day" lane
