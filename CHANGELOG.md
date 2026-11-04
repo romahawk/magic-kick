@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - Top bar: theme toggle and sync status (P31)
+
+### Changed
+- Top bar: the theme toggle is back in the bar, between sync and your avatar. It shows the colour scheme you are looking at (sun in light, moon in dark). One click switches; clicking again returns to "follow the system" when that matches your computer's setting. The old menu item sometimes switched to the scheme already shown.
+- Top bar: sync is a status, not a word. A cloud-check icon means all changes are saved (hover for when); "Syncing…" shows while it runs; a red "Retry" shows if it failed. Click any of them to sync now. Screen readers hear the failure and the recovery once each.
+- Avatar menu: "Calendar metadata" is now "Calendar settings", and Theme is a choice of System (with "currently light/dark"), Light or Dark.
+
+---
+
 ## [Unreleased] - 2026-11-03 - Deleted tasks no longer leave blocks on Schedule
 
 ### Fixed
