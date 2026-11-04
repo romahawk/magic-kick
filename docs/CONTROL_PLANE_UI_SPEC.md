@@ -39,7 +39,7 @@ that standard, not against general UI quality.
 
 Each item is independently shippable. Effort: S ≈ one session, M ≈ two, L ≈ more.
 
-**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, ADR-036, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P30 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
+**Working order (ADR-024, ADR-025, ADR-027, ADR-028, ADR-029, ADR-035, ADR-036, ADR-037, OS `DEC-2026-10-03-001`):** P1 → P12 → P13 → P2 → P3 → P14 → P16 → P17 → P18 → P7 → P11 → P20 → P21 → P22 → P23 → P24 → P26 → P27 → P25 → P28 → P29 → P30 → P31 → P19 → P15 → P8 → P6 → P10 → P9 → P4 → P5.
 Numbers are identifiers, not rank; this line is the rank. One item is `open` at a time.
 ADR-023's exception (P8 before P7 while P7 is blocked) is superseded by ADR-024.
 P13 was added on 2026-10-05 by Roman, ranked straight after P1. On 2026-10-05 Roman moved P2 ahead of
@@ -55,6 +55,7 @@ P21 was added on 2026-10-18 by Roman, ranked after P20, and opened while P20 wai
 landing PR (#172) and his real-data check: an exception to WIP = 1 he approved for one UI-only PR.
 P22 was added on 2026-10-18 by Roman, straight after P21 and stacked on it (same file).
 P27 was added on 2026-10-19 by Roman and opened straight away, ranked before P25 (nothing was `open`).
+P31 was added on 2026-11-04 by Roman, ranked ahead of P19 on purpose (ADR-037): P19 stays next after it.
 
 **Status line — the machine-readable field.** Every item carries `**Status:** <value>` from this
 vocabulary, and it is the only thing to edit when an item moves:
@@ -904,7 +905,7 @@ selects every shown row. Each action shows a toast with Undo, and the selection 
 
 ### P28 — ToDo with Schedule's filter sidebar · S
 
-**Status:** open (2026-10-21, `feat/p28-todo-sidebar`)
+**Status:** done (2026-10-21, #187 sidebar and rows, #188 allocation bar)
 
 **Why:** ToDo said everything twice (three summary cards repeated each lane's name, description and
 count above the lanes), had a full-width toolbar with no project filter, and showed every open task
@@ -949,7 +950,7 @@ colour; the text reads "4/6h", then "✓1.5 · 4/6h". The Review tab keeps readi
 
 ### P29 — Resources as a scannable list · S
 
-**Status:** open (2026-11-02, `feat/p29-resources-ui`)
+**Status:** done (2026-11-02, #190)
 
 **Why:** Resources hid what it exists for. A card showed only a title until expanded, so the links
 sat two clicks away; edit and delete were faint hover icons; and the category and tag filters used
@@ -981,7 +982,7 @@ dialog only (the drag inside the expanded card is gone).
 
 ### P30 — Schedule reads dated commitments from AIOS · S
 
-**Status:** open (2026-11-03, `feat/p30-dated-commitments`)
+**Status:** done (2026-11-03, #191; #192 fixed orphaned blocks after a task delete)
 
 **Why:** Calls and deadlines the team already knows about (OS `01_CONTEXT/dated-commitments.md`,
 kept by Vincent) had to be typed into Schedule by hand. Roman asked on 2026-11-03 for Magic Kick to
@@ -1006,6 +1007,69 @@ scheduled" lists today's rows as `HH:MM title` with the link. Missing or failing
    failure shows nothing and does not crash.
 6. Parser tests cover valid, all-day, missing end, bad date, empty table and missing file; `npm test`,
    lint and build pass.
+
+### P31 — Top bar UX v2 · S
+
+**Status:** open (2026-11-04, `feat/p31-top-bar-v2`)
+
+**Why:** The top bar's sync button says "idle" and does nothing a person can read; the theme control
+sits inside the avatar menu and compares `theme` (which can be `"system"`) instead of the rendered
+scheme, so it can flip to the colour already shown; and Quick Add cannot add a Resource without
+leaving the dialog's two tabs. Roman asked on 2026-11-04 for a v2 that supersedes the §4 note in
+`components/top-bar.tsx`. See ADR-037.
+
+**Shape.** UI only: no schema, store, rules or sync-engine change, no new dependency; shadcn
+primitives already in `components/ui`; `next-themes` stays.
+1. **Theme toggle** between sync and avatar: an icon button showing the rendered scheme
+   (`resolvedTheme`: Sun in light, Moon in dark), aria-label and Tooltip "Switch to dark theme" /
+   "Switch to light theme". Click sets `target = resolvedTheme === "dark" ? "light" : "dark"`, then
+   `setTheme(target === systemTheme ? "system" : target)`; it never compares against `theme`. A
+   same-size placeholder renders until mounted (no hydration mismatch). The avatar menu gets a
+   "Theme" radio group: System ("· currently light/dark") / Light / Dark.
+2. **Sync status** replaces the "idle" button (same ghost icon button, still `syncNow(user.uid)`):
+   idle = CloudCheck icon, Tooltip "All changes saved · <relative lastSyncedAt> · Click to sync now"
+   (or "Not synced yet · Click to sync"); syncing = spinning RefreshCcw (`motion-safe:animate-spin`)
+   and "Syncing…" from `sm`; error = CloudAlert in `text-destructive` and a "Retry" label, always
+   visible. aria-label mirrors the tooltip. One visually hidden `aria-live="polite"` span announces
+   only transitions into "error" and back to "saved". The relative time refreshes every 60 s only
+   while the tooltip is open or the button is focused or hovered; no always-on interval.
+3. **Quick Add as a split button:** the primary "+ Quick Add" opens the dialog on Task; an attached
+   chevron (aria-label "Choose what to add") opens a menu Task / Goal / Resource that opens the dialog
+   on that tab. The dialog's Tabs become controlled. A new Resource tab: Title (required), URL
+   (optional, `type="url"`, validated on submit), Category (existing resource categories, default the
+   first); it calls `store.addResource` with the defaults the Resources module uses; Enter submits,
+   toast "Resource added", the dialog stays open and the fields reset. The two buttons are joined
+   (shared radius, 1 px divider) and are separate Tab stops. Below `sm` only the "+" icon shows
+   (aria-label "Quick add task"); the chevron stays.
+4. **Avatar menu order:** email, Level/XP/streak, separator, "Calendar settings" (renamed from
+   "Calendar metadata"), the Theme radio group, separator, Log out (destructive). The header comment
+   of `top-bar.tsx` describes the new layout.
+
+The theme-toggle bug (comparing `theme`, not `resolvedTheme`) is fixed here, not as a separate item.
+Optional, stated in the PR body: `app/layout.tsx` `defaultTheme` "dark" → "system".
+
+**Acceptance criteria:**
+1. With the OS in dark and no stored choice the bar shows a Moon; one click gives light; a second click
+   returns to `system` (localStorage `theme` is `system`), not `dark`.
+2. The theme menu checks the right item and shows "currently <scheme>" for System.
+3. No hydration warning in the console on a hard reload, in either theme.
+4. Sync: saved shows the icon only; syncing shows text; error shows a red "Retry"; a click calls
+   `syncNow`; a screen reader hears error and recovered once each.
+5. Quick Add: the main button opens Task; chevron then Resource opens the Resource tab; a saved
+   resource appears in Resources without a reload.
+6. Keyboard: Tab order is sync, theme, avatar, Quick Add, chevron; Esc closes menus and returns focus
+   to the trigger; every icon button has an accessible name.
+7. At 390 px the bar fits on one row with no overflow.
+8. axe: 0 violations on the top bar with each menu open.
+9. `npm test`, typecheck, lint and build pass; the feature PR diff is about 250 lines or less.
+
+**Deferred:** "Note" in Quick Add becomes "Inbox item" once Stage 0 InboxItem ships; a global
+keyboard shortcut for Quick Add (one that does not clash with Ctrl+B for the sidebar); the streak in
+the top bar (only if it starts changing daily behaviour).
+
+**Rollback:** revert the PR. No data impact.
+
+---
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 

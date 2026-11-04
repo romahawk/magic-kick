@@ -1365,3 +1365,34 @@ only source of dated commitments". Magic Kick can show it without Roman entering
 
 **Revisit trigger:** the file's columns change, commitments need a reminder or status, or "Next free
 slot" lands on one in practice.
+
+---
+
+## ADR-037: Top bar UX v2: theme toggle back in the bar, sync as status, split Quick Add (P31)
+
+**Date:** 2026-11-04
+**Status:** Accepted (Roman's ruling of 2026-11-04)
+**Relates to:** ADR-024 §5 (9-module ceiling), the §4 note in `components/top-bar.tsx` (superseded),
+OS `DEC-2026-09-24-001` (WIP = 1).
+
+### Decision
+
+1. **Theme toggle returns to the top bar**, between sync and the avatar, as an icon showing the
+   rendered scheme (`resolvedTheme`). A click picks the opposite scheme and stores `"system"` when that
+   equals the OS scheme. The avatar menu keeps a System / Light / Dark radio group.
+2. **Sync is shown as a status**, not a mode button: saved is an icon, syncing and error carry text,
+   and only transitions into error and back to saved are announced to screen readers.
+3. **Quick Add is a split button** (Task / Goal / Resource). The Resource tab reuses the Resources
+   module through `store.addResource`; it adds no module, so the 9-module ceiling holds.
+4. **"Note" is deferred** to an Inbox item (Stage 0 InboxItem).
+5. **Ordering:** P31 is ranked ahead of P19 by Roman's ruling. P19 stays the next item after P31; it
+   still needs its own ADR and `ANTHROPIC_API_KEY` (ADR-017).
+6. P31 is a roadmap item, not a bug fix. The old toggle compared `theme`, which can be `"system"`; the
+   fix is part of P31.
+
+### Consequences
+
+- UI only: no schema, store, rules, sync-engine or dependency change.
+- **Rollback:** revert the P31 PR. No data impact.
+
+**Revisit trigger:** a global Quick Add shortcut is wanted, or Inbox items ship.
