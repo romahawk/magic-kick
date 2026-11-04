@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useAppStore } from "@/lib/store"
 import { levelFromXP } from "@/lib/game-utils"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,13 +23,10 @@ export function AchievementsModule() {
   const unlocked = achievements.filter((a) => a.unlocked)
   const locked = achievements.filter((a) => !a.unlocked)
 
+  usePageHeader({ title: "Achievements", subtitle: "Achievements unlock automatically as you use Magic Kick." })
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-serif text-2xl font-bold tracking-tight">Achievements</h1>
-        <p className="text-sm text-muted-foreground">Achievements unlock automatically as you use Magic Kick.</p>
-      </div>
-
       <Card className="border-none bg-primary/10">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">

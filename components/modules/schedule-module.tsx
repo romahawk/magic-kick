@@ -1,5 +1,7 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
+import { dayLabel, weekRangeLabel } from "@/lib/date-range-label"
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { addDays, format, getISOWeek, parseISO } from "date-fns"
 import { useAppStore } from "@/lib/store"
@@ -574,11 +576,12 @@ export function ScheduleModule() {
     else gridScrollRef.current?.focus()
   }
 
-  const visibleDateLabel =
-    view === "week"
-      ? `${format(parseISO(`${weekDays[0].iso}T12:00:00`), "MMM d")} - ${format(parseISO(`${weekDays[6].iso}T12:00:00`), "MMM d, yyyy")}`
-      : format(parseISO(`${selectedDateISO}T12:00:00`), "EEE, MMM d, yyyy")
   const visibleWeekNumber = getISOWeek(parseISO(`${weekStartISO}T12:00:00`))
+  usePageHeader({
+    title: "Schedule",
+    subtitle: view === "week" ? weekRangeLabel(weekDays[0].iso, weekDays[6].iso) : dayLabel(selectedDateISO),
+    help: "Click a slot to add · drag to move · drag edge to resize",
+  })
 
   function shiftSelection(days: number) {
     setSelectedDateISO((current) => format(addDays(parseISO(`${current}T00:00:00`), days), "yyyy-MM-dd"))
@@ -799,12 +802,7 @@ export function ScheduleModule() {
 
   return (
     <div className="flex h-full flex-col gap-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-        <div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-sm text-muted-foreground">{visibleDateLabel}</p>
-          <p className="text-sm text-muted-foreground">Click a slot to add · drag to move · drag edge to resize</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3 pb-3">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => shiftSelection(view === "week" ? -7 : -1)} aria-label={view === "week" ? "Previous week" : "Previous day"}>
             <ChevronLeft className="h-4 w-4" />

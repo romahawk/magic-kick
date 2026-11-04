@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useMemo, useState } from "react"
 import { useAppStore } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -162,13 +163,11 @@ export function GoalsModule() {
     setIsEditing(false)
   }
 
+  usePageHeader({ title: "Goals", subtitle: "Stay focused on what matters most." })
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight">Goals</h1>
-          <p className="text-sm text-muted-foreground">Stay focused on what matters most.</p>
-        </div>
+      <div className="flex flex-wrap items-start justify-end gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
             <DialogTrigger asChild>

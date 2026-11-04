@@ -1,5 +1,6 @@
 "use client"
 
+import { usePageHeader } from "@/lib/page-header"
 import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import type { Dispatch, SetStateAction } from "react"
@@ -195,17 +196,15 @@ export function CommandCenter() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  usePageHeader({
+    title: "Command Center",
+    subtitle: activePlan
+      ? `Execute the week you committed to, ${profile.name}.`
+      : "Set your weekly plan before the week decides itself for you.",
+  })
+
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="font-serif text-2xl font-bold tracking-tight">Command Center</h1>
-        <p className="text-sm text-muted-foreground">
-          {activePlan
-            ? `Execute the week you committed to, ${profile.name}.`
-            : "Set your weekly plan before the week decides itself for you."}
-        </p>
-      </div>
-
       <AttentionBlock onOpenTab={(next) => switchTab(next, true)} />
 
       <Tabs value={tab} onValueChange={(next) => switchTab(next)} className="w-full">
