@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { format, isToday, parseISO } from "date-fns"
-import { CalendarPlus, ChevronRight, ExternalLink, GripVertical, MoonStar, Plus } from "lucide-react"
+import { CalendarPlus, ChevronRight, ExternalLink, GripVertical, MoonStar, Plus, Sparkles } from "lucide-react"
 import { CloseDayDialog } from "@/components/close-day-dialog"
 import { useAppStore } from "@/lib/store"
 import { isOverdue } from "@/lib/game-utils"
@@ -19,6 +19,8 @@ import { isPast } from "@/lib/time-blocks"
 import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { useOsCanon } from "@/hooks/use-os-canon"
+import { useAiDailyFocus } from "@/hooks/use-ai-daily-focus"
+import type { AiFocusState } from "@/hooks/use-ai-daily-focus"
 import { useOsCommitments } from "@/hooks/use-os-commitments"
 import { commitmentsForDate, type DatedCommitment } from "@/lib/commitments"
 import type { CanonFeedResult } from "@/lib/os-feed/canon-parser"
@@ -180,12 +182,23 @@ function DailyFocusCard({
   const planInNextSlot = usePlanInNextSlot()
   const canon = useOsCanon()
   const commitments = useOsCommitments()
+  const ai = useAiDailyFocus(tasks, projects, dailyFocusLimit)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const now = useMinuteClock()
 
   const focus = selectDailyFocus(tasks, projects, systemConfig, { weeklyPlans, taskTimeSlots })
   const chosen = focus.filter((entry) => entry.chosen)
   const suggested = focus.filter((entry) => !entry.chosen)
+  // P19: an AI answer replaces the list while it shows; rows already accepted drop out of it.
+  const aiRows =
+    ai.state.status === "done"
+      ? ai.state.suggestions.flatMap((s) => {
+          const task = tasks.find((t) => t.id === s.taskId)
+          return task && task.lane !== "daily-focus" && !task.completed
+            ? [{ task, linkedProject: projects.find((p) => p.id === task.linkedProjectId), suggestion: s }]
+            : []
+        })
+      : []
   const todayISO = localDateISO()
   const isTimedToday = (task: Task) => task.dueDate === todayISO && Boolean(taskTimeSlots[task.id])
   const isTaskPast = (task: Task) => isTimedToday(task) && isPast(taskTimeSlots[task.id].endTime, todayISO, now)
@@ -297,6 +310,17 @@ function DailyFocusCard({
         onAdd={(taskId) => moveTaskToLane(taskId, "daily-focus")}
         isTaskPast={isTaskPast}
         className={chosen.length > 0 ? "mt-4" : undefined}
+        ai={
+          ai.available
+            ? {
+                state: ai.state,
+                rows: aiRows,
+                cooling: ai.cooling,
+                onRank: ai.rank,
+                onBack: ai.reset,
+              }
+            : undefined
+        }
       />
 
       <ScheduledToday
@@ -518,6 +542,7 @@ export function SuggestedFocusList({
   onAdd,
   isTaskPast,
   className,
+  ai,
 }: {
   entries: Array<{ task: Task; linkedProject?: Project }>
   taskTimeSlots: Record<string, TaskTimeSlot>
@@ -525,12 +550,84 @@ export function SuggestedFocusList({
   /** P20: a suggestion whose slot today has ended reads as past; it can still be added. */
   isTaskPast?: (task: Task) => boolean
   className?: string
+  /** P19: only the Command Center passes this, and only when the route answers 200. ToDo is unchanged. */
+  ai?: {
+    state: AiFocusState
+    rows: Array<{ task: Task; linkedProject?: Project; suggestion: { outcomeTitle: string; reason: string } }>
+    cooling: boolean
+    onRank: () => void
+    onBack: () => void
+  }
 }) {
+  if (ai && ai.state.status === "done" && ai.rows.length > 0) {
+    const { state } = ai
+    return (
+      <div className={cn("@container", className)}>
+        <div className="mb-2 flex flex-wrap items-center gap-x-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">AI · from canon</p>
+          <button
+            type="button"
+            onClick={ai.onBack}
+            className="ml-auto rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Back to default
+          </button>
+        </div>
+        {state.stale && state.fetchedAt ? (
+          <p className="mb-2 text-xs text-muted-foreground">Based on canon from {format(new Date(state.fetchedAt), "d MMM HH:mm")}</p>
+        ) : null}
+        <ul role="list" className="flex flex-col gap-2.5">
+          {ai.rows.slice(0, 3).map(({ task, linkedProject, suggestion }) => (
+            <li key={task.id} className="flex flex-col gap-2 @md:flex-row @md:items-start @md:gap-3">
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm leading-snug", isTaskPast?.(task) && "text-muted-foreground/70")}>{task.title}</p>
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                  {suggestion.reason} <span className="text-muted-foreground/70">· {suggestion.outcomeTitle}</span>
+                </p>
+                <FocusTaskMeta task={task} linkedProject={linkedProject} timeSlot={taskTimeSlots[task.id]} past={isTaskPast?.(task)} />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1 self-start px-2 text-xs"
+                onClick={() => onAdd(task.id)}
+                aria-label={`Accept ${task.title} into Daily Focus`}
+              >
+                <Plus className="h-3 w-3" />
+                Accept
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
   if (entries.length === 0) return null
   // Its own container, so the rows reflow by the list's width in ToDo as well as here.
   return (
     <div className={cn("@container", className)}>
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Suggested</p>
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Suggested</p>
+        {ai ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-6 gap-1 px-2 text-xs"
+            onClick={ai.onRank}
+            disabled={ai.state.status === "loading" || ai.cooling}
+            title="Rank your tasks against the current canon outcomes"
+          >
+            <Sparkles className="h-3 w-3" aria-hidden="true" />
+            {ai.state.status === "loading" ? "Ranking…" : "Rank with AI"}
+          </Button>
+        ) : null}
+      </div>
+      {ai?.state.status === "no-canon" ? <p className="mb-2 text-xs text-muted-foreground">Canon unavailable.</p> : null}
+      {ai?.state.status === "none" ? (
+        <p className="mb-2 text-xs text-muted-foreground">No suggestion right now.</p>
+      ) : null}
       <ul role="list" className="flex flex-col gap-2.5">
         {entries.map(({ task, linkedProject }) => (
           <li key={task.id} className="flex flex-col gap-2 @md:flex-row @md:items-start @md:gap-3">
