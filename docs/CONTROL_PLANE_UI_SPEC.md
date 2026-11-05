@@ -1076,7 +1076,7 @@ the top bar (only if it starts changing daily behaviour).
 
 ### P19 — AI Suggest proposes Daily Focus from canon · M
 
-**Status:** done (2026-11-05, #202, #203; real model call not verified)
+**Status:** done (2026-11-05, #202 route, #203 UI; real call checked locally by Roman)
 
 **Why:** Schedule's "AI Suggest" ranks tasks without knowing what the OS says matters, and it sends
 every task, including tasks of paused, parked or completed projects (open item since 2026-10-06).

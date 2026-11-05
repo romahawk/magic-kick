@@ -16,16 +16,22 @@
 1. Run `/session-start`. It checks this note against git, runs the gates and asks for the roadmap item.
 2. **Open item: none. Next by rank is P15 (gated); Roman to rule on scope (step 3).** Do not open P15 or
    anything else until Roman names it.
+   **Bug named by Roman on 2026-11-05 (not a roadmap item):** no one-click way to clear a task's due date so it
+   stays in the backlog undated (date set later). Work starts on its own branch from `main`. Also open:
+   PR `fix/p19-thinking-block` (`callClaude` reads the text block, not `content[0]`; the live 401 was an
+   invalid key, so this fix is unproven as a cause).
 3. **Roman to decide (first):** **Magic Kick allocation.** `DEC-2026-09-23-001` reverts it to `limited`
    when the control-plane scope is delivered or on 2026-12-31. After P19 the remaining items are P15/P10
    (gated), P6, P4, P5 and P11 (`decision` since 2026-10-17). Rule: name the remaining scope, or revert now.
 4. **Do not stack PRs.** Open each PR from `main`; if one depends on another, wait for the first to merge.
    Merge only when Roman says so.
-5. **Roman to check (P19, real call not verified):** with `NEXT_PUBLIC_AI_FEATURES_ENABLED=true` and a
-   signed-in (not demo) user, "Rank with AI" shows on the Command Center Suggested list when at least one
+5. **P19 real call: Roman confirmed it works locally on 2026-11-05** (after replacing an invalid
+   `ANTHROPIC_API_KEY`: Anthropic had answered 401 `invalid x-api-key`; the new key and `claude-haiku-5-5`
+   access were checked with a models-list call, status 200). Still to check: with
+   `NEXT_PUBLIC_AI_FEATURES_ENABLED=true` and a signed-in (not demo) user, "Rank with AI" shows on the Command Center Suggested list when at least one
    task is suggested; it returns up to 3 rows with a reason; Accept moves the task to Daily Focus; "Back to
-   default" restores the list; the button is disabled for 30 s after an answer. Also confirm the Anthropic
-   key can use `claude-haiku-5-5` (otherwise set `AI_DAILY_FOCUS_MODEL`). **Flag name:** the variable is
+   default" restores the list; the button is disabled for 30 s after an answer; 375 px and 1280 px layouts.
+   **Flag name:** the variable is
    `NEXT_PUBLIC_AI_FEATURES_ENABLED`; `AI_FEATURES_ENABLED` is ignored (`lib/ai/flags.ts`). Local
    `.env.local` was fixed on 2026-11-05 (names only: old line removed, new line added). **Vercel has not
    been checked** for `ANTHROPIC_API_KEY` or the flag; the flag is inlined at build time, so changing it
@@ -96,10 +102,9 @@ and `feat/p19-rank-with-ai-ui` were squash-merged (#202, #203). The local `feat/
 (`b93dcc5`) on 2026-11-05, all exit 0, 164 tests in 20 files; `b93dcc5` contains #201, #202 and #203; CI
 passed on #202 and #203 before merge. #191 is the P30 PR.
 
-**Not verified:** P19 end to end: no real model call was made, so `claude-haiku-5-5` access, `effort: low`,
-`max_tokens` 600 and the 15 s timeout are untested against the live API; the "Rank with AI" UI was never
-opened in a browser (no visual, 375 px or 1280 px check); no unit test for the hook or the list; Vercel
-`ANTHROPIC_API_KEY` and flag not checked; real canon; real commitments from OS `main`; light theme for
+**Not verified:** P19: Roman saw it work locally on 2026-11-05, but no 375 px or 1280 px layout check and no
+Accept / "Back to default" walkthrough is recorded here; the 30 s disable and the stale-canon label were not seen; no unit test for the hook or the list; Vercel
+`ANTHROPIC_API_KEY` (the local key was invalid until replaced) and flag not checked; real canon; real commitments from OS `main`; light theme for
 P32/P33; Safari, Firefox.
 
 **Previous session (2026-11-04, late):** BUG, P32, P33 done; P19 opened (#196–#200), see git history.
