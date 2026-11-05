@@ -1179,6 +1179,27 @@ approval-flow decision first.
 
 ---
 
+### P34 — Mark AIOS commitments Done · S
+
+**Status:** queued (2026-11-05; ADR-039 Proposed; rank is Roman's call). Do not open before ADR-039 is Accepted.
+
+**Why:** AIOS commitments (P30, P33) are read-only everywhere, so a finished one cannot be ticked off.
+Roman asked for Done on 2026-11-05.
+
+**Shape (from ADR-039).** A done-key list on the profile (not written to the OS file); a checkbox on the
+ToDo "Dated · from AIOS" box, the Command Center "Also scheduled" rows and Schedule; a done commitment
+stays in place, struck through and muted; un-tick removes it; no XP or Daily Focus effect.
+
+**Acceptance criteria (draft, to be fixed with the ADR).**
+1. Ticking a commitment marks it done on every surface that lists it; unticking restores it.
+2. The mark survives a reload and syncs to another device through the profile.
+3. `dated-commitments.md` is never written.
+4. Reordering rows in the file keeps marks; retitling a row resets it.
+5. Keys older than 90 days are dropped; at most 500 are kept.
+6. Tests cover the key, the pruning and the toggle.
+
+---
+
 ### P10 — Evidence-driven progress · M
 
 **Status:** gated

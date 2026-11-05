@@ -1501,3 +1501,60 @@ the Command Center Suggested list; Accept is `moveTaskToLane`; the route is the 
 
 **Revisit trigger:** a second AI surface is wanted, tasks should load server-side (ADR-017 point 5), or
 real usage hits the cap.
+
+---
+
+## ADR-039: AIOS commitments can be marked Done, kept in Magic Kick (P34)
+
+**Date:** 2026-11-05
+**Status:** Proposed (Roman reviews it with the PR; no code until it is Accepted)
+**Amends:** ADR-036 point 1 ("one source, read-only"; "nothing in the app edits a row") and P33's "No writes:
+commitments stay canonical in AIOS". Relates to ADR-032 (the only OS write path stays Close day), ADR-024 §5
+(server-side routes only, 9-module ceiling), P30, P33, P34 in `docs/CONTROL_PLANE_UI_SPEC.md`.
+
+### Context
+Commitments from `01_CONTEXT/dated-commitments.md` show on Schedule, in the Command Center's "Also
+scheduled" and in ToDo's "Dated · from AIOS" box, all read-only with no checkbox. Roman wants to mark one
+Done (2026-11-05). ADR-036 named "commitments need a reminder or status" as its revisit trigger, and a done
+mark is a status. The file has no status column and Magic Kick never writes it.
+
+### Decision (Roman chose "local in Magic Kick" on 2026-11-05)
+1. **Done lives in Magic Kick, not in the OS.** A list of done keys on the profile, synced the way
+   `closeDayChips` is (profile patch, existing sync path). `dated-commitments.md` stays read-only; no new
+   write path, no new token, no write job contract.
+2. **A key per commitment that survives reordering.** Not the row-numbered id (`commitment:<date>:<start>:<row>`),
+   which shifts when rows are added or removed. Proposed key: `date|start-or-all-day|title`, lowercased and
+   trimmed. Editing a row's date, start or title makes it a new commitment (not done); that is accepted.
+3. **Display.** A done commitment shows as done (checkbox ticked, title struck through, muted), still in
+   place; it is not hidden. Un-ticking removes the key. Surfaces: ToDo "Dated · from AIOS" (checkbox),
+   Command Center "Also scheduled" (checkbox) and Schedule (the all-day popover and the block popover).
+   No new module; no OS content outside the existing modules.
+4. **No effect elsewhere.** Done does not award XP, touch streaks, the Daily Focus limit, or the Close day
+   snapshot, and does not create a task.
+5. **Bounded.** Keys for commitments dated before today minus 90 days are dropped when a key is written.
+   The list holds at most 500 keys.
+6. **Drift is possible and accepted.** The OS file does not know a row is done. The next daily review or
+   a later P11 slice may read it, but that is out of scope here.
+
+### Alternatives rejected
+- **Writing the mark back to the OS file:** keeps the OS as the source of truth, but needs a write path
+  beyond Close day (ADR-032), a status column, a write job contract and a commit per click.
+- **Keeping the done mark in memory only:** lost on reload.
+- **The row-numbered id as the key:** detaches marks when rows move.
+- **Turning the commitment into a Magic Kick task to complete it:** P33's deferred "Make task" action
+  needs its own approval-flow decision, and duplicates data.
+
+### Consequences
+- One optional profile field, a small pure helper plus tests, a checkbox on each surface that already
+  lists commitments. No new route, token or dependency; Firestore rules and the sync schema need a check
+  that an optional profile array is already allowed (as for `closeDayChips`).
+- **Rollback:** remove the checkbox; the field stays unused. No migration.
+
+### Questions for Roman
+1. The key format in 2 (title included, so a retitled row resets), or date and start only (two rows with the
+   same time collide)?
+2. Done shown in place (3), or hidden after a delay or by a filter?
+3. Is the Schedule block popover in scope, or only ToDo and the Command Center?
+
+**Revisit trigger:** the OS should see done marks (write-back), the file gains a status column, or marks
+need to be shared between devices without the profile.
