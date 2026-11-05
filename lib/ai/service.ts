@@ -55,9 +55,17 @@ export async function callClaude(
     console.log(`[AI] model=${model} cache_hit=${hit} cache_created=${created}`)
   }
 
-  const block = response.content[0]
-  if (block.type !== "text") throw new Error("Unexpected non-text response from Claude")
-  return block.text
+  return textOf(response.content)
+}
+
+/**
+ * The answer text. A model with thinking on (Haiku 5.5 by default) can put a thinking block before the
+ * text, so the first block is not always the text one: join the text blocks and skip the rest.
+ */
+export function textOf(content: ReadonlyArray<{ type: string; text?: string }>): string {
+  const text = content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("")
+  if (!text) throw new Error("No text in the response from Claude")
+  return text
 }
 
 export function parseJsonResponse<T>(raw: string): T {
