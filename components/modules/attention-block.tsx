@@ -20,6 +20,7 @@ import type { Project, SystemConfig, Task, WeeklyPlan } from "@/lib/types"
 import { usePlanInNextSlot } from "@/hooks/use-plan-next-slot"
 import { useOsCanon } from "@/hooks/use-os-canon"
 import { useAiDailyFocus } from "@/hooks/use-ai-daily-focus"
+import { useCommitmentDone } from "@/hooks/use-commitment-done"
 import type { AiFocusState } from "@/hooks/use-ai-daily-focus"
 import { useOsCommitments } from "@/hooks/use-os-commitments"
 import { commitmentsForDate, type DatedCommitment } from "@/lib/commitments"
@@ -472,6 +473,7 @@ function ScheduledToday({
   now: Date
   className?: string
 }) {
+  const { isDone, toggle } = useCommitmentDone()
   if (blocks.length === 0 && commitments.length === 0) return null
   const rows = [
     ...commitments.map((entry) => ({ sort: entry.start ?? "00:00", commitment: entry })),
@@ -487,8 +489,9 @@ function ScheduledToday({
             const past = entry.end ? isPast(entry.end, todayISO, now) : false
             return (
               <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+                <Checkbox checked={isDone(entry)} onCheckedChange={() => toggle(entry)} aria-label={`Mark ${entry.title} done`} className="shrink-0 self-center" />
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{entry.allDay ? "All day" : entry.start}</span>
-                <span className={cn("min-w-0 flex-1 basis-32 leading-snug", past && "text-muted-foreground")}>
+                <span className={cn("min-w-0 flex-1 basis-32 leading-snug", (past || isDone(entry)) && "text-muted-foreground", isDone(entry) && "line-through")}>
                   {entry.title}
                   <span className="ml-1.5 rounded-sm bg-violet-500/10 px-1 py-px text-[10px] font-medium text-violet-700 dark:text-violet-300">
                     from AIOS

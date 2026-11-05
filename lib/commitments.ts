@@ -249,3 +249,24 @@ export function commitmentsInRange(
         a.title.localeCompare(b.title)
     )
 }
+
+// ── P34 (ADR-039): Done, kept in Magic Kick ──────────────────────────────────
+
+export const DONE_KEEP_DAYS = 90
+export const DONE_MAX_KEYS = 500
+
+/** `date|start-or-all-day|title`, lowercased and trimmed. Survives reordering rows in the file; a retitled
+ * or re-timed row is a new commitment (not done), and two identical rows share one mark. */
+export function commitmentDoneKey(entry: Pick<DatedCommitment, "date" | "start" | "title">): string {
+  return `${entry.date}|${entry.start ?? "all-day"}|${entry.title.trim().toLowerCase()}`
+}
+
+/** Toggles one key, then drops keys dated before today minus 90 days and keeps at most 500 (newest last). */
+export function toggleDoneKey(keys: readonly string[] | undefined, key: string, todayISO: string): string[] {
+  const current = keys ?? []
+  const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
+  const cutoff = new Date(`${todayISO}T12:00:00Z`)
+  cutoff.setUTCDate(cutoff.getUTCDate() - DONE_KEEP_DAYS)
+  const cutoffISO = cutoff.toISOString().slice(0, 10)
+  return next.filter((k) => k.slice(0, 10) >= cutoffISO).slice(-DONE_MAX_KEYS)
+}

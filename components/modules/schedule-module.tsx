@@ -20,6 +20,7 @@ import { ChevronLeft, ChevronRight, X, CheckCircle2, ExternalLink, Focus, Trash2
 import { toast } from "sonner"
 import type { ExternalCalendarBlock, ScheduleSuggestion, Task, TaskRepeat, TimeBlock, TimeBlockStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
 import { TruncatedTooltip } from "@/components/ui/truncated-tooltip"
 import { auth } from "@/lib/firebase/client"
 import { isAiEnabled } from "@/lib/ai/flags"
@@ -35,6 +36,7 @@ import { isPlanningFocus, selectNextMilestoneByProject } from "@/lib/roadmap"
 import { UnscheduledTasksPanel, type UnscheduleDropState } from "@/components/modules/unscheduled-tasks-panel"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 import { useOsCommitments } from "@/hooks/use-os-commitments"
+import { useCommitmentDone } from "@/hooks/use-commitment-done"
 import { commitmentRange, commitmentsForDate, overlapsCommitment, type DatedCommitment } from "@/lib/commitments"
 
 
@@ -235,6 +237,8 @@ function CommitmentLink({ entry, className }: { entry: DatedCommitment; classNam
 
 /** P30: a timed OS row as a fixed block above the task blocks. Not draggable, resizable or editable. */
 function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
+  const { isDone, toggle } = useCommitmentDone()
+  const done = isDone(entry)
   const range = commitmentRange(entry)
   if (!range || !entry.start) return null
   const end = entry.end ?? toTime(Math.min(DAY_END * 60, range.endMin))
@@ -242,7 +246,7 @@ function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
     <div
       title={FROM_AIOS_TITLE}
       aria-label={`${entry.title}, ${entry.start}${entry.end ? `–${entry.end}` : ""}, fixed event from AIOS`}
-      className="absolute inset-x-1 z-30 overflow-hidden rounded-md border border-l-[3px] border-violet-500/70 px-2 py-1 text-xs text-foreground"
+      className={cn("absolute inset-x-1 z-30 overflow-hidden rounded-md border border-l-[3px] border-violet-500/70 px-2 py-1 text-xs text-foreground", done && "opacity-60")}
       style={{
         top: toY(entry.start),
         height: blockH(entry.start, end),
@@ -254,8 +258,11 @@ function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
       onMouseUp={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">from AIOS</p>
-      <p className="truncate font-medium leading-tight">{entry.title}</p>
+      <div className="mb-0.5 flex items-center gap-1">
+        <Checkbox checked={done} onCheckedChange={() => toggle(entry)} aria-label={`Mark ${entry.title} done`} className="size-3.5" />
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">from AIOS</p>
+      </div>
+      <p className={cn("truncate font-medium leading-tight", done && "line-through")}>{entry.title}</p>
       <p className="truncate opacity-75">
         {entry.start}
         {entry.end ? `–${entry.end}` : ""}
@@ -267,6 +274,7 @@ function CommitmentBlock({ entry }: { entry: DatedCommitment }) {
 
 /** P33: a day's all-day OS rows in the fixed-height lane: one truncated chip, "+N" for the rest, the full list in a popover. */
 function AllDayCell({ entries }: { entries: DatedCommitment[] }) {
+  const { isDone, toggle } = useCommitmentDone()
   if (entries.length === 0) return null
   const [first, ...rest] = entries
   return (
@@ -279,7 +287,7 @@ function AllDayCell({ entries }: { entries: DatedCommitment[] }) {
           className="flex h-5 w-full min-w-0 items-center gap-1 rounded border border-violet-500/60 bg-violet-500/10 px-1 text-[10px] leading-none hover:bg-violet-500/20"
         >
           <span className="shrink-0 font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">AIOS</span>
-          <span className="min-w-0 flex-1 truncate text-left">{first.title}</span>
+          <span className={cn("min-w-0 flex-1 truncate text-left", isDone(first) && "line-through opacity-60")}>{first.title}</span>
           {rest.length > 0 ? <span className="shrink-0 font-semibold">+{rest.length}</span> : null}
         </button>
       </PopoverTrigger>
@@ -287,7 +295,10 @@ function AllDayCell({ entries }: { entries: DatedCommitment[] }) {
         <ul className="flex flex-col gap-2">
           {entries.map((entry) => (
             <li key={entry.id} className="flex flex-col gap-0.5">
-              <span className="font-medium">{entry.title}</span>
+              <label className="flex cursor-pointer items-center gap-2">
+                <Checkbox checked={isDone(entry)} onCheckedChange={() => toggle(entry)} aria-label={`Mark ${entry.title} done`} />
+                <span className={cn("font-medium", isDone(entry) && "text-muted-foreground line-through")}>{entry.title}</span>
+              </label>
               <CommitmentLink entry={entry} />
             </li>
           ))}

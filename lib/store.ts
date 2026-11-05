@@ -38,6 +38,7 @@ import { buildAchievementCatalog, evaluateAchievementUnlocks } from "@/lib/achie
 import { isRecurringTask, toggleTaskOccurrenceDate } from "@/lib/task-recurrence"
 import { findBySource } from "@/lib/provenance"
 import { moveMilestoneInList, nextMilestoneOrder, renumberMilestones, sortMilestones } from "./roadmap"
+import { toggleDoneKey } from "@/lib/commitments"
 import { addCloseDayChip, dailyFocusSnapshotTasks, nextDailyFocusSnapshots, removeCloseDayChip } from "@/lib/close-day"
 import type { CloseDayJournalFields } from "@/lib/close-day"
 import { berlinDateISO } from "@/lib/os-feed/daily-review"
@@ -381,6 +382,8 @@ export interface AppState {
   saveDailyFocusSnapshot: () => void
   addCloseDayChip: (section: CloseDayChipSection, text: string) => void
   removeCloseDayChip: (section: CloseDayChipSection, text: string) => void
+  /** P34 (ADR-039): tick or untick an AIOS commitment, by its done key. */
+  toggleCommitmentDone: (key: string, todayISO: string) => void
   toggleTask: (id: string) => void
   toggleTaskOccurrence: (id: string, dateISO: string) => void
   addTask: (task: Omit<Task, "id" | "xpValue"> & Partial<Pick<Task, "xpValue">> & { timeHHmm?: string }) => void
@@ -825,6 +828,10 @@ export const useAppStore = create<AppState>()(
         const current = get().profile.closeDayChips ?? []
         const next = addCloseDayChip(current, section, text)
         if (next !== current) setProfilePatch(set, { closeDayChips: next }, now())
+      },
+
+      toggleCommitmentDone: (key, todayISO) => {
+        setProfilePatch(set, { doneCommitments: toggleDoneKey(get().profile.doneCommitments, key, todayISO) }, now())
       },
 
       removeCloseDayChip: (section, text) => {
