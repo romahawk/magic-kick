@@ -1507,7 +1507,7 @@ real usage hits the cap.
 ## ADR-039: AIOS commitments can be marked Done, kept in Magic Kick (P34)
 
 **Date:** 2026-11-05
-**Status:** Proposed (Roman reviews it with the PR; no code until it is Accepted)
+**Status:** Accepted (Roman, 2026-11-05: "accept with defaults"; answers in "Roman's answers" below)
 **Amends:** ADR-036 point 1 ("one source, read-only"; "nothing in the app edits a row") and P33's "No writes:
 commitments stay canonical in AIOS". Relates to ADR-032 (the only OS write path stays Close day), ADR-024 §5
 (server-side routes only, 9-module ceiling), P30, P33, P34 in `docs/CONTROL_PLANE_UI_SPEC.md`.
@@ -1550,11 +1550,11 @@ mark is a status. The file has no status column and Magic Kick never writes it.
   that an optional profile array is already allowed (as for `closeDayChips`).
 - **Rollback:** remove the checkbox; the field stays unused. No migration.
 
-### Questions for Roman
-1. The key format in 2 (title included, so a retitled row resets), or date and start only (two rows with the
-   same time collide)?
-2. Done shown in place (3), or hidden after a delay or by a filter?
-3. Is the Schedule block popover in scope, or only ToDo and the Command Center?
+### Roman's answers (2026-11-05, defaults accepted)
+1. Key: `date|start-or-all-day|title`, lowercased and trimmed (a retitled row resets; two rows with the same
+   date, start and title collide and share a mark).
+2. A done commitment stays in place, struck through and muted; it is not hidden.
+3. Schedule is in scope along with ToDo and the Command Center.
 
 **Revisit trigger:** the OS should see done marks (write-back), the file gains a status column, or marks
 need to be shared between devices without the profile.
