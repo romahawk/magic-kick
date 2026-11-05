@@ -15,6 +15,7 @@ import { isDueToday, isOverdue } from "@/lib/game-utils"
 import { cn } from "@/lib/utils"
 import { useCategories } from "@/hooks/use-categories"
 import { useOsCommitments } from "@/hooks/use-os-commitments"
+import { useCommitmentDone } from "@/hooks/use-commitment-done"
 import { commitmentsInRange, type DatedCommitment } from "@/lib/commitments"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -441,6 +442,7 @@ export function TodoModule() {
 // ── Dated · from AIOS (P33): read-only, no checkbox, changed in dated-commitments.md ──
 
 function DatedFromAios({ entries, todayISO }: { entries: DatedCommitment[]; todayISO: string }) {
+  const { isDone, toggle } = useCommitmentDone()
   if (entries.length === 0) return null
   return (
     <section aria-label="Dated, from AIOS" className="mb-4 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
@@ -448,12 +450,13 @@ function DatedFromAios({ entries, todayISO }: { entries: DatedCommitment[]; toda
       <ul className="flex flex-col gap-1.5">
         {entries.map((entry) => (
           <li key={entry.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <Checkbox checked={isDone(entry)} onCheckedChange={() => toggle(entry)} aria-label={`Mark ${entry.title} done`} className="shrink-0" />
             <Badge variant="outline" className="border-violet-500/60 px-1.5 text-[10px] font-semibold uppercase text-violet-700 dark:text-violet-300">AIOS</Badge>
             <span className="shrink-0 whitespace-nowrap text-xs tabular-nums sm:w-40 text-muted-foreground">
               {entry.date === todayISO ? "Today" : format(parseISO(`${entry.date}T12:00:00`), "EEE, MMM d")}
               {entry.start ? ` · ${entry.start}` : ""}
             </span>
-            <span className="min-w-0 basis-full sm:flex-1 sm:basis-0 sm:truncate" title={entry.title}>{entry.title}</span>
+            <span className={cn("min-w-0 basis-full sm:flex-1 sm:basis-0 sm:truncate", isDone(entry) && "text-muted-foreground line-through")} title={entry.title}>{entry.title}</span>
             {entry.link ? (
               <a href={entry.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-xs underline underline-offset-2">
                 Open link

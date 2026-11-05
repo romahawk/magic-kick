@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-05 - Mark AIOS commitments Done (P34)
+
+### Added
+- AIOS commitments get a checkbox: in ToDo's "Dated · from AIOS" box, in the Command Center's "Also scheduled" list and on Schedule (the fixed block and the all-day popover). A done commitment stays in place, struck through and muted; untick to undo. The mark is saved in Magic Kick and synced with your profile; the OS file `dated-commitments.md` is never changed. A mark belongs to the row's date, start time and title, so retitling or moving a row in the file makes it not done again. Marks older than 90 days are dropped.
+
+---
+
 ## [Unreleased] - 2026-11-05 - Remove a task's due date in one click (ToDo)
 
 ### Added

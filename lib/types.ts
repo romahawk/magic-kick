@@ -289,6 +289,8 @@ export interface Profile extends SyncFields {
   dailyFocusSnapshots?: DailyFocusSnapshot[]
   /** P11 Close day: quick-pick chips Roman saved, on top of the built-in ones. */
   closeDayChips?: CloseDayChip[]
+  /** P34 (ADR-039): keys of AIOS commitments Roman marked done (`commitmentDoneKey`). Not written to the OS. */
+  doneCommitments?: string[]
 }
 
 export interface DailyFocusSnapshot {
