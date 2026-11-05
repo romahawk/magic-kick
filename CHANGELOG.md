@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-04 - Rank with AI in the Command Center Suggested list (P19, part 2)
+
+### Added
+- Command Center: a "Rank with AI" button on the Daily Focus card's Suggested list, shown only when the AI flag is on and the server has a key. It ranks your open tasks against the canon's outcomes and replaces the list with up to 3 rows ("AI · from canon"), each with a one-line reason and the outcome it serves. "Accept" moves that task to Daily Focus; nothing changes until you accept. "Back to default" restores the usual list. A stale canon shows "Based on canon from <time>"; an unavailable one shows "Canon unavailable"; a failed or empty answer shows "No suggestion right now". The button is disabled while a request runs and for 30 seconds after an answer. Task titles are sent to Anthropic; notes and descriptions never are.
+
+---
+
 ## [Unreleased] - 2026-11-04 - ToDo shows dated AIOS items for the week (P33, part 2)
 
 ### Added
