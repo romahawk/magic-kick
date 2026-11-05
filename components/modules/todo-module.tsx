@@ -22,7 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { TaskDetailSheet } from "@/components/task-detail-sheet"
 import { SuggestedFocusList } from "@/components/modules/attention-block"
 import { FiltersPopover, InlineSearch, ProjectFilterList, ScopeSwitch, useStoredProjectFilter } from "@/components/modules/task-filters"
-import { ChevronDown, ExternalLink, PanelRightClose, PanelRightOpen } from "lucide-react"
+import { ChevronDown, ExternalLink, PanelRightClose, PanelRightOpen, X } from "lucide-react"
+import { toast } from "sonner"
 import type { Project, Task, TaskLane } from "@/lib/types"
 
 const TASK_LANES: Array<{ id: TaskLane; title: string; description: string }> = [
@@ -655,6 +656,24 @@ function TaskRow({ task, timeSlot, project, showProject, categoryColor, todayISO
     onQuickEdit?.(task.id, { dueDate: dateVal || undefined })
     setEditingField(null)
   }
+  // One click: the date (and its time and repeat, which need a date) goes, and the task sits in the backlog.
+  function clearDate(e: React.MouseEvent) {
+    e.stopPropagation()
+    const before = { dueDate: task.dueDate, repeat: task.repeat, lane: task.lane }
+    onQuickEdit?.(task.id, { dueDate: undefined, repeat: "none", lane: "backlog" }, { clearTimeSlot: true })
+    toast("Due date removed", {
+      description: task.title + " is in the backlog",
+      action: {
+        label: "Undo",
+        onClick: () =>
+          onQuickEdit?.(
+            task.id,
+            before,
+            timeSlot ? { startHHmm: timeSlot.startTime, endHHmm: timeSlot.endTime } : undefined
+          ),
+      },
+    })
+  }
   function startTimeEdit(e: React.MouseEvent) {
     e.stopPropagation()
     setStartVal(timeSlot?.startTime ?? "")
@@ -733,6 +752,17 @@ function TaskRow({ task, timeSlot, project, showProject, categoryColor, todayISO
                 {dueText(task.dueDate, todayISO)}
               </button>
             )
+          ) : null}
+          {task.dueDate && editingField !== "date" ? (
+            <button
+              type="button"
+              className="-ml-1 shrink-0 rounded-sm p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={clearDate}
+              title="Remove due date (moves to backlog)"
+              aria-label={`Remove due date from ${task.title}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
           ) : null}
           {timeSlot ? (
             editingField === "time" ? (
