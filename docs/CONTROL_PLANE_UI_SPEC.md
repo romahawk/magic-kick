@@ -1181,7 +1181,7 @@ approval-flow decision first.
 
 ### P34 — Mark AIOS commitments Done · S
 
-**Status:** open (2026-11-05; ADR-039 accepted; start the code on a branch from `main` after the ADR PR merges)
+**Status:** done (2026-11-05, #206 ADR-039, #208 code; checked locally by Roman)
 
 **Why:** AIOS commitments (P30, P33) are read-only everywhere, so a finished one cannot be ticked off.
 Roman asked for Done on 2026-11-05.
