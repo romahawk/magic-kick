@@ -85,7 +85,9 @@ export async function POST(req: NextRequest) {
     })
     const suggestions = parseSuggestions(raw, { taskIds: new Set(candidates.map((c) => c.id)), outcomes: canon.outcomes, slots })
     return NextResponse.json({ ...done, suggestions })
-  } catch {
+  } catch (err) {
+    // The error type and message only (never the task text or the key), so a failure can be diagnosed.
+    console.error(`[ai/daily-focus] call failed: ${err instanceof Error ? `${err.name}: ${err.message}` : "unknown"}`)
     return NextResponse.json({ ok: false, error: "AI call failed" }, { status: 502 })
   } finally {
     limiter.finish(uid)
