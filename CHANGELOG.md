@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-05 - Remove a task's due date in one click (ToDo)
+
+### Added
+- ToDo: a small "×" next to a task's due date removes it in one click. The task moves to the backlog (it stays there, undated), its time and repeat are cleared with the date, and a toast offers "Undo". Set a new date later by clicking the task's date area or opening the task.
+
+---
+
 ## [Unreleased] - 2026-11-04 - Rank with AI in the Command Center Suggested list (P19, part 2)
 
 ### Added
