@@ -1307,7 +1307,7 @@ Firestore data and has no public surface.
 ## ADR-036: Schedule reads dated commitments from AIOS (read-only) (P30)
 
 **Date:** 2026-11-03
-**Status:** Proposed (Roman reviews it with the PR)
+**Status:** Accepted (2026-11-03, merged with P30 in #191)
 **Relates to:** ADR-031 (P7 reads tracked canon, read-only `AIOS_GITHUB_TOKEN`), ADR-024 §5 (server-side
 routes only, 9-module ceiling), ADR-032 (the only write path stays Close day).
 
