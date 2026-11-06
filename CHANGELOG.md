@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-06 - A delete made during a sync is no longer lost; the console names a server copy that brings a deleted item back
+
+### Fixed
+- Sync: a change made while a sync was pushing (a delete, for example) could lose its "needs sync" mark, so the server kept the old copy. It now stays pending until it is pushed.
+
+### Added
+- When a server copy brings back an item you deleted on this device, the browser console shows a warning with the title, the item id and both timestamps, so a task that "keeps coming back" can be traced.
+
+---
+
 ## [Unreleased] - 2026-11-05 - Mark AIOS commitments Done (P34)
 
 ### Added

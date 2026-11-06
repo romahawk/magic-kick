@@ -20,9 +20,10 @@ function compareRemoteVsLocal(
   return "local"
 }
 
-function mergeCollection<T extends { id: string; clientUpdatedAt?: number; updatedAt?: number }>(
+function mergeCollection<T extends { id: string; clientUpdatedAt?: number; updatedAt?: number; deleted?: boolean; title?: string }>(
   localItems: T[],
-  remoteItems: T[]
+  remoteItems: T[],
+  label = "item"
 ) {
   const localById = new Map(localItems.map((item) => [item.id, item]))
   const mergedById = new Map<string, T>(localById)
@@ -37,6 +38,13 @@ function mergeCollection<T extends { id: string; clientUpdatedAt?: number; updat
     }
     const winner = compareRemoteVsLocal(local.clientUpdatedAt, remoteItem.clientUpdatedAt, local.updatedAt, remoteItem.updatedAt)
     if (winner === "remote") {
+      // A server copy brought back something deleted here: say which one and how the clocks compare.
+      if (local.deleted && !remoteItem.deleted) {
+        console.warn(
+          `[sync] the server copy of ${label} "${remoteItem.title ?? remoteItem.id}" (${remoteItem.id}) un-deleted it here: ` +
+            `local deleted at ${local.clientUpdatedAt}, server copy stamped ${remoteItem.clientUpdatedAt}`
+        )
+      }
       mergedById.set(remoteItem.id, remoteItem)
       overriddenIds.push(remoteItem.id)
     }
@@ -71,7 +79,7 @@ function mergeProfile(local: Profile, remote: Profile | null) {
 export function applyRemoteSnapshot(snapshot: RemoteSnapshot) {
   const state = useAppStore.getState()
   const profileResult = mergeProfile(state.profile, snapshot.profile)
-  const tasks = mergeCollection(state.tasks, snapshot.entities.tasks)
+  const tasks = mergeCollection(state.tasks, snapshot.entities.tasks, "task")
   const goals = mergeCollection(state.goals, snapshot.entities.goals)
   const projects = mergeCollection(state.projects, snapshot.entities.projects)
   const achievements = mergeCollection(state.achievements, snapshot.entities.achievements)
