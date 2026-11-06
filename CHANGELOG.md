@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-06 - Reordering or moving a task no longer brings back tasks you deleted
+
+### Fixed
+- Dragging a task to reorder it, or adding a task to Daily Focus, re-stamped and re-queued every task in the list. A device with an old copy of the list (an open tab, the production site) then pushed tasks you had deleted somewhere else back as "newer", so deleted tasks kept returning to the backlog. Only the tasks whose position actually changed are updated now.
+
+---
+
 ## [Unreleased] - 2026-11-06 - A delete made during a sync is no longer lost; the console names a server copy that brings a deleted item back
 
 ### Fixed
