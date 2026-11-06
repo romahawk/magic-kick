@@ -1067,9 +1067,11 @@ export const useAppStore = create<AppState>()(
             orderById.set(task.id, index + 1)
           })
 
+          // Only a task whose position changed is stamped and queued. Re-stamping the whole list let a device
+          // with an old copy push tasks that were deleted elsewhere back as "newer".
           const tasks = s.tasks.map((task) => {
             const nextOrder = orderById.get(task.id)
-            if (!nextOrder) return task
+            if (!nextOrder || task.order === nextOrder) return task
             return {
               ...task,
               order: nextOrder,
@@ -1080,7 +1082,7 @@ export const useAppStore = create<AppState>()(
 
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const task of nextActive) {
-            pendingTasks[task.id] = ts
+            if (orderById.get(task.id) !== task.order) pendingTasks[task.id] = ts
           }
 
           return {
@@ -1145,6 +1147,7 @@ export const useAppStore = create<AppState>()(
                 deleted: false,
               }
             }
+            if (task.order === nextOrder) return task // not moved: leave its stamp alone (see reorderTasks)
             return {
               ...task,
               order: nextOrder,
@@ -1155,7 +1158,7 @@ export const useAppStore = create<AppState>()(
 
           const pendingTasks = { ...s.sync.pending.tasks }
           for (const task of nextActive) {
-            pendingTasks[task.id] = ts
+            if (task.id === taskId || orderById.get(task.id) !== task.order) pendingTasks[task.id] = ts
           }
 
           return {
