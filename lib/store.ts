@@ -447,7 +447,8 @@ export interface AppState {
 
   setSyncStatus: (status: SyncState["status"], error?: string | null) => void
   markPending: (collection: SyncCollection, id: string, clientUpdatedAt?: number) => void
-  clearPending: (changes: Array<{ collection: SyncCollection; id: string }>) => void
+  /** `stamp` is the pending timestamp the push was built from: a newer change (a delete made while the push ran) stays pending. */
+  clearPending: (changes: Array<{ collection: SyncCollection; id: string; stamp?: number }>) => void
   setCurrentUid: (uid: string | null) => void
   setLastPulledAt: (timestamp: number | null) => void
   setLastSyncedAt: (timestamp: number | null) => void
@@ -2576,6 +2577,8 @@ export const useAppStore = create<AppState>()(
             journal: { ...s.sync.pending.journal },
           }
           for (const change of changes) {
+            const current = nextPending[change.collection][change.id]
+            if (change.stamp !== undefined && current !== undefined && current > change.stamp) continue
             delete nextPending[change.collection][change.id]
           }
           return {
