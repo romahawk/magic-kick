@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Unreleased] - 2026-11-07 - A removed due date now stays removed after a reload
+
+### Fixed
+- Removing a task's due date (the "×" on a task, "Remove from schedule", or dragging it off the calendar) only cleared it on the device you used. The sync wrote the task without the field, and the server kept the old due date, so after a reload the task came back as overdue in the Backlog. The sync now tells the server to delete the field, for a task's due date, completion date, estimate, pomodoros, project, milestone, notes and repeat days. A task whose due date you removed before this fix still has the old date on the server: remove it once more after the update.
+
+---
+
 ## [Unreleased] - 2026-11-06 - Reordering or moving a task no longer brings back tasks you deleted
 
 ### Fixed

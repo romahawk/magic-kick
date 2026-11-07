@@ -1,6 +1,7 @@
 import {
   Timestamp,
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -135,6 +136,12 @@ export interface PendingWrite {
   collection: EntityCollection | "profile"
   id: string
   data: Record<string, unknown>
+  /** Fields the item no longer has; `merge: true` alone would leave them on the server. */
+  clear?: string[]
+}
+
+function deletions(clear: string[] | undefined) {
+  return Object.fromEntries((clear ?? []).map((field) => [field, deleteField()]))
 }
 
 export async function pushPendingWrites(uid: string, writes: PendingWrite[]) {
@@ -147,6 +154,7 @@ export async function pushPendingWrites(uid: string, writes: PendingWrite[]) {
         profileRef(uid),
         {
           ...(stripUndefined(write.data) as Record<string, unknown>),
+          ...deletions(write.clear),
           updatedAt: serverTimestamp(),
           createdAt: write.data.createdAt ?? serverTimestamp(),
         },
@@ -159,6 +167,7 @@ export async function pushPendingWrites(uid: string, writes: PendingWrite[]) {
       ref,
       {
         ...(stripUndefined(write.data) as Record<string, unknown>),
+        ...deletions(write.clear),
         updatedAt: serverTimestamp(),
         createdAt: write.data.createdAt ?? serverTimestamp(),
       },

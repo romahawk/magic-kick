@@ -22,6 +22,33 @@ function getEntityById(state: AppState, collection: EntityCollection, id: string
   return state[collection].find((item) => item.id === id)
 }
 
+/**
+ * Task fields the app can clear. A push writes with `merge: true` and drops undefined values, so a field
+ * that is simply missing would stay on the server and come back on the next pull (a removed due date
+ * returned as overdue). Local storage also drops undefined keys, so absence has to count as "cleared".
+ */
+const CLEARABLE_TASK_FIELDS = [
+  "dueDate",
+  "completedAt",
+  "estimateMin",
+  "pomodorosPlanned",
+  "linkedProjectId",
+  "milestoneId",
+  "notes",
+  "recurrenceDays",
+] as const
+
+/** Fields to delete on the server: explicit undefined values, plus the clearable fields a task lacks. */
+export function fieldsToClear(collection: EntityCollection | "profile", data: Record<string, unknown>): string[] {
+  const keys = new Set(Object.keys(data).filter((key) => data[key] === undefined))
+  if (collection === "tasks") {
+    for (const key of CLEARABLE_TASK_FIELDS) {
+      if (data[key] === undefined) keys.add(key)
+    }
+  }
+  return Array.from(keys)
+}
+
 export function buildPendingWrites(state: AppState): PendingWrite[] {
   const writes: PendingWrite[] = []
 
@@ -33,6 +60,7 @@ export function buildPendingWrites(state: AppState): PendingWrite[] {
       data: {
         ...state.profile,
       },
+      clear: fieldsToClear("profile", { ...state.profile }),
     })
   }
 
@@ -47,6 +75,7 @@ export function buildPendingWrites(state: AppState): PendingWrite[] {
         data: {
           ...item,
         },
+        clear: fieldsToClear(collection, { ...item }),
       })
     }
   }
